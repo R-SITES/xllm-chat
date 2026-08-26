@@ -214,7 +214,7 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .send-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .stop-btn{background:var(--red);font-size:16px}
 .stop-btn:hover{opacity:.85;transform:scale(1.05)}
-.jump-stack{position:fixed;bottom:78px;right:max(calc((100vw - 820px)/2),16px);display:flex;flex-direction:column;gap:8px;z-index:50}
+.jump-stack{position:fixed;bottom:78px;right:max(calc((100vw - 820px)/2),16px);display:flex;flex-direction:column;gap:8px;z-index:50;will-change:transform;transform:translateZ(0)}
 .jump-btn{width:44px;height:44px;border-radius:50%;border:1px solid var(--border);background:var(--bg3);color:var(--dim);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;box-shadow:0 4px 14px rgba(0,0,0,.4)}
 .jump-btn:hover{color:var(--text);border-color:var(--accent);transform:scale(1.05)}
 .jump-btn:disabled{opacity:.4;cursor:default;transform:none;border-color:var(--border)}
@@ -299,7 +299,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="new-chat-btn" onclick="newChat();toggleSidebar();" title="Start a new chat">＋ New Chat</button>
   </div>
   <div class="sidebar-body" id="chatHistory"></div>
-  <div class="sidebar-footer">vLLM Chat v1.6.2</div>
+  <div class="sidebar-footer">vLLM Chat v1.6.3</div>
 </div>
 
 <div class="header">
@@ -388,10 +388,10 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
 </div>
 
 <div class="jump-stack" id="jumpStack">
-  <button class="jump-btn" id="jumpBtn" onclick="jumpUp()" title="Go to top of this message — click again for the one above">
+  <button class="jump-btn" id="jumpBtn" title="Go to top of this message — click again for the one above">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="m18 15-6-6-6 6"/></svg>
   </button>
-  <button class="jump-btn" id="jumpDownBtn" onclick="jumpDown()" title="Go to the next message below">
+  <button class="jump-btn" id="jumpDownBtn" title="Go to the next message below">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="m6 9 6 6 6-6"/></svg>
   </button>
 </div>
@@ -3136,6 +3136,9 @@ function deleteMessage(btn) {
       const h = parseInt(el.dataset.hidx, 10);
       if (!isNaN(h) && h >= idx) el.remove();
     });
+    // messages were removed WITHOUT renderAllMessages — reset the walk index or
+    // _jumpIndex can point past the end and the jump buttons go dead (2026-08-26)
+    resetJumpIndex();
   }
   updateTokenBar();
   saveCurrentChat();
@@ -3472,6 +3475,7 @@ async function streamResponse() {
       }
     }
     updateTokenBar();
+    resetJumpIndex();   // stream finished -> walk restarts from the newest message
   } catch (e) {
     if (msgStatsTimer) { clearInterval(msgStatsTimer); msgStatsTimer = null; }
     if (e.name === 'AbortError') {
@@ -3484,6 +3488,7 @@ async function streamResponse() {
       const totalMs = Date.now() - streamStartTime;
       msgStatsEl.innerHTML = statsBarHTML(streamTokens, totalMs, totalMs > 0 ? (streamTokens / (totalMs / 1000)) : 0, false, currentModel);
     }
+    resetJumpIndex();   // stream ended (stop/error) -> walk restarts from the newest message
   }
   msgStatsEl = null;
 }
@@ -3747,6 +3752,7 @@ function _updateJumpButtons() {
 function jumpUp() {
   const msgs = _jumpMsgs();
   if (!msgs.length) return;
+  if (_jumpIndex >= msgs.length) _jumpIndex = msgs.length - 1;   // clamp stale index (dead-button guard)
   if (_jumpIndex === -1) _jumpIndex = msgs.length - 1;   // first click: last response
   else if (_jumpIndex > 0) _jumpIndex--;                 // then walk up
   _scrollToMsg(msgs[_jumpIndex]);
@@ -3756,6 +3762,7 @@ function jumpUp() {
 function jumpDown() {
   const msgs = _jumpMsgs();
   if (!msgs.length) return;
+  if (_jumpIndex >= msgs.length) _jumpIndex = msgs.length - 1;   // clamp stale index (dead-button guard)
   if (_jumpIndex === -1) _jumpIndex = msgs.length - 1;   // first click: newest response
   else if (_jumpIndex < msgs.length - 1) _jumpIndex++;   // then walk down
   _scrollToMsg(msgs[_jumpIndex]);
@@ -3763,6 +3770,21 @@ function jumpDown() {
 }
 
 function resetJumpIndex() { _jumpIndex = -1; _updateJumpButtons(); }
+
+// Delegated, POSITION-based click handling for the jump buttons (2026-08-26):
+// a GPU compositor hit-test glitch can route the click to a different element
+// after heavy repaints (long streams) — the event still bubbles to document,
+// so hit-test by coordinates in addition to the normal target check.
+document.addEventListener('click', (e) => {
+  const up = document.getElementById('jumpBtn');
+  const down = document.getElementById('jumpDownBtn');
+  const inRect = (btn) => {
+    const r = btn.getBoundingClientRect();
+    return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+  };
+  if (up && (up.contains(e.target) || inRect(up))) { if (!up.disabled) jumpUp(); return; }
+  if (down && (down.contains(e.target) || inRect(down))) { if (!down.disabled) jumpDown(); return; }
+});
 
 function exportChat() {
   if (!conversationHistory.length) return showToast('No messages');
