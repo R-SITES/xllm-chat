@@ -43,6 +43,10 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .stat-item .val{color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
 .stat-item.live{border-color:var(--accentLine);background:var(--accentSoft)}
 .stat-item.live .val{color:var(--green)}
+/* Header live-stats pills (tok/s + tokens) hidden 2026-08-26 — pure display, redundant with
+   the per-message stats bar; JS still updates them (must stay in DOM), !important beats the
+   inline display:'' that startStatsTracking sets. */
+#statTokSec, #statTokens{display:none!important}
 .chat-area{flex:1;overflow-y:auto;padding:20px 0}
 .messages{max-width:880px;width:100%;margin:0 auto;padding:0 24px}
 .msg{display:flex;gap:12px;margin-bottom:24px;animation:fadeIn .2s ease}
@@ -299,7 +303,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="new-chat-btn" onclick="newChat();toggleSidebar();" title="Start a new chat">＋ New Chat</button>
   </div>
   <div class="sidebar-body" id="chatHistory"></div>
-  <div class="sidebar-footer">vLLM Chat v1.6.3</div>
+  <div class="sidebar-footer">vLLM Chat v1.6.4</div>
 </div>
 
 <div class="header">
