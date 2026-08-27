@@ -1,6 +1,6 @@
 # vLLM Chat
 
-![vLLM Chat](screenshot-vllm-chat.png)
+![vLLM Chat](screenshot-vllm-chat.gif)
 
 A llama.cpp-style chat window for [vLLM](https://github.com/vllm-project/vllm)'s OpenAI-compatible API. Single-file HTML frontend + a tiny Python static server. Built to run locally against your own vLLM instance.
 
