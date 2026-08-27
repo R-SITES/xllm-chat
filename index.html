@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>vLLM Chat</title>
 <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="favicon-16.png" sizes="16x16" type="image/png">
@@ -164,22 +167,23 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .input-area{padding:12px 16px;background:var(--bg2);border-top:1px solid var(--border);flex-shrink:0}
 /* System prompt collapsible bar — same width as the chat input (820px) */
 .sys-prompt-area{max-width:820px;width:100%;margin:0 auto;padding:10px 16px 0;flex-shrink:0}
-.sys-prompt-bar{display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;cursor:pointer;user-select:none;font-size:12px;color:var(--dim);transition:border-color .15s,color .15s}
+.sys-prompt-bar{display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:0 0 10px 10px;cursor:pointer;user-select:none;font-size:12px;color:var(--dim);transition:border-color .15s,color .15s;margin-bottom:5px;box-shadow:0 1px 5px rgba(0,0,0,.10)}
 .sys-prompt-bar:hover{border-color:var(--accent);color:var(--text)}
 .sys-prompt-bar.has-prompt{border-color:var(--accentStrong);color:var(--accent)}
 .sys-prompt-bar .sp-label{font-weight:600}
 .sys-prompt-bar .sp-status{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;opacity:.85}
 .sys-prompt-bar .sp-chevron{transition:transform .2s}
 .sys-prompt-bar.open .sp-chevron{transform:rotate(180deg)}
+.sys-prompt-bar.open{margin-bottom:0}   /* expanded: the panel's own 8px padding-top handles the gap */
 .sys-prompt-panel{padding-top:8px}
-.sys-prompt-panel textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-size:13px;font-family:var(--font);resize:vertical;min-height:90px;outline:none;line-height:1.5}
+.sys-prompt-panel textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:0 0 10px 10px;padding:10px 14px;color:var(--text);font-size:13px;font-family:var(--font);resize:vertical;min-height:90px;outline:none;line-height:1.5}
 .sys-prompt-panel textarea:focus{border-color:var(--accent)}
 .sp-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
 .sp-btn{padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer;font-size:12px;font-family:var(--font);transition:all .15s}
 .sp-btn:hover{border-color:var(--accent);color:var(--accent)}
 .sp-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .sp-btn.primary:hover{opacity:.85}
-.input-container{max-width:820px;margin:0 auto;display:flex;gap:8px;align-items:flex-end}
+.input-container{max-width:820px;margin:0 auto;display:flex;gap:8px;align-items:flex-end;padding:2px;border:1px solid var(--border);border-radius:10px;background:var(--bg3)}
 .input-wrap{flex:1;position:relative}
 #chatInput{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:10px 16px;color:var(--text);font-size:14px;font-family:var(--font);resize:none;outline:none;min-height:42px;max-height:200px;line-height:1.4;transition:border-color .15s}
 #chatInput:focus{border-color:var(--accent)}
@@ -338,7 +342,25 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
 .bg-ov-toggle input{accent-color:var(--accent)}
 .new-chat-btn{width:100%;padding:10px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:13px;cursor:pointer;font-family:var(--font);margin-bottom:12px;transition:opacity .15s}
 .new-chat-btn:hover{opacity:.85}
-.sidebar-footer{padding:8px 16px;border-top:1px solid var(--border);color:var(--dim);font-size:11px;text-align:center;flex-shrink:0}
+.sidebar-footer{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 10px;border-top:1px solid var(--border);color:var(--dim);font-size:11px;text-align:center;flex-shrink:0}
+.sidebar-footer .footer-version{flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sidebar-footer .icon-btn{width:28px;height:28px;border-radius:7px;flex-shrink:0}
+.sidebar-footer .icon-btn svg{width:15px;height:15px}
+/* ── Export/Import modals (sidebar footer) ── */
+.export-modal{width:480px}
+.export-all-row{display:flex;align-items:center;gap:8px;margin-top:4px;margin-bottom:10px;font-size:13px;color:var(--text);font-weight:500;cursor:pointer}
+.export-all-row input{width:auto;margin:0;accent-color:var(--accent);cursor:pointer}
+.export-chat-list{max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.export-chat-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;cursor:pointer;min-width:0}
+.export-chat-item:hover{background:var(--bg3)}
+.export-chat-item input{width:auto;margin:0;flex-shrink:0;accent-color:var(--accent);cursor:pointer}
+.export-chat-item .title{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;color:var(--text)}
+.export-chat-item .date{font-size:11px;color:var(--dim);flex-shrink:0}
+.import-hint{font-size:12.5px;color:var(--dim);margin:0 0 14px;line-height:1.5}
+.import-pick-btn{width:100%;padding:10px;font-size:13.5px}
+.import-status{font-size:12.5px;margin-top:12px;min-height:18px;line-height:1.5}
+.import-status.ok{color:var(--accent)}
+.import-status.err{color:var(--red)}
 .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:2000;animation:fadeIn .2s}
 </style>
 <script>
@@ -387,7 +409,15 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="sidebar-search-clear" id="chatSearchClear" onclick="clearChatSearch()" title="Clear filter">✕</button>
   </div>
   <div class="sidebar-body" id="chatHistory"></div>
-  <div class="sidebar-footer">vLLM Chat v2.2.6</div>
+  <div class="sidebar-footer">
+    <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
+    </button>
+    <span class="footer-version">vLLM Chat v2.2.7</span>
+    <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    </button>
+  </div>
 </div>
 
 <div class="header">
@@ -590,6 +620,33 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <div class="btn-row">
       <button class="btn" onclick="closeRename()">Cancel</button>
       <button class="btn primary" onclick="saveRename()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Export chats (sidebar footer) — select all or individual chats, download JSON -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal export-modal">
+    <h2>Export Chats</h2>
+    <label class="export-all-row"><input type="checkbox" id="exportSelectAll" onchange="exportToggleAll(this)" checked> <span>Select all chats</span></label>
+    <div class="export-chat-list" id="exportChatList"></div>
+    <div class="btn-row">
+      <button class="btn" onclick="closeExportModal()">Cancel</button>
+      <button class="btn primary" onclick="doExportSelected()">Export JSON</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import chats (sidebar footer) — pick a JSON export file -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal">
+    <h2>Import Chats</h2>
+    <p class="import-hint">Select a JSON file exported from vLLM Chat. Imported chats are added; chats with the same ID are updated.</p>
+    <input type="file" id="importFileInput" accept=".json,application/json" style="display:none" onchange="importChatsFromFile(this)">
+    <button class="btn primary import-pick-btn" onclick="document.getElementById('importFileInput').click()">Select File</button>
+    <div class="import-status" id="importStatus"></div>
+    <div class="btn-row">
+      <button class="btn" onclick="closeImportModal()">Close</button>
     </div>
   </div>
 </div>
@@ -2576,6 +2633,7 @@ let TOP_P = parseFloat(localStorage.getItem('chat_top_p') || '0.9');
 let currentModel = localStorage.getItem('chat_current_model') || '';
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
+const APP_VERSION = '2.2.7';   // keep in sync with the sidebar footer version text
 let abortController = null;
 let isStreaming = false;
 let currentStreamingEl = null;
@@ -3305,13 +3363,8 @@ function exportThread(chatId) {
   const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
   const chat = chats.find(c => c.id === chatId);
   if (!chat || !(chat.messages || []).length) return showToast('No messages');
-  const text = (chat.messages || []).map(m => `${m.role.toUpperCase()}: ${m.content || ''}`).join('\n\n');
   const base = (threadTitle(chat.title) || 'chat').replace(/[^a-z0-9 _-]+/gi, '').trim().replace(/\s+/g, '-').slice(0, 60) || 'chat';
-  const blob = new Blob([text], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = base + '.txt'; a.click();
-  URL.revokeObjectURL(url);
+  downloadJson(base + '_' + new Date().toISOString().slice(0, 10) + '.json', chatExportEnvelope([chat]));
   showToast('Chat exported');
 }
 document.addEventListener('click', (e) => {
@@ -4230,12 +4283,143 @@ document.addEventListener('click', (e) => {
   if (down && (down.contains(e.target) || inRect(down))) { if (!down.disabled) jumpDown(); return; }
 });
 
-function exportChat() {
-  if (!conversationHistory.length) return showToast('No messages');
-  const blob = new Blob([conversationHistory.map(m => `${m.role.toUpperCase()}: ${m.content||''}`).join('\n\n')], {type:'text/plain'});
+// ---- Export / Import (JSON) ----
+function downloadJson(filename, obj) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = `chat_${new Date().toISOString().slice(0,10)}.txt`; a.click();
-  URL.revokeObjectURL(url); showToast('Exported');
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+function chatExportEnvelope(chats) {
+  return { app: 'vLLM Chat', version: APP_VERSION, type: 'vllm-chat-export', exportedAt: new Date().toISOString(), chats };
+}
+function exportChat() {   // header button — current chat only
+  if (!conversationHistory.length) return showToast('No messages');
+  const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+  const stored = currentChatId ? chats.find(c => c.id === currentChatId) : null;
+  const chat = {
+    id: currentChatId || ('chat_' + Date.now()),
+    title: stored ? stored.title : threadTitle(conversationHistory.find(m => m.role === 'user')?.content),
+    created: stored ? stored.created : Date.now(),
+    messages: JSON.parse(JSON.stringify(conversationHistory)),
+    ...(SYSTEM_PROMPT ? { systemPrompt: SYSTEM_PROMPT } : {}),
+    ...(stored && stored.renamed ? { renamed: true } : {}),
+    ...(stored && stored.pinned ? { pinned: true } : {})
+  };
+  downloadJson(`chat_${new Date().toISOString().slice(0,10)}.json`, chatExportEnvelope([chat]));
+  showToast('Exported');
+}
+
+// ── Export modal (sidebar footer) — select all or individual chats → JSON ──
+function openExportModal() {
+  const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+  // same ordering as the sidebar list: pinned first, then recency
+  const sorted = [...chats.filter(c => c.pinned), ...chats.filter(c => !c.pinned)];
+  const list = document.getElementById('exportChatList');
+  const all = document.getElementById('exportSelectAll');
+  if (!sorted.length) {
+    list.innerHTML = '<p style="padding:10px;color:var(--dim);font-size:12.5px;text-align:center">No chats to export</p>';
+    all.checked = false; all.disabled = true;
+  } else {
+    list.innerHTML = sorted.map(c => `
+      <label class="export-chat-item">
+        <input type="checkbox" value="${escAttr(c.id)}" checked>
+        <span class="title">${escHtml(threadTitle(c.title))}</span>
+        <span class="date">${formatDate(c.created)}</span>
+      </label>`).join('');
+    all.checked = true; all.disabled = false;
+  }
+  document.getElementById('exportModal').classList.add('show');
+}
+function closeExportModal() {
+  document.getElementById('exportModal').classList.remove('show');
+}
+function exportToggleAll(el) {
+  document.querySelectorAll('#exportChatList input[type=checkbox]').forEach(cb => cb.checked = el.checked);
+}
+function doExportSelected() {
+  const ids = new Set([...document.querySelectorAll('#exportChatList input[type=checkbox]:checked')].map(cb => cb.value));
+  if (!ids.size) return showToast('Select at least one chat');
+  const chats = JSON.parse(localStorage.getItem('chat_history') || '[]').filter(c => ids.has(c.id));
+  downloadJson(`vllm-chats_${new Date().toISOString().slice(0,10)}.json`, chatExportEnvelope(chats));
+  showToast(`Exported ${chats.length} chat${chats.length > 1 ? 's' : ''}`);
+  closeExportModal();
+}
+
+// ── Import modal (sidebar footer) — pick a JSON export file ──
+function openImportModal() {
+  const status = document.getElementById('importStatus');
+  status.textContent = ''; status.className = 'import-status';
+  document.getElementById('importFileInput').value = '';
+  document.getElementById('importModal').classList.add('show');
+}
+function closeImportModal() {
+  document.getElementById('importModal').classList.remove('show');
+}
+function importChatsFromFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const status = document.getElementById('importStatus');
+  const reader = new FileReader();
+  reader.onload = () => {
+    let imported;
+    try {
+      const data = JSON.parse(reader.result);
+      imported = Array.isArray(data) ? data : (data && Array.isArray(data.chats) ? data.chats : null);
+      if (!imported) throw new Error('shape');
+    } catch (e) {
+      status.textContent = 'Invalid file — not a vLLM Chat JSON export.';
+      status.className = 'import-status err';
+      input.value = '';
+      return;
+    }
+    imported = imported.filter(c => c && typeof c === 'object' && c.id && Array.isArray(c.messages));
+    if (!imported.length) {
+      status.textContent = 'No valid chats found in this file.';
+      status.className = 'import-status err';
+      input.value = '';
+      return;
+    }
+    const norm = imported.map(c => ({
+      id: c.id,
+      title: c.title || '',
+      created: c.created || Date.now(),
+      messages: c.messages,
+      ...(c.systemPrompt !== undefined ? { systemPrompt: c.systemPrompt } : {}),
+      ...(c.renamed ? { renamed: true } : {}),
+      ...(c.pinned ? { pinned: true } : {})
+    }));
+    const store = JSON.parse(localStorage.getItem('chat_history') || '[]');
+    let added = 0, replaced = 0;
+    for (const chat of norm) {
+      const idx = store.findIndex(c => c.id === chat.id);
+      if (idx >= 0) { store[idx] = chat; replaced++; }
+      else { store.unshift(chat); added++; }
+    }
+    try {
+      let serialized = JSON.stringify(store);
+      if (serialized.length > 4500000) {
+        // same slim-down as saveCurrentChat: keep name/kind/size, drop attachment payloads
+        const slim = store.map(c => ({ ...c, messages: (c.messages || []).map(m => m.attachments
+          ? { ...m, attachments: m.attachments.map(a => ({ name: a.name, kind: a.kind, size: a.size })) }
+          : m) }));
+        serialized = JSON.stringify(slim);
+      }
+      localStorage.setItem('chat_history', serialized);
+    } catch (e) {
+      status.textContent = 'Import failed — chat storage is full.';
+      status.className = 'import-status err';
+      input.value = '';
+      return;
+    }
+    loadHistory();
+    const total = added + replaced;
+    status.textContent = `Imported ${total} chat${total > 1 ? 's' : ''} — ${added} new, ${replaced} updated.`;
+    status.className = 'import-status ok';
+    showToast('Chats imported');
+    input.value = '';
+  };
+  reader.readAsText(file);
 }
 
 function showToast(msg) {
@@ -4252,6 +4436,8 @@ document.addEventListener('click', (e) => {
 });
 document.getElementById('settingsModal').addEventListener('click', (e) => { if (e.target === document.getElementById('settingsModal')) closeSettings(); });
 document.getElementById('renameModal').addEventListener('click', (e) => { if (e.target === document.getElementById('renameModal')) closeRename(); });
+document.getElementById('exportModal').addEventListener('click', (e) => { if (e.target === document.getElementById('exportModal')) closeExportModal(); });
+document.getElementById('importModal').addEventListener('click', (e) => { if (e.target === document.getElementById('importModal')) closeImportModal(); });
 applyTheme(localStorage.getItem('chat_theme')||'blue', false);   // sync theme swatch active state (head already painted it)
 updateSysPromptBar(); updateTokenBar();
 (function initSidebarPin() {

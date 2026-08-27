@@ -66,14 +66,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=os.path.dirname(os.path.abspath(__file__)), **kwargs)
 
     def end_headers(self):
-        # no-cache: browsers must revalidate index.html (Last-Modified) instead
-        # of heuristic-caching it — otherwise UI fixes never reach the open tab
-        # without Ctrl+Shift+R (hit repeatedly: stale stats-bar, old flag state)
-        self.send_header("Cache-Control", "no-cache")
+        # no-store: the browser must NEVER keep index.html (all CSS/JS is
+        # inline), so every plain reload re-fetches — no Ctrl+Shift+R, and
+        # the user never has to clear browsing data (which wiped his chats once).
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
         super().end_headers()
 
     def log_message(self, format, *args):
-        pass
+        # keep the access log ON (2026-08-27): needed to prove whether a
+        # browser actually fetched the page (stale-tab debugging) — the old
+        # `pass` made "why is my profile showing an old page?" undiagnosable
+        print(f"[{self.log_date_time_string()}] {self.client_address[0]} {format % args}", flush=True)
 
     def do_POST(self):
         if self.path != "/api/extract":
@@ -107,6 +112,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
 
-with socketserver.TCPServer(("", PORT), Handler) as httpd:
+with http.server.ThreadingHTTPServer(("", PORT), Handler) as httpd:
     print(f"Chat server running on port {PORT}")
     httpd.serve_forever()
