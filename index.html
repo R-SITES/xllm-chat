@@ -301,14 +301,17 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .chat-area::-webkit-scrollbar-thumb:active,.bubble pre::-webkit-scrollbar-thumb:active,.thinking-block .thinking-content::-webkit-scrollbar-thumb:active,.modal::-webkit-scrollbar-thumb:active{background:var(--accentStrong);border:2px solid transparent;background-clip:content-box}
 /* ── Chat Background engine (2026-08-27) — fixed layers behind the app; when a background is
    active the main surfaces go translucent + blurred so messages stay readable ── */
-#chatBg{position:fixed;inset:0;z-index:0;background-size:cover;background-position:center;background-repeat:no-repeat}
+#chatBg{position:fixed;inset:0;z-index:0;background-size:cover;background-position:center;background-repeat:no-repeat;pointer-events:none}
 #chatBg iframe{width:100%;height:100%;border:0;pointer-events:none;display:block}
 #chatBgOverlay{position:fixed;inset:0;z-index:1;pointer-events:none;display:none}
 #bgOv1,#bgOv2{position:absolute;inset:0}
 #bgOv1{background:var(--bgOv1,#000)}
 #bgOv2{background:var(--bgOv2,#000);animation:bgCrossfade 10s ease-in-out infinite alternate}
 @keyframes bgCrossfade{0%{opacity:0}45%{opacity:0}55%{opacity:1}100%{opacity:1}}
-body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-bg .chat-area,body.has-bg .input-container,body.has-bg .attach-bar{background:color-mix(in srgb,var(--bg) 74%,transparent);backdrop-filter:blur(6px)}
+/* Chat area shows the background nearly clean (no blur — bubbles are opaque so text stays
+   readable); only the chrome surfaces (header/sidebar/input) keep a frost for their own text. */
+body.has-bg .chat-area{background:color-mix(in srgb,var(--bg) 38%,transparent)}
+body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-bg .input-container,body.has-bg .attach-bar{background:color-mix(in srgb,var(--bg) 72%,transparent);backdrop-filter:blur(5px)}
 .bg-unmute-btn{position:fixed;right:14px;bottom:88px;z-index:1200;width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:rgba(0,0,0,.55);color:#fff;cursor:pointer;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);transition:background .15s}
 .bg-unmute-btn:hover{background:rgba(0,0,0,.8)}
 .bg-type-row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
@@ -384,7 +387,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="sidebar-search-clear" id="chatSearchClear" onclick="clearChatSearch()" title="Clear filter">✕</button>
   </div>
   <div class="sidebar-body" id="chatHistory"></div>
-  <div class="sidebar-footer">vLLM Chat v2.2.1</div>
+  <div class="sidebar-footer">vLLM Chat v2.2.5</div>
 </div>
 
 <div class="header">
@@ -412,7 +415,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
       <select id="modelSelect" title="Model" onchange="selectModel(this.value)"></select>
     </div>
     <button class="icon-btn" onclick="openSettings()" title="Settings">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.46.27a2 2 0 0 0-1.54.5l-.2.18a2 2 0 0 1-1.06 2.43l.14.46a2 2 0 0 1 0 1.92l-.14.47a2 2 0 0 1-.18.93l-.52.52a2 2 0 0 0 0 2.82l.52.52a2 2 0 0 1 .18.93l.14.47a2 2 0 0 1 0 1.92l.2.18a2 2 0 0 0 1.54.5l.46.27a2 2 0 0 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.46-.27a2 2 0 0 0 1.54-.5l.2-.18a2 2 0 0 1 1.06 2.43l.14.46a2 2 0 0 1 0 1.92l.14.47a2 2 0 0 1 .18.93l.52.52a2 2 0 0 0 0 2.82l.52.52a2 2 0 0 1-.18.93l-.14.47a2 2 0 0 1 0 1.92l-.2-.18a2 2 0 0 0-1.54-.5l-.46-.27a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.46.27a2 2 0 0 0-1.54.5l-.2.18a2 2 0 0 1-1.06 2.43l.14.46a2 2 0 0 1 0 1.92l-.14.47a2 2 0 0 1-.18.93l-.52.52a2 2 0 0 0 0 2.82l.52.52a2 2 0 0 1 .18.93l.14.47a2 2 0 0 1 0 1.92l.2.18a2 2 0 0 0 1.54.5l.46.27a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.46-.27a2 2 0 0 0 1.54-.5l.2-.18a2 2 0 0 1 1.06 2.43l.14.46a2 2 0 0 1 0 1.92l.14.47a2 2 0 0 1 .18.93l.52.52a2 2 0 0 0 0 2.82l.52.52a2 2 0 0 1-.18.93l-.14.47a2 2 0 0 1 0 1.92l-.2-.18a2 2 0 0 0-1.54-.5l-.46-.27a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
     </button>
     <button class="icon-btn" onclick="exportChat()" title="Export Chat">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
@@ -2851,10 +2854,17 @@ let bgMuted = true;
 function loadBgState() {
   for (const k of Object.keys(BG_DEFAULTS)) {
     const v = localStorage.getItem('chat_bg_' + k);
-    if (v !== null) BG[k] = (typeof BG_DEFAULTS[k] === 'boolean') ? v === 'true' : v;
+    if (v === null || v === '' || v === 'null') continue;   // absent/empty/null-string -> keep default (2026-08-27: 'null' string fix)
+    BG[k] = (typeof BG_DEFAULTS[k] === 'boolean') ? v === 'true' : v;
   }
 }
-function saveBgState() { for (const k of Object.keys(BG_DEFAULTS)) localStorage.setItem('chat_bg_' + k, BG[k]); }
+function saveBgState() {
+  for (const k of Object.keys(BG_DEFAULTS)) {
+    const v = BG[k];
+    // never persist null as the string "null" — it comes back truthy and renders url("null")
+    localStorage.setItem('chat_bg_' + k, (v === null || v === undefined) ? '' : String(v));
+  }
+}
 function hexToRgba(hex, a) {
   let h = hex.replace('#', '');
   if (h.length === 3) h = h.split('').map(c => c + c).join('');
@@ -2882,11 +2892,31 @@ function updateBgMuteBtn() {
     ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>'
     : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
 }
+function cmdToBgPlayer(func, args) {
+  const f = document.querySelector('#chatBg iframe');
+  if (!f) return;
+  try { f.contentWindow.postMessage(JSON.stringify({ event: 'command', func: func, args: args || [] }), '*'); } catch (e) {}
+}
+// Wire mute/caption control into the YouTube player. Also force captions OFF — the embed
+// inherits the signed-in account's caption preference, which showed CC on the user's video (2026-08-27).
+function wireBgPlayer(f) {
+  if (!f) return;
+  const onMsg = (e) => {
+    if (e.source !== f.contentWindow) return;
+    let d; try { d = JSON.parse(e.data); } catch (err) { return; }
+    // onReady/listening = player up; onStateChange = also fires when a playlist advances to the
+    // next video (loadNewVideoConfig) — captions can return per video, so re-kill on every state change
+    if (d.event === 'onReady' || d.event === 'listening' || d.event === 'onStateChange') cmdToBgPlayer('unloadModule', ['captions']);
+  };
+  window.addEventListener('message', onMsg);
+  f.addEventListener('load', () => setTimeout(() => cmdToBgPlayer('unloadModule', ['captions']), 400));
+}
 function toggleBgMute() {
   const f = document.querySelector('#chatBg iframe');
   if (!f) return;
   bgMuted = !bgMuted;
-  try { f.contentWindow.postMessage(JSON.stringify({ event: 'command', func: bgMuted ? 'mute' : 'unMute', args: [] }), '*'); } catch (e) {}
+  cmdToBgPlayer(bgMuted ? 'mute' : 'unMute');
+  if (!bgMuted) cmdToBgPlayer('unloadModule', ['captions']);
   updateBgMuteBtn();
 }
 function applyChatBg() {
@@ -2912,6 +2942,7 @@ function applyChatBg() {
       f.allow = 'autoplay; encrypted-media';
       f.title = 'Chat background video';
       bg.appendChild(f);
+      wireBgPlayer(f);   // mute/unmute + force captions off
       if (unmute) { unmute.style.display = 'flex'; bgMuted = true; updateBgMuteBtn(); }
     }
   }
