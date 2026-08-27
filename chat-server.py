@@ -77,8 +77,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         # keep the access log ON (2026-08-27): needed to prove whether a
         # browser actually fetched the page (stale-tab debugging) — the old
-        # `pass` made "why is my profile showing an old page?" undiagnosable
-        print(f"[{self.log_date_time_string()}] {self.client_address[0]} {format % args}", flush=True)
+        # `pass` made "why is my profile showing an old page?" undiagnosable.
+        # Guard the write: if the parent session died and stdout is an
+        # orphaned pipe, an uncaught BrokenPipeError here kills the request
+        # handler (empty reply on every request — hit live 2026-08-27).
+        try:
+            print(f"[{self.log_date_time_string()}] {self.client_address[0]} {format % args}", flush=True)
+        except (BrokenPipeError, OSError):
+            pass
 
     def do_POST(self):
         if self.path != "/api/extract":

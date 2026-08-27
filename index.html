@@ -166,7 +166,7 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 @keyframes typing{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-4px)}}
 .input-area{padding:12px 16px;background:var(--bg2);border-top:1px solid var(--border);flex-shrink:0}
 /* System prompt collapsible bar — same width as the chat input (820px) */
-.sys-prompt-area{max-width:820px;width:100%;margin:0 auto;padding:10px 16px 0;flex-shrink:0}
+.sys-prompt-area{max-width:820px;width:100%;margin:0 auto;padding:10px 16px 0;flex-shrink:0;border-style:none;border-radius:0 0 10px 10px}
 .sys-prompt-bar{display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:0 0 10px 10px;cursor:pointer;user-select:none;font-size:12px;color:var(--dim);transition:border-color .15s,color .15s;margin-bottom:5px;box-shadow:0 1px 5px rgba(0,0,0,.10)}
 .sys-prompt-bar:hover{border-color:var(--accent);color:var(--text)}
 .sys-prompt-bar.has-prompt{border-color:var(--accentStrong);color:var(--accent)}
@@ -413,7 +413,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">vLLM Chat v2.2.7</span>
+    <span class="footer-version">vLLM Chat v2.2.8</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -2633,7 +2633,7 @@ let TOP_P = parseFloat(localStorage.getItem('chat_top_p') || '0.9');
 let currentModel = localStorage.getItem('chat_current_model') || '';
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '2.2.7';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '2.2.8';   // keep in sync with the sidebar footer version text
 let abortController = null;
 let isStreaming = false;
 let currentStreamingEl = null;
