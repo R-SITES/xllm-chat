@@ -387,7 +387,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="sidebar-search-clear" id="chatSearchClear" onclick="clearChatSearch()" title="Clear filter">✕</button>
   </div>
   <div class="sidebar-body" id="chatHistory"></div>
-  <div class="sidebar-footer">vLLM Chat v2.2.5</div>
+  <div class="sidebar-footer">vLLM Chat v2.2.6</div>
 </div>
 
 <div class="header">
@@ -2892,20 +2892,23 @@ function updateBgMuteBtn() {
     ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>'
     : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
 }
+let bgCapTimer = null;
+function stopBgCapWatchdog() { if (bgCapTimer) { clearInterval(bgCapTimer); bgCapTimer = null; } }
 function cmdToBgPlayer(func, args) {
   const f = document.querySelector('#chatBg iframe');
   if (!f) return;
   try { f.contentWindow.postMessage(JSON.stringify({ event: 'command', func: func, args: args || [] }), '*'); } catch (e) {}
 }
 // Wire mute/caption control into the YouTube player. Also force captions OFF — the embed
-// inherits the signed-in account's caption preference, which showed CC on the user's video (2026-08-27).
+// inherits the signed-in account's caption preference, and playlists re-init the captions
+// module per video (loadNewVideoConfig), so a 3s watchdog keeps re-killing it (2026-08-27).
 function wireBgPlayer(f) {
   if (!f) return;
   const onMsg = (e) => {
     if (e.source !== f.contentWindow) return;
     let d; try { d = JSON.parse(e.data); } catch (err) { return; }
     // onReady/listening = player up; onStateChange = also fires when a playlist advances to the
-    // next video (loadNewVideoConfig) — captions can return per video, so re-kill on every state change
+    // next video — captions can return per video, so re-kill on every state change
     if (d.event === 'onReady' || d.event === 'listening' || d.event === 'onStateChange') cmdToBgPlayer('unloadModule', ['captions']);
   };
   window.addEventListener('message', onMsg);
@@ -2926,6 +2929,7 @@ function applyChatBg() {
   if (!bg) return;
   bg.innerHTML = '';
   bg.style.background = '';
+  stopBgCapWatchdog();   // captions watchdog runs only while a video bg is active
   document.body.classList.toggle('has-bg', BG.type !== 'none');
   if (unmute) unmute.style.display = 'none';
   if (BG.type === 'color') {
@@ -2943,6 +2947,7 @@ function applyChatBg() {
       f.title = 'Chat background video';
       bg.appendChild(f);
       wireBgPlayer(f);   // mute/unmute + force captions off
+      bgCapTimer = setInterval(() => cmdToBgPlayer('unloadModule', ['captions']), 3000);   // playlist-advance captions watchdog
       if (unmute) { unmute.style.display = 'flex'; bgMuted = true; updateBgMuteBtn(); }
     }
   }
