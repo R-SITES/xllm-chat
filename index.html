@@ -273,7 +273,12 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .sidebar-header button.pin-sidebar-btn:hover{color:var(--text);background:var(--accentSoft)}
 .sidebar-header button.pin-sidebar-btn.pinned{color:var(--accent);background:var(--accentBg)}
 .sidebar-header button.pin-sidebar-btn.pinned:hover{color:var(--accent)}
-.sidebar-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px}
+.sidebar-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.sidebar-body::-webkit-scrollbar{width:8px}
+.sidebar-body::-webkit-scrollbar-track{background:transparent}
+.sidebar-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;border:2px solid transparent;background-clip:content-box}
+.sidebar-body::-webkit-scrollbar-thumb:hover{background:var(--accentLine);border:2px solid transparent;background-clip:content-box}
+.sidebar-body::-webkit-scrollbar-thumb:active{background:var(--accentStrong);border:2px solid transparent;background-clip:content-box}
 .new-chat-btn{width:100%;padding:10px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:13px;cursor:pointer;font-family:var(--font);margin-bottom:12px;transition:opacity .15s}
 .new-chat-btn:hover{opacity:.85}
 .sidebar-footer{padding:8px 16px;border-top:1px solid var(--border);color:var(--dim);font-size:11px;text-align:center;flex-shrink:0}
@@ -311,7 +316,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="new-chat-btn" onclick="newChat();if(!sidebarPinned) toggleSidebar();" title="Start a new chat">＋ New Chat</button>
   </div>
   <div class="sidebar-body" id="chatHistory"></div>
-  <div class="sidebar-footer">vLLM Chat v1.6.7</div>
+  <div class="sidebar-footer">vLLM Chat v1.6.8</div>
 </div>
 
 <div class="header">
@@ -3891,7 +3896,8 @@ updateSysPromptBar(); updateTokenBar();
   b.title = 'Unpin panel (allow auto-close)';
 })();
 (function restoreSidebar() {
-  if (localStorage.getItem('chat_sidebar_open') !== '1') return;
+  // Open by default: only a stored '0' (user chose closed) keeps it shut (2026-08-27)
+  if (localStorage.getItem('chat_sidebar_open') === '0') return;
   const sb = document.getElementById('sidebar');
   if (!sb) return;
   sb.style.transition = 'none';

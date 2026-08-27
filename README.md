@@ -15,7 +15,7 @@ A llama.cpp-style chat window for [vLLM](https://github.com/vllm-project/vllm)'s
 - **Message actions** — copy, recycle (re-run the prompt), delete (bubble + everything below)
 - **Jump buttons** — floating up/down chevrons to walk between messages
 - **Token context bar** — Big AGI-style segmented bar at the input's bottom edge (history / current message / max response, red on overflow); hover pops the exact context breakdown: model max tokens, this message, history, max response
-- **History** — sidebar with localStorage persistence, thread titles, per-thread model badges; the currently open conversation is highlighted in the list (theme-aware accent rail + tint)
+- **History** — sidebar with localStorage persistence, thread titles, per-thread model badges, a slim theme-aware scrollbar, and the panel open by default (your last open/closed choice still wins after you've set it); the currently open conversation is highlighted in the list (theme-aware accent rail + tint)
 - **Sidebar pin** — a panel icon next to the Chat History header keeps the chat-history panel open while you switch conversations (chat select and outside-click no longer auto-close it); click again for normal auto-close behavior, and both the pin choice and the panel's open/closed state persist across reloads
 - **Thread menu** — ⋯ menu on every conversation: rename (custom title that survives saves), pin (favorites float to the top with a pin glyph), export the thread as a .txt, or delete
 - **Edit messages** — ✎ on user messages: edit an old prompt and re-send; if a response existed, the old answer is kept and a ‹ n/N › pill flips between versions (llama.cpp/Qwen style, persists across reloads)
