@@ -375,16 +375,16 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     </div>
     <button onclick="toggleSidebar()">×</button>
   </div>
-  <div class="sidebar-search">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-    <input type="text" id="chatSearch" placeholder="Filter chats…" oninput="filterChats(this.value)" spellcheck="false">
-    <button class="sidebar-search-clear" id="chatSearchClear" onclick="clearChatSearch()" title="Clear filter">✕</button>
-  </div>
   <div style="padding:8px 8px 0">
     <button class="new-chat-btn" onclick="newChat();if(!sidebarPinned) toggleSidebar();" title="Start a new chat">＋ New Chat</button>
   </div>
+  <div class="sidebar-search">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    <input type="text" id="chatSearch" placeholder="Search chats..." oninput="filterChats(this.value)" onkeydown="if(event.key==='Enter')chatSearchEnter()" spellcheck="false" title="Type to filter titles — Enter to search chat contents">
+    <button class="sidebar-search-clear" id="chatSearchClear" onclick="clearChatSearch()" title="Clear filter">✕</button>
+  </div>
   <div class="sidebar-body" id="chatHistory"></div>
-  <div class="sidebar-footer">vLLM Chat v2.1.1</div>
+  <div class="sidebar-footer">vLLM Chat v2.2.1</div>
 </div>
 
 <div class="header">
@@ -3058,16 +3058,30 @@ function toggleSidebarPin() {
   btn.innerHTML = sidebarPinned ? ICON_PANEL : ICON_PANEL_CLOSE;
   btn.title = sidebarPinned ? 'Unpin panel (allow auto-close)' : 'Keep panel open';
 }
-let chatSearchQuery = '';   // live letter-filter for the chat list (2026-08-27)
+let chatSearchQuery = '';      // live letter-filter for the chat list (2026-08-27)
+let chatSearchMode = 'title';  // 'title' while typing; 'content' after Enter (full message search)
 function filterChats(v) {
   chatSearchQuery = v.trim().toLowerCase();
+  chatSearchMode = 'title';    // typing again always returns to live title filtering
   document.getElementById('chatSearchClear').classList.toggle('show', !!v.trim());
   loadHistory();
+}
+function chatSearchEnter() {
+  chatSearchMode = 'content';  // Enter = search inside the actual chat messages
+  document.getElementById('chatSearchClear').classList.toggle('show', !!chatSearchQuery);
+  loadHistory();
+}
+function chatMatchesContent(chat, q) {
+  return (chat.messages || []).some(m => {
+    const text = (m.content || '') + (m.thinking || '') + (m.attachments ? ' ' + m.attachments.map(a => a.name).join(' ') : '');
+    return text.toLowerCase().includes(q);
+  });
 }
 function clearChatSearch() {
   const inp = document.getElementById('chatSearch');
   inp.value = '';
   chatSearchQuery = '';
+  chatSearchMode = 'title';
   document.getElementById('chatSearchClear').classList.remove('show');
   loadHistory();
   inp.focus();
@@ -3079,9 +3093,14 @@ function loadHistory() {
     container.innerHTML = '<p style="padding:16px;color:var(--dim);font-size:13px;text-align:center">No conversations yet</p>';
     return;
   }
-  // live letter-filter: keep only titles containing the query (case-insensitive)
+  // search: while typing = live title filter; after Enter = full message-content search
+  // (content mode is a union — title matches stay visible, content matches join them)
   let list = chats;
-  if (chatSearchQuery) list = chats.filter(c => (c.title || '').toLowerCase().includes(chatSearchQuery));
+  if (chatSearchQuery) {
+    list = (chatSearchMode === 'content')
+      ? chats.filter(c => (c.title || '').toLowerCase().includes(chatSearchQuery) || chatMatchesContent(c, chatSearchQuery))
+      : chats.filter(c => (c.title || '').toLowerCase().includes(chatSearchQuery));
+  }
   if (!list.length) {
     container.innerHTML = '<p style="padding:16px;color:var(--dim);font-size:13px;text-align:center">No chats match “' + escHtml(chatSearchQuery) + '”</p>';
     return;

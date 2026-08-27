@@ -22,7 +22,7 @@ A llama.cpp-style chat window for [vLLM](https://github.com/vllm-project/vllm)'s
 - **Themes** — ten two-color themes in the settings modal, grouped as Dark and Light (Blue, Green, Purple, Orange, Teal each in a dark and a light variant): a single click re-themes the whole UI instantly and your choice persists across reloads
 - **Background streaming** — start a response, then browse any other chat: the render keeps running in the background and lands in the thread that started it (the chat you're reading is never touched, no scroll-jacking); return mid-render and the live bubble picks the stream back up; Stop keeps the partial output
 - **Chat background** — settings → Chat Background: a local image, an image URL, a YouTube video or playlist (muted autoplay with a bottom-right unmute button), or a color with a transparency slider; an optional overlay with two crossfading colors and its own transparency sits over any background, and the chat surfaces turn translucent + blurred so messages stay readable
-- **Chat filter** — a live letter-filter under the Chat History header narrows the chat list as you type (case-insensitive; pinned chats still float to the top of the results)
+- **Chat search** — a search box under the + New Chat button: typing live-filters the chat list by title (case-insensitive; pinned chats still float to the top); pressing Enter searches inside the actual chat messages and lists every chat containing the word or phrase (title matches stay in the results too)
 
 ## Run
 
