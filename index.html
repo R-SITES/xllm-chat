@@ -234,7 +234,10 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .modal .btn:hover{border-color:var(--accent);color:var(--accent)}
 .modal .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 /* ── Theme picker (settings modal) — front circle = accent (3px white ring), back circle = theme's base color, offset bottom-right ── */
-.theme-row{display:flex;gap:10px;margin-top:8px}
+.theme-groups{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.theme-group{display:flex;align-items:center;gap:10px}
+.theme-group-label{flex-shrink:0;width:34px;font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+.theme-row{display:flex;gap:10px}
 .theme-swatch{position:relative;width:44px;height:44px;padding:0;border:none;background:none;cursor:pointer;flex-shrink:0;border-radius:50%;transition:transform .12s}
 .theme-swatch:hover{transform:scale(1.07)}
 .theme-swatch.active{outline:2px solid var(--accent);outline-offset:2px}
@@ -279,6 +282,14 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .sidebar-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;border:2px solid transparent;background-clip:content-box}
 .sidebar-body::-webkit-scrollbar-thumb:hover{background:var(--accentLine);border:2px solid transparent;background-clip:content-box}
 .sidebar-body::-webkit-scrollbar-thumb:active{background:var(--accentStrong);border:2px solid transparent;background-clip:content-box}
+/* Same slim theme-aware scrollbars for the whole-chat area, in-chat code blocks,
+   thinking panels, and modals (2026-08-27) */
+.chat-area,.bubble pre,.thinking-block .thinking-content,.modal{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.chat-area::-webkit-scrollbar,.bubble pre::-webkit-scrollbar,.thinking-block .thinking-content::-webkit-scrollbar,.modal::-webkit-scrollbar{width:8px;height:8px}
+.chat-area::-webkit-scrollbar-track,.bubble pre::-webkit-scrollbar-track,.thinking-block .thinking-content::-webkit-scrollbar-track,.modal::-webkit-scrollbar-track{background:transparent}
+.chat-area::-webkit-scrollbar-thumb,.bubble pre::-webkit-scrollbar-thumb,.thinking-block .thinking-content::-webkit-scrollbar-thumb,.modal::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;border:2px solid transparent;background-clip:content-box}
+.chat-area::-webkit-scrollbar-thumb:hover,.bubble pre::-webkit-scrollbar-thumb:hover,.thinking-block .thinking-content::-webkit-scrollbar-thumb:hover,.modal::-webkit-scrollbar-thumb:hover{background:var(--accentLine);border:2px solid transparent;background-clip:content-box}
+.chat-area::-webkit-scrollbar-thumb:active,.bubble pre::-webkit-scrollbar-thumb:active,.thinking-block .thinking-content::-webkit-scrollbar-thumb:active,.modal::-webkit-scrollbar-thumb:active{background:var(--accentStrong);border:2px solid transparent;background-clip:content-box}
 .new-chat-btn{width:100%;padding:10px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:13px;cursor:pointer;font-family:var(--font);margin-bottom:12px;transition:opacity .15s}
 .new-chat-btn:hover{opacity:.85}
 .sidebar-footer{padding:8px 16px;border-top:1px solid var(--border);color:var(--dim);font-size:11px;text-align:center;flex-shrink:0}
@@ -287,11 +298,16 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 <script>
 /* ── Theme engine — head: applies the stored theme BEFORE first paint (no flash). THEMES keys double as localStorage 'chat_theme' values; each key maps 1:1 to CSS custom props (minus 'name'). ── */
 const THEMES={
-blue:{name:'Blue / Dark Grey',bg:'#0d1117',bg2:'#161b22',bg3:'#1c2333',border:'#30363d',text:'#e6edf3',dim:'#8b949e',accent:'#58a6ff',accentBg:'rgba(88,166,255,.15)',accentSoft:'rgba(88,166,255,.08)',accentLine:'rgba(88,166,255,.30)',accentStrong:'rgba(88,166,255,.45)',userBg:'#1f6feb',asstBg:'#161b22',sysBg:'#2d1b2e',sysText:'#d2a8ff',sysLine:'rgba(210,168,255,.22)',sysBgSoft:'rgba(210,168,255,.10)',sysGlow:'rgba(210,168,255,.30)',purple:'#b388ff',quoteBg:'rgba(188,140,255,.06)'},
-green:{name:'Green / Charcoal',bg:'#0b1210',bg2:'#111a17',bg3:'#17241f',border:'#23362d',text:'#e2f0e8',dim:'#7f9c8d',accent:'#34d399',accentBg:'rgba(52,211,153,.15)',accentSoft:'rgba(52,211,153,.08)',accentLine:'rgba(52,211,153,.30)',accentStrong:'rgba(52,211,153,.45)',userBg:'#0f8a5f',asstBg:'#111a17',sysBg:'#0e2a20',sysText:'#8fe8bd',sysLine:'rgba(143,232,189,.22)',sysBgSoft:'rgba(143,232,189,.10)',sysGlow:'rgba(143,232,189,.30)',purple:'#2dd48f',quoteBg:'rgba(45,212,143,.08)'},
-purple:{name:'Purple / Black',bg:'#0a0a12',bg2:'#12121e',bg3:'#1a1a2c',border:'#2d2d47',text:'#eae6f5',dim:'#8f8ab0',accent:'#a78bfa',accentBg:'rgba(167,139,250,.15)',accentSoft:'rgba(167,139,250,.08)',accentLine:'rgba(167,139,250,.30)',accentStrong:'rgba(167,139,250,.45)',userBg:'#7c5cff',asstBg:'#12121e',sysBg:'#241a3d',sysText:'#cbb8ff',sysLine:'rgba(203,184,255,.22)',sysBgSoft:'rgba(203,184,255,.10)',sysGlow:'rgba(203,184,255,.30)',purple:'#b388ff',quoteBg:'rgba(179,136,255,.08)'},
-orange:{name:'Orange / Deep Navy',bg:'#0d1420',bg2:'#141c2b',bg3:'#1c2740',border:'#2c3b5c',text:'#eef2f8',dim:'#8ea3c0',accent:'#ff9f43',accentBg:'rgba(255,159,67,.15)',accentSoft:'rgba(255,159,67,.08)',accentLine:'rgba(255,159,67,.30)',accentStrong:'rgba(255,159,67,.45)',userBg:'#e07b1f',asstBg:'#141c2b',sysBg:'#33220f',sysText:'#ffc58a',sysLine:'rgba(255,197,138,.22)',sysBgSoft:'rgba(255,197,138,.10)',sysGlow:'rgba(255,197,138,.30)',purple:'#ffab5e',quoteBg:'rgba(255,159,67,.08)'},
-teal:{name:'Teal / Slate',bg:'#0b1316',bg2:'#121c20',bg3:'#18262c',border:'#26404a',text:'#e2f0f4',dim:'#7f9aa6',accent:'#2dd4bf',accentBg:'rgba(45,212,191,.15)',accentSoft:'rgba(45,212,191,.08)',accentLine:'rgba(45,212,191,.30)',accentStrong:'rgba(45,212,191,.45)',userBg:'#0e9e8f',asstBg:'#121c20',sysBg:'#0f2a2e',sysText:'#8fe6da',sysLine:'rgba(143,230,218,.22)',sysBgSoft:'rgba(143,230,218,.10)',sysGlow:'rgba(143,230,218,.30)',purple:'#2dd4a8',quoteBg:'rgba(45,212,168,.08)'}
+blue:{name:'Dark Blue / Charcoal',bg:'#0d1117',bg2:'#161b22',bg3:'#1c2333',border:'#30363d',text:'#e6edf3',dim:'#8b949e',accent:'#58a6ff',accentBg:'rgba(88,166,255,.15)',accentSoft:'rgba(88,166,255,.08)',accentLine:'rgba(88,166,255,.30)',accentStrong:'rgba(88,166,255,.45)',userBg:'#1f6feb',asstBg:'#161b22',sysBg:'#2d1b2e',sysText:'#d2a8ff',sysLine:'rgba(210,168,255,.22)',sysBgSoft:'rgba(210,168,255,.10)',sysGlow:'rgba(210,168,255,.30)',purple:'#b388ff',quoteBg:'rgba(188,140,255,.06)'},
+green:{name:'Dark Green / Charcoal',bg:'#0b1210',bg2:'#111a17',bg3:'#17241f',border:'#23362d',text:'#e2f0e8',dim:'#7f9c8d',accent:'#34d399',accentBg:'rgba(52,211,153,.15)',accentSoft:'rgba(52,211,153,.08)',accentLine:'rgba(52,211,153,.30)',accentStrong:'rgba(52,211,153,.45)',userBg:'#0f8a5f',asstBg:'#111a17',sysBg:'#0e2a20',sysText:'#8fe8bd',sysLine:'rgba(143,232,189,.22)',sysBgSoft:'rgba(143,232,189,.10)',sysGlow:'rgba(143,232,189,.30)',purple:'#2dd48f',quoteBg:'rgba(45,212,143,.08)'},
+purple:{name:'Dark Purple / Black',bg:'#0a0a12',bg2:'#12121e',bg3:'#1a1a2c',border:'#2d2d47',text:'#eae6f5',dim:'#8f8ab0',accent:'#a78bfa',accentBg:'rgba(167,139,250,.15)',accentSoft:'rgba(167,139,250,.08)',accentLine:'rgba(167,139,250,.30)',accentStrong:'rgba(167,139,250,.45)',userBg:'#7c5cff',asstBg:'#12121e',sysBg:'#241a3d',sysText:'#cbb8ff',sysLine:'rgba(203,184,255,.22)',sysBgSoft:'rgba(203,184,255,.10)',sysGlow:'rgba(203,184,255,.30)',purple:'#b388ff',quoteBg:'rgba(179,136,255,.08)'},
+orange:{name:'Dark Orange / Deep Navy',bg:'#0d1420',bg2:'#141c2b',bg3:'#1c2740',border:'#2c3b5c',text:'#eef2f8',dim:'#8ea3c0',accent:'#ff9f43',accentBg:'rgba(255,159,67,.15)',accentSoft:'rgba(255,159,67,.08)',accentLine:'rgba(255,159,67,.30)',accentStrong:'rgba(255,159,67,.45)',userBg:'#e07b1f',asstBg:'#141c2b',sysBg:'#33220f',sysText:'#ffc58a',sysLine:'rgba(255,197,138,.22)',sysBgSoft:'rgba(255,197,138,.10)',sysGlow:'rgba(255,197,138,.30)',purple:'#ffab5e',quoteBg:'rgba(255,159,67,.08)'},
+teal:{name:'Dark Teal / Slate',bg:'#0b1316',bg2:'#121c20',bg3:'#18262c',border:'#26404a',text:'#e2f0f4',dim:'#7f9aa6',accent:'#2dd4bf',accentBg:'rgba(45,212,191,.15)',accentSoft:'rgba(45,212,191,.08)',accentLine:'rgba(45,212,191,.30)',accentStrong:'rgba(45,212,191,.45)',userBg:'#0e9e8f',asstBg:'#121c20',sysBg:'#0f2a2e',sysText:'#8fe6da',sysLine:'rgba(143,230,218,.22)',sysBgSoft:'rgba(143,230,218,.10)',sysGlow:'rgba(143,230,218,.30)',purple:'#2dd4a8',quoteBg:'rgba(45,212,168,.08)'},
+'light-blue':{name:'Light Blue / White',bg:'#f6f8fa',bg2:'#ffffff',bg3:'#eef1f5',border:'#d0d7de',text:'#1f2328',dim:'#59636e',accent:'#0969da',accentBg:'rgba(9,105,218,.12)',accentSoft:'rgba(9,105,218,.06)',accentLine:'rgba(9,105,218,.30)',accentStrong:'rgba(9,105,218,.45)',userBg:'#0969da',asstBg:'#ffffff',sysBg:'#f3ecff',sysText:'#7c3aed',sysLine:'rgba(124,58,237,.25)',sysBgSoft:'rgba(124,58,237,.10)',sysGlow:'rgba(124,58,237,.28)',purple:'#7c3aed',quoteBg:'rgba(124,58,237,.08)'},
+'light-green':{name:'Light Green / White',bg:'#f5faf7',bg2:'#ffffff',bg3:'#eaf3ee',border:'#c9e2d3',text:'#16281f',dim:'#55705f',accent:'#16a34a',accentBg:'rgba(22,163,74,.12)',accentSoft:'rgba(22,163,74,.06)',accentLine:'rgba(22,163,74,.30)',accentStrong:'rgba(22,163,74,.45)',userBg:'#16a34a',asstBg:'#ffffff',sysBg:'#e7f7ee',sysText:'#0f8a4a',sysLine:'rgba(15,138,74,.25)',sysBgSoft:'rgba(15,138,74,.10)',sysGlow:'rgba(15,138,74,.28)',purple:'#10b981',quoteBg:'rgba(16,185,129,.08)'},
+'light-purple':{name:'Light Purple / White',bg:'#f9f7ff',bg2:'#ffffff',bg3:'#f0edfa',border:'#d9d2ef',text:'#221a38',dim:'#6b6390',accent:'#7c3aed',accentBg:'rgba(124,58,237,.12)',accentSoft:'rgba(124,58,237,.06)',accentLine:'rgba(124,58,237,.30)',accentStrong:'rgba(124,58,237,.45)',userBg:'#7c3aed',asstBg:'#ffffff',sysBg:'#f1eaff',sysText:'#7c3aed',sysLine:'rgba(124,58,237,.25)',sysBgSoft:'rgba(124,58,237,.10)',sysGlow:'rgba(124,58,237,.28)',purple:'#9333ea',quoteBg:'rgba(147,51,234,.08)'},
+'light-orange':{name:'Light Orange / White',bg:'#fdf9f4',bg2:'#ffffff',bg3:'#faf0e3',border:'#ecd7ba',text:'#2c2012',dim:'#8a6d45',accent:'#ea580c',accentBg:'rgba(234,88,12,.12)',accentSoft:'rgba(234,88,12,.06)',accentLine:'rgba(234,88,12,.30)',accentStrong:'rgba(234,88,12,.45)',userBg:'#ea580c',asstBg:'#ffffff',sysBg:'#fdeeda',sysText:'#b45309',sysLine:'rgba(180,83,9,.25)',sysBgSoft:'rgba(180,83,9,.10)',sysGlow:'rgba(180,83,9,.28)',purple:'#f59e0b',quoteBg:'rgba(245,158,11,.08)'},
+'light-teal':{name:'Light Teal / White',bg:'#f3faf9',bg2:'#ffffff',bg3:'#e8f4f2',border:'#c4e2dd',text:'#0f2a27',dim:'#4f7670',accent:'#0d9488',accentBg:'rgba(13,148,136,.12)',accentSoft:'rgba(13,148,136,.06)',accentLine:'rgba(13,148,136,.30)',accentStrong:'rgba(13,148,136,.45)',userBg:'#0d9488',asstBg:'#ffffff',sysBg:'#e0f5f2',sysText:'#0f766e',sysLine:'rgba(15,118,110,.25)',sysBgSoft:'rgba(15,118,110,.10)',sysGlow:'rgba(15,118,110,.28)',purple:'#14b8a6',quoteBg:'rgba(20,184,166,.08)'}
 };
 function applyTheme(key,persist){
   const t=THEMES[key]||THEMES.blue,s=document.documentElement.style;
@@ -316,7 +332,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="new-chat-btn" onclick="newChat();if(!sidebarPinned) toggleSidebar();" title="Start a new chat">＋ New Chat</button>
   </div>
   <div class="sidebar-body" id="chatHistory"></div>
-  <div class="sidebar-footer">vLLM Chat v1.6.8</div>
+  <div class="sidebar-footer">vLLM Chat v2.0.1</div>
 </div>
 
 <div class="header">
@@ -417,12 +433,27 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
   <div class="modal">
     <h2>⚙ Settings</h2>
     <label>Theme</label>
-    <div class="theme-row" id="themeRow">
-      <button class="theme-swatch" data-theme="blue" onclick="applyTheme('blue')" title="Blue / Dark Grey (default)"><span class="swatch-back" style="background:#0d1117"></span><span class="swatch-front" style="background:#58a6ff"></span></button>
-      <button class="theme-swatch" data-theme="green" onclick="applyTheme('green')" title="Green / Charcoal"><span class="swatch-back" style="background:#0b1210"></span><span class="swatch-front" style="background:#34d399"></span></button>
-      <button class="theme-swatch" data-theme="purple" onclick="applyTheme('purple')" title="Purple / Black"><span class="swatch-back" style="background:#0a0a12"></span><span class="swatch-front" style="background:#a78bfa"></span></button>
-      <button class="theme-swatch" data-theme="orange" onclick="applyTheme('orange')" title="Orange / Deep Navy"><span class="swatch-back" style="background:#0d1420"></span><span class="swatch-front" style="background:#ff9f43"></span></button>
-      <button class="theme-swatch" data-theme="teal" onclick="applyTheme('teal')" title="Teal / Slate"><span class="swatch-back" style="background:#0b1316"></span><span class="swatch-front" style="background:#2dd4bf"></span></button>
+    <div class="theme-groups" id="themeRow">
+      <div class="theme-group">
+        <span class="theme-group-label">Dark</span>
+        <div class="theme-row">
+          <button class="theme-swatch" data-theme="blue" onclick="applyTheme('blue')" title="Dark Blue / Charcoal (default)"><span class="swatch-back" style="background:#0d1117"></span><span class="swatch-front" style="background:#58a6ff"></span></button>
+          <button class="theme-swatch" data-theme="green" onclick="applyTheme('green')" title="Dark Green / Charcoal"><span class="swatch-back" style="background:#0b1210"></span><span class="swatch-front" style="background:#34d399"></span></button>
+          <button class="theme-swatch" data-theme="purple" onclick="applyTheme('purple')" title="Dark Purple / Black"><span class="swatch-back" style="background:#0a0a12"></span><span class="swatch-front" style="background:#a78bfa"></span></button>
+          <button class="theme-swatch" data-theme="orange" onclick="applyTheme('orange')" title="Dark Orange / Deep Navy"><span class="swatch-back" style="background:#0d1420"></span><span class="swatch-front" style="background:#ff9f43"></span></button>
+          <button class="theme-swatch" data-theme="teal" onclick="applyTheme('teal')" title="Dark Teal / Slate"><span class="swatch-back" style="background:#0b1316"></span><span class="swatch-front" style="background:#2dd4bf"></span></button>
+        </div>
+      </div>
+      <div class="theme-group">
+        <span class="theme-group-label">Light</span>
+        <div class="theme-row">
+          <button class="theme-swatch" data-theme="light-blue" onclick="applyTheme('light-blue')" title="Light Blue / White"><span class="swatch-back" style="background:#f6f8fa"></span><span class="swatch-front" style="background:#0969da"></span></button>
+          <button class="theme-swatch" data-theme="light-green" onclick="applyTheme('light-green')" title="Light Green / White"><span class="swatch-back" style="background:#f5faf7"></span><span class="swatch-front" style="background:#16a34a"></span></button>
+          <button class="theme-swatch" data-theme="light-purple" onclick="applyTheme('light-purple')" title="Light Purple / White"><span class="swatch-back" style="background:#f9f7ff"></span><span class="swatch-front" style="background:#7c3aed"></span></button>
+          <button class="theme-swatch" data-theme="light-orange" onclick="applyTheme('light-orange')" title="Light Orange / White"><span class="swatch-back" style="background:#fdf9f4"></span><span class="swatch-front" style="background:#ea580c"></span></button>
+          <button class="theme-swatch" data-theme="light-teal" onclick="applyTheme('light-teal')" title="Light Teal / White"><span class="swatch-back" style="background:#f3faf9"></span><span class="swatch-front" style="background:#0d9488"></span></button>
+        </div>
+      </div>
     </div>
     <label>API URL</label>
     <input type="text" id="setApiUrl" value="http://localhost:8000">
