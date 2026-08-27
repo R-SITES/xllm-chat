@@ -311,7 +311,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="new-chat-btn" onclick="newChat();if(!sidebarPinned) toggleSidebar();" title="Start a new chat">＋ New Chat</button>
   </div>
   <div class="sidebar-body" id="chatHistory"></div>
-  <div class="sidebar-footer">vLLM Chat v1.6.6</div>
+  <div class="sidebar-footer">vLLM Chat v1.6.7</div>
 </div>
 
 <div class="header">
@@ -2433,6 +2433,7 @@ let conversationHistory = [];
 let abortController = null;
 let isStreaming = false;
 let currentStreamingEl = null;
+let streamChatId = null;   // thread this stream belongs to — finalize writes THERE, not the on-screen chat (2026-08-27)
 
 // Live stats tracking
 let streamTokens = 0;
@@ -3099,6 +3100,8 @@ async function streamFromHistory() {
   input.disabled = true;
   startStatsTracking();
   conversationHistory.push({ role: 'assistant', content: '' });
+  saveCurrentChat();   // persist prompt+placeholder NOW — a mid-stream chat switch can't lose the prompt (2026-08-27)
+  streamChatId = currentChatId;   // bind this stream to its thread — AFTER save so brand-new chats get the materialized id (2026-08-27)
   try { await streamResponse(); }
   catch (e) {
     if (e.name !== 'AbortError') appendMessage('system', 'Error: ' + e.message);
@@ -3106,6 +3109,7 @@ async function streamFromHistory() {
   ensureBranchBar();
   saveCurrentChat();
   isStreaming = false;
+  streamChatId = null;
   abortController = null;
   document.getElementById('sendBtn').style.display = 'flex';
   document.getElementById('stopBtn').style.display = 'none';
@@ -3451,14 +3455,15 @@ async function streamResponse() {
       }
     }
     // Finalize
-    if (currentStreamingEl && (fullText || thinking)) {
+    const finalEl = liveBubble();
+    if (finalEl && (fullText || thinking)) {
       let html = '';
       if (thinking) {
         html = thinkingPillHTML(thinking, false);
       }
       if (fullText) html += escapeAndFormat(fullText);
-      currentStreamingEl.innerHTML = html;
-      currentStreamingEl.querySelectorAll('pre').forEach(pre => {
+      finalEl.innerHTML = html;
+      finalEl.querySelectorAll('pre').forEach(pre => {
         const btn = document.createElement('button');
         btn.className = 'copy-btn'; btn.textContent = 'Copy';
         btn.onclick = () => {
@@ -3470,19 +3475,18 @@ async function streamResponse() {
       });
     }
 
-    // Final stats bar (exact numbers: usage.completion_tokens if available)
+    // Final stats (exact numbers: usage.completion_tokens if available) — computed
+    // once, reused for the on-screen bar AND the stored-thread write
     if (msgStatsTimer) { clearInterval(msgStatsTimer); msgStatsTimer = null; }
-    if (msgStatsEl) {
-      const totalMs = Date.now() - streamStartTime;
-      const genMs = msgFirstTokenTime > 0 ? Date.now() - msgFirstTokenTime : totalMs;
-      const exactTokens = (finalUsage && finalUsage.completion_tokens > 0) ? finalUsage.completion_tokens : streamTokens;
-      // llama.cpp formula: predicted_n / predicted_ms * 1000 (cumulative since gen start)
-      const tps = genMs > 0 ? (exactTokens / (genMs / 1000)) : 0;
-      msgStatsEl.innerHTML = statsBarHTML(exactTokens, totalMs, tps, false, currentModel);
-    }
+    const totalMs = Date.now() - streamStartTime;
+    const genMs = msgFirstTokenTime > 0 ? Date.now() - msgFirstTokenTime : totalMs;
+    const exactTokens = (finalUsage && finalUsage.completion_tokens > 0) ? finalUsage.completion_tokens : streamTokens;
+    // llama.cpp formula: predicted_n / predicted_ms * 1000 (cumulative since gen start)
+    const finalStats = { tokens: exactTokens, timeMs: totalMs, tps: genMs > 0 ? (exactTokens / (genMs / 1000)) : 0, truncated: finishReason === 'length' || undefined, model: currentModel };
+    if (msgStatsEl) msgStatsEl.innerHTML = statsBarHTML(exactTokens, totalMs, finalStats.tps, false, currentModel);
 
     // Truncation notice: finish_reason "length" = hit the token cap mid-generation
-    if (finishReason === 'length' && currentStreamingEl) {
+    if (finishReason === 'length' && finalEl) {
       const note = document.createElement('div');
       note.className = 'trunc-note';
       note.innerHTML = '⚠ Response stopped at the token limit' + (MAX_TOKENS > 0 ? ` (max_tokens ${MAX_TOKENS})` : ' (server cap)') + '. Raise Max Tokens or set 0 for unlimited, then retry.';
@@ -3490,25 +3494,51 @@ async function streamResponse() {
       if (mm) mm.appendChild(note);
     }
 
-    const lastAi = conversationHistory.length ? conversationHistory[conversationHistory.length - 1] : null;
-    if (lastAi && lastAi.role === 'assistant') {
-      lastAi.content = fullText;
-      if (thinking) lastAi.thinking = thinking;
-      if (msgStatsEl) {
-        const totalMs = Date.now() - streamStartTime;
-        const genMs = msgFirstTokenTime > 0 ? Date.now() - msgFirstTokenTime : totalMs;
-        const exactTokens = (finalUsage && finalUsage.completion_tokens > 0) ? finalUsage.completion_tokens : streamTokens;
-        lastAi.stats = { tokens: exactTokens, timeMs: totalMs, tps: genMs > 0 ? (exactTokens / (genMs / 1000)) : 0, truncated: finishReason === 'length' || undefined, model: currentModel };
+    // Persist the finished response into the RIGHT thread: the on-screen array if
+    // the stream's chat is still active, else the stored thread directly — the user
+    // may have browsed away mid-render; never touch the chat they're reading (2026-08-27)
+    if (streamChatId === currentChatId) {
+      const lastAi = conversationHistory.length ? conversationHistory[conversationHistory.length - 1] : null;
+      if (lastAi && lastAi.role === 'assistant') {
+        lastAi.content = fullText;
+        if (thinking) lastAi.thinking = thinking;
+        lastAi.stats = finalStats;
+      }
+    } else {
+      const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+      const chat = chats.find(c => c.id === streamChatId);
+      const la = chat && chat.messages ? chat.messages[chat.messages.length - 1] : null;
+      if (la && la.role === 'assistant') {
+        la.content = fullText;
+        if (thinking) la.thinking = thinking;
+        la.stats = finalStats;
+        localStorage.setItem('chat_history', JSON.stringify(chats));
+        loadHistory();
       }
     }
     updateTokenBar();
     resetJumpIndex();   // stream finished -> walk restarts from the newest message
   } catch (e) {
     if (msgStatsTimer) { clearInterval(msgStatsTimer); msgStatsTimer = null; }
+    const errEl = liveBubble();
     if (e.name === 'AbortError') {
-      if (currentStreamingEl) currentStreamingEl.innerHTML = fullText ? escapeAndFormat(fullText) + '<span style="color:var(--dim);font-size:12px"> — [stopped]</span>' : '<span style="color:var(--dim)">[stopped]</span>';
+      if (errEl) errEl.innerHTML = fullText ? escapeAndFormat(fullText) + '<span style="color:var(--dim);font-size:12px"> — [stopped]</span>' : '<span style="color:var(--dim)">[stopped]</span>';
+      // persist whatever streamed so far into the stream's thread (2026-08-27)
+      if (streamChatId === currentChatId) {
+        const lastAi = conversationHistory.length ? conversationHistory[conversationHistory.length - 1] : null;
+        if (lastAi && lastAi.role === 'assistant') lastAi.content = fullText;
+      } else {
+        const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+        const chat = chats.find(c => c.id === streamChatId);
+        const la = chat && chat.messages ? chat.messages[chat.messages.length - 1] : null;
+        if (la && la.role === 'assistant') {
+          la.content = fullText;
+          localStorage.setItem('chat_history', JSON.stringify(chats));
+          loadHistory();
+        }
+      }
     } else {
-      if (currentStreamingEl) currentStreamingEl.innerHTML = '<span style="color:var(--dim)">Error: ' + escHtml(e.message) + '</span>';
+      if (errEl) errEl.innerHTML = '<span style="color:var(--dim)">Error: ' + escHtml(e.message) + '</span>';
     }
     // Partial stats on stop/error
     if (msgStatsEl && streamTokens > 0) {
@@ -3520,20 +3550,34 @@ async function streamResponse() {
   msgStatsEl = null;
 }
 
+function liveBubble() {
+  // Resolve the streaming bubble per call: while the stream's chat is active, hit
+  // the visible placeholder (so returning to the chat mid-render picks up live
+  // updates); otherwise keep the (possibly detached) creation-time element —
+  // writes there are harmless and never touch the chat being read (2026-08-27).
+  if (currentChatId === streamChatId) {
+    const live = document.querySelector('.msg:last-of-type .bubble');
+    if (live) return live;
+  }
+  return currentStreamingEl;
+}
+
 function updateThinkingUI(thinking, inThinking) {
-  if (inThinking && currentStreamingEl) {
-    let tb = currentStreamingEl.querySelector('.thinking-block');
+  if (inThinking) {
+    const el = liveBubble();
+    if (!el) return;
+    let tb = el.querySelector('.thinking-block');
     if (!tb) {
       tb = document.createElement('div');
       tb.className = 'thinking-block';
       tb.innerHTML = `<span class="thinking-pill"><span class="tp-spinner"></span> reasoning <span class="tp-chev">▾</span></span><div class="thinking-content">${escHtml(thinking)}</div>`;
       tb.addEventListener('click', () => tb.classList.toggle('open'));
-      currentStreamingEl.appendChild(tb);
+      el.appendChild(tb);
     } else {
       const content = tb.querySelector('.thinking-content');
       if (content) content.textContent = thinking;
     }
-    document.getElementById('chatArea').scrollTop = document.getElementById('chatArea').scrollHeight;
+    if (currentChatId === streamChatId) document.getElementById('chatArea').scrollTop = document.getElementById('chatArea').scrollHeight;
   }
 }
 
@@ -3542,14 +3586,15 @@ function thinkingPillHTML(thinking, live) {
 }
 
 function updateContentUI(fullText, thinking, inThinking) {
-  if (currentStreamingEl) {
+  const el = liveBubble();
+  if (el) {
     let html = '';
     if (thinking) {
       html += thinkingPillHTML(thinking, true);
     }
     html += escapeAndFormat(fullText);
-    currentStreamingEl.innerHTML = html;
-    document.getElementById('chatArea').scrollTop = document.getElementById('chatArea').scrollHeight;
+    el.innerHTML = html;
+    if (currentChatId === streamChatId) document.getElementById('chatArea').scrollTop = document.getElementById('chatArea').scrollHeight;
   }
 }
 

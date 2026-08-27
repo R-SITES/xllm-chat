@@ -20,6 +20,7 @@ A llama.cpp-style chat window for [vLLM](https://github.com/vllm-project/vllm)'s
 - **Thread menu** — ⋯ menu on every conversation: rename (custom title that survives saves), pin (favorites float to the top with a pin glyph), export the thread as a .txt, or delete
 - **Edit messages** — ✎ on user messages: edit an old prompt and re-send; if a response existed, the old answer is kept and a ‹ n/N › pill flips between versions (llama.cpp/Qwen style, persists across reloads)
 - **Themes** — five two-color themes (Blue / Dark Grey, Green / Charcoal, Purple / Black, Orange / Deep Navy, Teal / Slate) in the settings modal: a single click re-themes the whole UI instantly and your choice persists across reloads
+- **Background streaming** — start a response, then browse any other chat: the render keeps running in the background and lands in the thread that started it (the chat you're reading is never touched, no scroll-jacking); return mid-render and the live bubble picks the stream back up; Stop keeps the partial output
 
 ## Run
 
