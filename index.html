@@ -268,6 +268,11 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .sidebar-header h3{font-size:14px;font-weight:600}
 .sidebar-header button{background:none;border:none;color:var(--dim);cursor:pointer;font-size:18px;padding:4px}
 .sidebar-header button:hover{color:var(--text)}
+.sidebar-header-left{display:flex;align-items:center;gap:2px;min-width:0}
+.sidebar-header button.pin-sidebar-btn{display:flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0;border-radius:6px;font-size:0;transition:color .12s,background .12s}
+.sidebar-header button.pin-sidebar-btn:hover{color:var(--text);background:var(--accentSoft)}
+.sidebar-header button.pin-sidebar-btn.pinned{color:var(--accent);background:var(--accentBg)}
+.sidebar-header button.pin-sidebar-btn.pinned:hover{color:var(--accent)}
 .sidebar-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px}
 .new-chat-btn{width:100%;padding:10px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:13px;cursor:pointer;font-family:var(--font);margin-bottom:12px;transition:opacity .15s}
 .new-chat-btn:hover{opacity:.85}
@@ -296,14 +301,17 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
 
 <div class="sidebar" id="sidebar">
   <div class="sidebar-header">
-    <h3>Chat History</h3>
+    <div class="sidebar-header-left">
+      <h3>Chat History</h3>
+      <button class="pin-sidebar-btn" id="pinSidebarBtn" onclick="toggleSidebarPin()" title="Keep panel open"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg></button>
+    </div>
     <button onclick="toggleSidebar()">×</button>
   </div>
   <div style="padding:8px 8px 0">
-    <button class="new-chat-btn" onclick="newChat();toggleSidebar();" title="Start a new chat">＋ New Chat</button>
+    <button class="new-chat-btn" onclick="newChat();if(!sidebarPinned) toggleSidebar();" title="Start a new chat">＋ New Chat</button>
   </div>
   <div class="sidebar-body" id="chatHistory"></div>
-  <div class="sidebar-footer">vLLM Chat v1.6.4</div>
+  <div class="sidebar-footer">vLLM Chat v1.6.5</div>
 </div>
 
 <div class="header">
@@ -2740,6 +2748,15 @@ function threadTitle(content) {
   return words.length > 7 ? words.slice(0, 7).join(' ') + '…' : s;
 }
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+let sidebarPinned = localStorage.getItem('chat_sidebar_pinned') === '1';
+function toggleSidebarPin() {
+  sidebarPinned = !sidebarPinned;
+  localStorage.setItem('chat_sidebar_pinned', sidebarPinned ? '1' : '0');
+  const btn = document.getElementById('pinSidebarBtn');
+  btn.classList.toggle('pinned', sidebarPinned);
+  btn.innerHTML = sidebarPinned ? ICON_PANEL : ICON_PANEL_CLOSE;
+  btn.title = sidebarPinned ? 'Unpin panel (allow auto-close)' : 'Keep panel open';
+}
 function loadHistory() {
   const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
   const container = document.getElementById('chatHistory');
@@ -2751,7 +2768,7 @@ function loadHistory() {
   // existing recency order (newest first)
   const sorted = [...chats.filter(c => c.pinned), ...chats.filter(c => !c.pinned)];
   container.innerHTML = sorted.map(c => `
-    <div class="history-item${c.pinned ? ' pinned' : ''}${c.id === currentChatId ? ' active' : ''}" onclick="loadConversation('${c.id}');toggleSidebar();">
+    <div class="history-item${c.pinned ? ' pinned' : ''}${c.id === currentChatId ? ' active' : ''}" onclick="loadConversation('${c.id}');if(!sidebarPinned) toggleSidebar();">
       <div style="flex:1;min-width:0">
         <div class="title">${c.pinned ? '<span class="pin-ic">' + ICON_PIN + '</span>' : ''}${escHtml(threadTitle(c.title))}</div>
         <div class="date">${formatDate(c.created)}</div>
@@ -2882,6 +2899,8 @@ function saveRename() {
 const ICON_MORE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>';
 const ICON_PIN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z"/></svg>';
 const ICON_UNPIN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z"/><line x1="2" y1="2" x2="22" y2="22"/></svg>';
+const ICON_PANEL = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>';
+const ICON_PANEL_CLOSE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg>';
 const ICON_DL = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
 const ICON_TRASH = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
 const ICON_EDIT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
@@ -3805,12 +3824,20 @@ function showToast(msg) {
 
 document.addEventListener('click', (e) => {
   const sb = document.getElementById('sidebar');
-  if (sb.classList.contains('open') && !sb.contains(e.target) && !e.target.classList.contains('sidebar-toggle')) sb.classList.remove('open');
+  if (sb.classList.contains('open') && !sidebarPinned && !sb.contains(e.target) && !e.target.classList.contains('sidebar-toggle')) sb.classList.remove('open');
 });
 document.getElementById('settingsModal').addEventListener('click', (e) => { if (e.target === document.getElementById('settingsModal')) closeSettings(); });
 document.getElementById('renameModal').addEventListener('click', (e) => { if (e.target === document.getElementById('renameModal')) closeRename(); });
 applyTheme(localStorage.getItem('chat_theme')||'blue', false);   // sync theme swatch active state (head already painted it)
 updateSysPromptBar(); updateTokenBar();
+(function initSidebarPin() {
+  if (!sidebarPinned) return;
+  const b = document.getElementById('pinSidebarBtn');
+  if (!b) return;
+  b.classList.add('pinned');
+  b.innerHTML = ICON_PANEL;
+  b.title = 'Unpin panel (allow auto-close)';
+})();
 </script>
 </body>
 </html>
