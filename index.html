@@ -277,6 +277,15 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .sidebar-header button.pin-sidebar-btn.pinned{color:var(--accent);background:var(--accentBg)}
 .sidebar-header button.pin-sidebar-btn.pinned:hover{color:var(--accent)}
 .sidebar-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+/* Chat list letter-filter (2026-08-27) — lives under the Chat History header, above New Chat */
+.sidebar-search{display:flex;align-items:center;gap:6px;padding:10px 12px 0}
+.sidebar-search svg{color:var(--dim);flex-shrink:0}
+.sidebar-search input{flex:1;min-width:0;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-size:12px;font-family:var(--font);outline:none;transition:border-color .15s,background .15s}
+.sidebar-search input::placeholder{color:var(--dim);opacity:.8}
+.sidebar-search input:focus{border-color:var(--accent);background:var(--bg2)}
+.sidebar-search-clear{flex-shrink:0;width:22px;height:22px;border-radius:6px;background:none;border:none;color:var(--dim);cursor:pointer;font-size:12px;display:none;align-items:center;justify-content:center;padding:0}
+.sidebar-search-clear:hover{color:var(--text);background:var(--accentSoft)}
+.sidebar-search-clear.show{display:flex}
 .sidebar-body::-webkit-scrollbar{width:8px}
 .sidebar-body::-webkit-scrollbar-track{background:transparent}
 .sidebar-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;border:2px solid transparent;background-clip:content-box}
@@ -290,6 +299,40 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .chat-area::-webkit-scrollbar-thumb,.bubble pre::-webkit-scrollbar-thumb,.thinking-block .thinking-content::-webkit-scrollbar-thumb,.modal::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;border:2px solid transparent;background-clip:content-box}
 .chat-area::-webkit-scrollbar-thumb:hover,.bubble pre::-webkit-scrollbar-thumb:hover,.thinking-block .thinking-content::-webkit-scrollbar-thumb:hover,.modal::-webkit-scrollbar-thumb:hover{background:var(--accentLine);border:2px solid transparent;background-clip:content-box}
 .chat-area::-webkit-scrollbar-thumb:active,.bubble pre::-webkit-scrollbar-thumb:active,.thinking-block .thinking-content::-webkit-scrollbar-thumb:active,.modal::-webkit-scrollbar-thumb:active{background:var(--accentStrong);border:2px solid transparent;background-clip:content-box}
+/* ── Chat Background engine (2026-08-27) — fixed layers behind the app; when a background is
+   active the main surfaces go translucent + blurred so messages stay readable ── */
+#chatBg{position:fixed;inset:0;z-index:0;background-size:cover;background-position:center;background-repeat:no-repeat}
+#chatBg iframe{width:100%;height:100%;border:0;pointer-events:none;display:block}
+#chatBgOverlay{position:fixed;inset:0;z-index:1;pointer-events:none;display:none}
+#bgOv1,#bgOv2{position:absolute;inset:0}
+#bgOv1{background:var(--bgOv1,#000)}
+#bgOv2{background:var(--bgOv2,#000);animation:bgCrossfade 10s ease-in-out infinite alternate}
+@keyframes bgCrossfade{0%{opacity:0}45%{opacity:0}55%{opacity:1}100%{opacity:1}}
+body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-bg .chat-area,body.has-bg .input-container,body.has-bg .attach-bar{background:color-mix(in srgb,var(--bg) 74%,transparent);backdrop-filter:blur(6px)}
+.bg-unmute-btn{position:fixed;right:14px;bottom:88px;z-index:1200;width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:rgba(0,0,0,.55);color:#fff;cursor:pointer;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);transition:background .15s}
+.bg-unmute-btn:hover{background:rgba(0,0,0,.8)}
+.bg-type-row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.bg-type-btn{flex:1;min-width:64px;padding:7px 0;border:1px solid var(--border);background:var(--bg3);color:var(--dim);border-radius:8px;font-size:12px;cursor:pointer;font-family:var(--font);transition:all .15s}
+.bg-type-btn.active{background:var(--accentBg);border-color:var(--accentLine);color:var(--accent)}
+.bg-opt{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.bg-opt[hidden]{display:none}
+.bg-url-row{display:flex;gap:6px}
+.bg-url-row input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:12px;font-family:var(--font);outline:none;min-width:0}
+.bg-url-row input:focus{border-color:var(--accent)}
+.bg-btn{padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:12px;cursor:pointer;font-family:var(--font)}
+.bg-btn:hover{border-color:var(--accent);color:var(--accent)}
+.bg-thumb-row{display:flex;align-items:center;gap:10px}
+.bg-thumb{width:72px;height:44px;border-radius:8px;border:1px solid var(--border);background-size:cover;background-position:center;flex-shrink:0}
+.bg-slider-row{display:flex;align-items:center;gap:10px}
+.bg-slider-row label{font-size:11px;color:var(--dim);width:86px;flex-shrink:0}
+.bg-slider-row input[type=range]{flex:1;accent-color:var(--accent)}
+.bg-slider-row .val{font-size:11px;color:var(--accent);width:38px;text-align:right;font-variant-numeric:tabular-nums}
+.bg-color-row{display:flex;align-items:center;gap:10px}
+.bg-color-row label{font-size:11px;color:var(--dim);width:86px;flex-shrink:0}
+.bg-color-row input[type=color]{width:34px;height:28px;border:1px solid var(--border);border-radius:6px;background:none;padding:0;cursor:pointer}
+.bg-note{font-size:11px;color:var(--dim);opacity:.8;line-height:1.45}
+.bg-ov-toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);cursor:pointer;margin-top:10px}
+.bg-ov-toggle input{accent-color:var(--accent)}
 .new-chat-btn{width:100%;padding:10px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:13px;cursor:pointer;font-family:var(--font);margin-bottom:12px;transition:opacity .15s}
 .new-chat-btn:hover{opacity:.85}
 .sidebar-footer{padding:8px 16px;border-top:1px solid var(--border);color:var(--dim);font-size:11px;text-align:center;flex-shrink:0}
@@ -320,6 +363,10 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
 </head>
 <body>
 
+<div id="chatBg"></div>
+<div id="chatBgOverlay"><div id="bgOv1"></div><div id="bgOv2"></div></div>
+<button id="bgUnmute" class="bg-unmute-btn" onclick="toggleBgMute()" title="Unmute video"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg></button>
+
 <div class="sidebar" id="sidebar">
   <div class="sidebar-header">
     <div class="sidebar-header-left">
@@ -328,11 +375,16 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     </div>
     <button onclick="toggleSidebar()">×</button>
   </div>
+  <div class="sidebar-search">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    <input type="text" id="chatSearch" placeholder="Filter chats…" oninput="filterChats(this.value)" spellcheck="false">
+    <button class="sidebar-search-clear" id="chatSearchClear" onclick="clearChatSearch()" title="Clear filter">✕</button>
+  </div>
   <div style="padding:8px 8px 0">
     <button class="new-chat-btn" onclick="newChat();if(!sidebarPinned) toggleSidebar();" title="Start a new chat">＋ New Chat</button>
   </div>
   <div class="sidebar-body" id="chatHistory"></div>
-  <div class="sidebar-footer">vLLM Chat v2.0.1</div>
+  <div class="sidebar-footer">vLLM Chat v2.1.1</div>
 </div>
 
 <div class="header">
@@ -454,6 +506,61 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
           <button class="theme-swatch" data-theme="light-teal" onclick="applyTheme('light-teal')" title="Light Teal / White"><span class="swatch-back" style="background:#f3faf9"></span><span class="swatch-front" style="background:#0d9488"></span></button>
         </div>
       </div>
+    </div>
+    <label>Chat Background</label>
+    <div class="bg-type-row">
+      <button class="bg-type-btn active" data-bgtype="none" onclick="setBgType('none')">None</button>
+      <button class="bg-type-btn" data-bgtype="image" onclick="setBgType('image')">Image</button>
+      <button class="bg-type-btn" data-bgtype="url" onclick="setBgType('url')">Image URL</button>
+      <button class="bg-type-btn" data-bgtype="youtube" onclick="setBgType('youtube')">YouTube</button>
+      <button class="bg-type-btn" data-bgtype="color" onclick="setBgType('color')">Color</button>
+    </div>
+    <div class="bg-opt" id="bgOptImage" hidden>
+      <div class="bg-thumb-row">
+        <div class="bg-thumb" id="bgThumb" style="display:none"></div>
+        <button class="bg-btn" onclick="document.getElementById('bgFile').click()">Choose Image…</button>
+        <button class="bg-btn" id="bgImageRemove" onclick="clearBgImage()" style="display:none">Remove</button>
+      </div>
+      <input type="file" id="bgFile" accept="image/*" style="display:none" onchange="bgFilePicked(this)">
+      <div class="bg-note">Local image (max 1.5 MB).</div>
+    </div>
+    <div class="bg-opt" id="bgOptUrl" hidden>
+      <div class="bg-url-row">
+        <input type="text" id="bgUrlInput" placeholder="https://… image URL" onkeydown="if(event.key==='Enter')applyBgUrl()">
+        <button class="bg-btn" onclick="applyBgUrl()">Apply</button>
+      </div>
+      <div class="bg-note">A YouTube URL pasted here is auto-detected and moved to the YouTube tab.</div>
+    </div>
+    <div class="bg-opt" id="bgOptYoutube" hidden>
+      <div class="bg-url-row">
+        <input type="text" id="bgYtInput" placeholder="https://www.youtube.com/watch?v=… or playlist?list=…" onkeydown="if(event.key==='Enter')applyBgYoutube()">
+        <button class="bg-btn" onclick="applyBgYoutube()">Apply</button>
+      </div>
+      <div class="bg-note">Plays muted &amp; autoplaying behind the chat. Use the speaker button at the bottom-right to unmute. Playlist URLs cycle through the playlist.</div>
+    </div>
+    <div class="bg-opt" id="bgOptColor" hidden>
+      <div class="bg-color-row">
+        <label>Color</label>
+        <input type="color" id="bgColorPick" oninput="setBgColor(this.value)">
+        <label style="width:auto;margin-left:12px">Transparency</label>
+        <input type="range" id="bgColorAlpha" min="0" max="100" value="0" oninput="setBgColorAlpha(this.value)">
+        <span class="val" id="bgColorAlphaVal">0%</span>
+      </div>
+    </div>
+    <label class="bg-ov-toggle"><input type="checkbox" id="bgOvToggle" onchange="setBgOverlay(this.checked)"> Overlay (over image / video / color)</label>
+    <div class="bg-opt" id="bgOptOverlay" hidden>
+      <div class="bg-color-row">
+        <label>Color 1</label>
+        <input type="color" id="bgOv1Pick" oninput="setBgOvColor(1,this.value)">
+        <label style="width:auto;margin-left:12px">Color 2</label>
+        <input type="color" id="bgOv2Pick" oninput="setBgOvColor(2,this.value)">
+      </div>
+      <div class="bg-slider-row">
+        <label>Transparency</label>
+        <input type="range" id="bgOvAlpha" min="0" max="100" value="35" oninput="setBgOvAlpha(this.value)">
+        <span class="val" id="bgOvAlphaVal">35%</span>
+      </div>
+      <div class="bg-note">The two colors crossfade over the background. Transparency 0 = no tint, 100 = fully opaque.</div>
     </div>
     <label>API URL</label>
     <input type="text" id="setApiUrl" value="http://localhost:8000">
@@ -2713,6 +2820,7 @@ function openSettings() {
   document.getElementById('setMaxTokens').value = MAX_TOKENS;
   document.getElementById('setTemp').value = TEMPERATURE;
   document.getElementById('setTopP').value = TOP_P;
+  updateBgSettingsUI();
   document.getElementById('settingsModal').classList.add('show');
 }
 function closeSettings() { document.getElementById('settingsModal').classList.remove('show'); }
@@ -2734,6 +2842,158 @@ function saveSettings() {
   closeSettings();
   showToast('Settings saved');
 }
+
+// ---- Chat Background (2026-08-27): image / image-URL / YouTube (muted autoplay, playlists) /
+// color, plus a crossfading dual-color overlay. Persisted under chat_bg_*; applies LIVE, no Save.
+const BG_DEFAULTS = { type: 'none', image: null, url: '', yt: '', color: '#0d1117', colorAlpha: 0, overlayOn: false, ov1: '#000000', ov2: '#000000', ovAlpha: 35 };
+let BG = Object.assign({}, BG_DEFAULTS);
+let bgMuted = true;
+function loadBgState() {
+  for (const k of Object.keys(BG_DEFAULTS)) {
+    const v = localStorage.getItem('chat_bg_' + k);
+    if (v !== null) BG[k] = (typeof BG_DEFAULTS[k] === 'boolean') ? v === 'true' : v;
+  }
+}
+function saveBgState() { for (const k of Object.keys(BG_DEFAULTS)) localStorage.setItem('chat_bg_' + k, BG[k]); }
+function hexToRgba(hex, a) {
+  let h = hex.replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const n = parseInt(h, 16);
+  if (isNaN(n)) return 'transparent';
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+function ytEmbedURL(raw) {
+  const m = raw.match(/(?:youtube\.com\/watch\?[^#]*v=|youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/embed\/)([A-Za-z0-9_-]{6,})/);
+  const list = raw.match(/[?&]list=([A-Za-z0-9_-]+)/);
+  if (m && m[1]) {
+    const v = m[1];
+    return 'https://www.youtube.com/embed/' + v + '?autoplay=1&mute=1&playsinline=1&rel=0&enablejsapi=1&loop=1&playlist=' + v + (list ? '&list=' + list[1] : '');
+  }
+  const lm = raw.match(/youtube\.com\/playlist\?[^#]*list=([A-Za-z0-9_-]+)/);
+  if (lm && lm[1]) return 'https://www.youtube.com/embed/videoseries?list=' + lm[1] + '&autoplay=1&mute=1&rel=0&enablejsapi=1';
+  return null;
+}
+function isYouTubeURL(raw) { return /youtube\.com|youtu\.be/i.test(raw); }
+function updateBgMuteBtn() {
+  const b = document.getElementById('bgUnmute');
+  if (!b) return;
+  b.title = bgMuted ? 'Unmute video' : 'Mute video';
+  b.innerHTML = bgMuted
+    ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>'
+    : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
+}
+function toggleBgMute() {
+  const f = document.querySelector('#chatBg iframe');
+  if (!f) return;
+  bgMuted = !bgMuted;
+  try { f.contentWindow.postMessage(JSON.stringify({ event: 'command', func: bgMuted ? 'mute' : 'unMute', args: [] }), '*'); } catch (e) {}
+  updateBgMuteBtn();
+}
+function applyChatBg() {
+  const bg = document.getElementById('chatBg');
+  const ov = document.getElementById('chatBgOverlay');
+  const unmute = document.getElementById('bgUnmute');
+  if (!bg) return;
+  bg.innerHTML = '';
+  bg.style.background = '';
+  document.body.classList.toggle('has-bg', BG.type !== 'none');
+  if (unmute) unmute.style.display = 'none';
+  if (BG.type === 'color') {
+    bg.style.background = hexToRgba(BG.color, BG.colorAlpha / 100);
+  } else if (BG.type === 'image') {
+    if (BG.image) bg.style.background = 'url("' + BG.image + '") center/cover no-repeat';
+  } else if (BG.type === 'url') {
+    if (BG.url) bg.style.background = 'url("' + BG.url + '") center/cover no-repeat';
+  } else if (BG.type === 'youtube') {
+    const embed = ytEmbedURL(BG.yt);
+    if (embed) {
+      const f = document.createElement('iframe');
+      f.src = embed;
+      f.allow = 'autoplay; encrypted-media';
+      f.title = 'Chat background video';
+      bg.appendChild(f);
+      if (unmute) { unmute.style.display = 'flex'; bgMuted = true; updateBgMuteBtn(); }
+    }
+  }
+  if (ov) {
+    if (BG.overlayOn) {
+      ov.style.display = 'block';
+      ov.style.opacity = BG.ovAlpha / 100;
+      ov.style.setProperty('--bgOv1', BG.ov1);
+      ov.style.setProperty('--bgOv2', BG.ov2);
+    } else {
+      ov.style.display = 'none';
+    }
+  }
+}
+// settings UI wiring (applies live, no Save)
+function setBgType(t) {
+  BG.type = t;
+  saveBgState(); applyChatBg();
+  document.querySelectorAll('.bg-type-btn').forEach(b => b.classList.toggle('active', b.dataset.bgtype === t));
+  document.getElementById('bgOptImage').hidden = t !== 'image';
+  document.getElementById('bgOptUrl').hidden = t !== 'url';
+  document.getElementById('bgOptYoutube').hidden = t !== 'youtube';
+  document.getElementById('bgOptColor').hidden = t !== 'color';
+  updateBgSettingsUI();
+}
+function bgFilePicked(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  if (f.size > 1.5 * 1024 * 1024) { showToast('Too big', 'Background image must be under 1.5 MB', true); input.value = ''; return; }
+  const r = new FileReader();
+  r.onload = () => { BG.image = r.result; saveBgState(); applyChatBg(); updateBgSettingsUI(); };
+  r.readAsDataURL(f);
+}
+function clearBgImage() { BG.image = null; saveBgState(); applyChatBg(); updateBgSettingsUI(); }
+function applyBgUrl() {
+  const raw = document.getElementById('bgUrlInput').value.trim();
+  if (!raw) return;
+  if (isYouTubeURL(raw)) {
+    BG.yt = raw; BG.type = 'youtube';
+    document.getElementById('bgYtInput').value = raw;
+    setBgType('youtube');
+  } else {
+    BG.url = raw; BG.type = 'url';
+    setBgType('url');
+  }
+  saveBgState(); applyChatBg();
+}
+function applyBgYoutube() {
+  const raw = document.getElementById('bgYtInput').value.trim();
+  if (!raw || !ytEmbedURL(raw)) { showToast('Invalid YouTube URL', '', true); return; }
+  BG.yt = raw; BG.type = 'youtube';
+  saveBgState(); applyChatBg(); updateBgSettingsUI();
+}
+function setBgColor(c) { BG.color = c; saveBgState(); applyChatBg(); }
+function setBgColorAlpha(v) { BG.colorAlpha = parseInt(v, 10); document.getElementById('bgColorAlphaVal').textContent = v + '%'; saveBgState(); applyChatBg(); }
+function setBgOverlay(on) {
+  BG.overlayOn = on;
+  document.getElementById('bgOptOverlay').hidden = !on;
+  saveBgState(); applyChatBg();
+}
+function setBgOvColor(n, c) { if (n === 1) BG.ov1 = c; else BG.ov2 = c; saveBgState(); applyChatBg(); }
+function setBgOvAlpha(v) { BG.ovAlpha = parseInt(v, 10); document.getElementById('bgOvAlphaVal').textContent = v + '%'; saveBgState(); applyChatBg(); }
+function updateBgSettingsUI() {
+  const thumb = document.getElementById('bgThumb');
+  const rm = document.getElementById('bgImageRemove');
+  if (thumb) {
+    if (BG.image) { thumb.style.display = 'block'; thumb.style.backgroundImage = 'url("' + BG.image + '")'; rm.style.display = 'inline-block'; }
+    else { thumb.style.display = 'none'; rm.style.display = 'none'; }
+  }
+  document.getElementById('bgUrlInput').value = BG.url;
+  document.getElementById('bgYtInput').value = BG.yt;
+  document.getElementById('bgColorPick').value = BG.color;
+  document.getElementById('bgColorAlpha').value = BG.colorAlpha;
+  document.getElementById('bgColorAlphaVal').textContent = BG.colorAlpha + '%';
+  document.getElementById('bgOvToggle').checked = BG.overlayOn;
+  document.getElementById('bgOptOverlay').hidden = !BG.overlayOn;
+  document.getElementById('bgOv1Pick').value = BG.ov1;
+  document.getElementById('bgOv2Pick').value = BG.ov2;
+  document.getElementById('bgOvAlpha').value = BG.ovAlpha;
+  document.getElementById('bgOvAlphaVal').textContent = BG.ovAlpha + '%';
+}
+function initChatBg() { loadBgState(); applyChatBg(); setBgType(BG.type); }
 
 // ---- System Prompt Bar ----
 function toggleSysPrompt() {
@@ -2798,6 +3058,20 @@ function toggleSidebarPin() {
   btn.innerHTML = sidebarPinned ? ICON_PANEL : ICON_PANEL_CLOSE;
   btn.title = sidebarPinned ? 'Unpin panel (allow auto-close)' : 'Keep panel open';
 }
+let chatSearchQuery = '';   // live letter-filter for the chat list (2026-08-27)
+function filterChats(v) {
+  chatSearchQuery = v.trim().toLowerCase();
+  document.getElementById('chatSearchClear').classList.toggle('show', !!v.trim());
+  loadHistory();
+}
+function clearChatSearch() {
+  const inp = document.getElementById('chatSearch');
+  inp.value = '';
+  chatSearchQuery = '';
+  document.getElementById('chatSearchClear').classList.remove('show');
+  loadHistory();
+  inp.focus();
+}
 function loadHistory() {
   const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
   const container = document.getElementById('chatHistory');
@@ -2805,9 +3079,16 @@ function loadHistory() {
     container.innerHTML = '<p style="padding:16px;color:var(--dim);font-size:13px;text-align:center">No conversations yet</p>';
     return;
   }
+  // live letter-filter: keep only titles containing the query (case-insensitive)
+  let list = chats;
+  if (chatSearchQuery) list = chats.filter(c => (c.title || '').toLowerCase().includes(chatSearchQuery));
+  if (!list.length) {
+    container.innerHTML = '<p style="padding:16px;color:var(--dim);font-size:13px;text-align:center">No chats match “' + escHtml(chatSearchQuery) + '”</p>';
+    return;
+  }
   // pinned chats float to the top as favorites; order within each group is the
   // existing recency order (newest first)
-  const sorted = [...chats.filter(c => c.pinned), ...chats.filter(c => !c.pinned)];
+  const sorted = [...list.filter(c => c.pinned), ...list.filter(c => !c.pinned)];
   container.innerHTML = sorted.map(c => `
     <div class="history-item${c.pinned ? ' pinned' : ''}${c.id === currentChatId ? ' active' : ''}" onclick="loadConversation('${c.id}');if(!sidebarPinned) toggleSidebar();">
       <div style="flex:1;min-width:0">
@@ -3936,6 +4217,7 @@ updateSysPromptBar(); updateTokenBar();
   void sb.offsetWidth;
   sb.style.transition = '';
 })();
+initChatBg();   // chat background (image / URL / YouTube / color + overlay) — restores last state
 </script>
 </body>
 </html>
