@@ -311,7 +311,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="new-chat-btn" onclick="newChat();if(!sidebarPinned) toggleSidebar();" title="Start a new chat">＋ New Chat</button>
   </div>
   <div class="sidebar-body" id="chatHistory"></div>
-  <div class="sidebar-footer">vLLM Chat v1.6.5</div>
+  <div class="sidebar-footer">vLLM Chat v1.6.6</div>
 </div>
 
 <div class="header">
@@ -2747,7 +2747,11 @@ function threadTitle(content) {
   const words = s.split(' ');
   return words.length > 7 ? words.slice(0, 7).join(' ') + '…' : s;
 }
-function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  sb.classList.toggle('open');
+  localStorage.setItem('chat_sidebar_open', sb.classList.contains('open') ? '1' : '0');
+}
 let sidebarPinned = localStorage.getItem('chat_sidebar_pinned') === '1';
 function toggleSidebarPin() {
   sidebarPinned = !sidebarPinned;
@@ -3824,7 +3828,10 @@ function showToast(msg) {
 
 document.addEventListener('click', (e) => {
   const sb = document.getElementById('sidebar');
-  if (sb.classList.contains('open') && !sidebarPinned && !sb.contains(e.target) && !e.target.classList.contains('sidebar-toggle')) sb.classList.remove('open');
+  if (sb.classList.contains('open') && !sidebarPinned && !sb.contains(e.target) && !e.target.classList.contains('sidebar-toggle')) {
+    sb.classList.remove('open');
+    localStorage.setItem('chat_sidebar_open', '0');
+  }
 });
 document.getElementById('settingsModal').addEventListener('click', (e) => { if (e.target === document.getElementById('settingsModal')) closeSettings(); });
 document.getElementById('renameModal').addEventListener('click', (e) => { if (e.target === document.getElementById('renameModal')) closeRename(); });
@@ -3837,6 +3844,15 @@ updateSysPromptBar(); updateTokenBar();
   b.classList.add('pinned');
   b.innerHTML = ICON_PANEL;
   b.title = 'Unpin panel (allow auto-close)';
+})();
+(function restoreSidebar() {
+  if (localStorage.getItem('chat_sidebar_open') !== '1') return;
+  const sb = document.getElementById('sidebar');
+  if (!sb) return;
+  sb.style.transition = 'none';
+  sb.classList.add('open');
+  void sb.offsetWidth;
+  sb.style.transition = '';
 })();
 </script>
 </body>
