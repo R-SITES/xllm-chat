@@ -4,8 +4,9 @@ set -e
 
 cd "$(dirname "$0")" || exit 1
 PORT=3001
-PIDFILE="/tmp/chat-client.pid"
-LOGFILE="/tmp/chat-client.log"
+# runtime artifacts live next to the script (no absolute paths in the repo)
+PIDFILE=".chat-client.pid"
+LOGFILE=".chat-client.log"
 
 # If the port is already serving (regardless of who started it), just open browser
 if curl -s -o /dev/null --max-time 2 "http://localhost:$PORT/"; then
