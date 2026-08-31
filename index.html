@@ -60,8 +60,8 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .msg.assistant .avatar{background:var(--accentBg);color:var(--accent)}
 .msg.system .avatar{background:var(--sysBg);color:var(--sysText)}
 .bubble{max-width:85%;padding:12px 16px;border-radius:16px;line-height:1.75;font-size:14px;word-wrap:break-word;position:relative}
-.msg.user .bubble{background:var(--userBg);border-radius:16px 4px 16px 16px;color:#fff}
-.msg.assistant .bubble{background:var(--asstBg);border:1px solid var(--border);border-radius:4px 16px 16px 16px}
+.msg.user .bubble{background:var(--userBg);border-radius:16px 4px 0px 16px;color:#fff}
+.msg.assistant .bubble{background:var(--asstBg);border:1px solid var(--border);border-radius:4px 16px 16px 0px}
 .msg.system .bubble{background:var(--sysBg);border:1px solid var(--sysLine);border-radius:var(--r);color:var(--sysText);font-size:12px}
 .bubble p{margin:1rem 0}
 .bubble p:first-child{margin-top:0}
@@ -116,8 +116,8 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .msg.editing .bubble{width:100%;max-width:100%}
 .msg.user .msg-main .bubble{max-width:100%}
 .msg.assistant .msg-main .bubble{max-width:100%}
-.msg-stats{display:flex;align-items:center;gap:12px;margin-top:4px;padding:0 4px;font-size:11px;color:var(--dim);flex-wrap:wrap;user-select:none}
-.msg.user .msg-stats{justify-content:flex-end}
+.msg-stats{display:flex;align-items:center;gap:12px;margin-top:0;padding:4px 10px;font-size:11px;color:var(--dim);flex-wrap:wrap;user-select:none;background:var(--asstBg);border:1px solid var(--border);border-radius:0 0 10px 10px;box-shadow:0 1px 5px rgba(0,0,0,.10);position:relative}
+.msg.user .msg-stats{justify-content:flex-end;background:var(--userBg);border-color:transparent;color:rgba(255,255,255,.92)}
 .msg-stats .stat-badge{display:inline-flex;align-items:center;gap:4px;opacity:.85;transition:opacity .15s}
 .msg-stats .stat-badge:hover{opacity:1;color:var(--text)}
 .msg-stats .stat-badge svg{width:12px;height:12px;flex-shrink:0}
@@ -126,10 +126,13 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .msg-stats .stat-badge .model-val{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--accent)}
 .msg-stats .msg-actions{margin-left:auto;display:inline-flex;align-items:center;gap:2px}
 .msg-stats .msg-act{background:none;border:none;color:var(--dim);cursor:pointer;padding:3px 5px;border-radius:4px;opacity:.6;display:inline-flex;align-items:center;transition:all .15s}
-.msg-stats .msg-act:hover{opacity:1;color:var(--text);background:var(--bg3)}
+.msg-stats .msg-act:hover{opacity:1;color:var(--text);background:var(--accentBg)}
 .msg-stats .msg-act.del:hover{color:var(--red);background:rgba(248,81,73,.12)}
+.msg.user .msg-stats .msg-act{color:rgba(255,255,255,.78)}
+.msg.user .msg-stats .msg-act:hover{color:#fff;background:rgba(255,255,255,.14)}
+.msg.user .msg-stats .msg-act.del:hover{color:#fff;background:rgba(248,81,73,.75)}
 /* ── Message edit + branch versions (llama.cpp/Qwen port) ── */
-.branch-bar{display:inline-flex;align-items:center;gap:5px;margin-bottom:8px;padding:2px 12px;background:var(--accentSoft);border:1px solid var(--accentLine);border-radius:999px;font-size:11px;font-family:var(--mono);color:var(--accent);cursor:pointer;user-select:none;transition:background .12s}
+.branch-bar{display:inline-flex;align-items:center;gap:5px;margin-bottom:8px;padding:2px 12px;background:var(--accentSoft);border:1px solid var(--accentLine);border-radius:999px;font-size:11px;font-family:var(--mono);color:var(--accent);cursor:pointer;user-select:none;transition:background .12s;position:relative}
 .branch-bar:hover{background:var(--accentLine)}
 .branch-bar.past{background:rgba(210,153,34,.10);border-color:rgba(210,153,34,.32);color:#d29922}
 .branch-bar.past:hover{background:rgba(210,153,34,.2)}
@@ -140,7 +143,8 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .edit-btn:hover{border-color:var(--accent);color:var(--accent)}
 .edit-btn.save{background:var(--accent);border-color:var(--accent);color:#fff}
 .edit-btn.save:hover{opacity:.85}
-.trunc-note{margin-top:6px;padding:6px 10px;font-size:11px;color:#e3b341;background:rgba(227,179,65,.1);border:1px solid rgba(227,179,65,.25);border-radius:6px;line-height:1.4}
+.trunc-note{margin-top:6px;padding:6px 10px;font-size:11px;color:#e3b341;background:rgba(227,179,65,.1);border:1px solid rgba(227,179,65,.25);border-radius:6px;line-height:1.4;position:relative}
+.loop-warn{margin-top:6px;padding:6px 10px;font-size:11px;color:#e36b5b;background:rgba(227,107,91,.1);border:1px solid rgba(227,107,91,.3);border-radius:6px;line-height:1.4;position:relative}
 .preview-overlay{display:none;position:fixed;inset:0;background-color:transparent;z-index:100000}
 .preview-overlay.show{display:block}
 .preview-overlay .preview-frame-wrap{position:fixed;inset:0;top:0!important;left:0!important;width:100dvw;height:100dvh;margin:0;padding:0;border:none;border-radius:0;background-color:transparent;box-shadow:none;display:block;overflow:hidden;transform:none!important;z-index:100001}
@@ -195,8 +199,8 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .tp-direct{background:var(--accent)}
 .tp-response{background:rgba(139,148,158,.5)}
 .tp-overflow{background:var(--red)}
-.tokenTip{position:absolute;right:0;bottom:calc(100% + 10px);z-index:70;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-family:var(--mono);font-size:12px;line-height:1.7;white-space:pre;box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:auto;opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s;max-width:340px}
-.tokenTip.show{opacity:1;transform:translateY(0)}
+.tokenTip{position:absolute;right:0;bottom:calc(100% + 10px);z-index:70;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-family:var(--mono);font-size:12px;line-height:1.7;white-space:pre;box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:none;opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s;max-width:340px}
+.tokenTip.show{opacity:1;transform:translateY(0);pointer-events:auto}
 .tokenTip.tp-warn{border-color:rgba(210,153,34,.6);background:#1c1a15}
 .tokenTip.tp-danger{border-color:var(--red);background:#1c1214}
 /* ── Attachments (paperclip) ── */
@@ -328,6 +332,15 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
 .bg-url-row input:focus{border-color:var(--accent)}
 .bg-btn{padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:12px;cursor:pointer;font-family:var(--font)}
 .bg-btn:hover{border-color:var(--accent);color:var(--accent)}
+.yt-presets{margin-top:2px;display:flex;flex-direction:column;gap:6px}
+.yt-presets-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.yt-presets-label{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.4px}
+.yt-preset-pills{display:flex;flex-wrap:wrap;gap:6px}
+.yt-preset-pill{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:4px 10px;border:1px solid var(--border);background:var(--bg3);color:var(--text);border-radius:999px;font-size:11px;cursor:pointer;font-family:var(--font);transition:all .15s}
+.yt-preset-pill:hover{border-color:var(--accent);color:var(--accent)}
+.yt-preset-x{color:var(--dim);font-size:10px;line-height:1;padding:2px;border-radius:50%}
+.yt-preset-x:hover{color:var(--red)}
+.yt-presets-empty{font-size:11px;color:var(--dim);font-style:italic}
 .bg-thumb-row{display:flex;align-items:center;gap:10px}
 .bg-thumb{width:72px;height:44px;border-radius:8px;border:1px solid var(--border);background-size:cover;background-position:center;flex-shrink:0}
 .bg-slider-row{display:flex;align-items:center;gap:10px}
@@ -413,7 +426,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">vLLM Chat v2.2.9</span>
+    <span class="footer-version">vLLM Chat v2.3.1</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -570,6 +583,13 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
         <button class="bg-btn" onclick="applyBgYoutube()">Apply</button>
       </div>
       <div class="bg-note">Plays muted &amp; autoplaying behind the chat. Use the speaker button at the bottom-right to unmute. Playlist URLs cycle through the playlist.</div>
+      <div class="yt-presets">
+        <div class="yt-presets-head">
+          <span class="yt-presets-label">Presets</span>
+          <button class="bg-btn" onclick="saveYtPreset()" title="Save the URL above as a named preset">Save Preset</button>
+        </div>
+        <div class="yt-preset-pills" id="ytPresetPills"></div>
+      </div>
     </div>
     <div class="bg-opt" id="bgOptColor" hidden>
       <div class="bg-color-row">
@@ -596,7 +616,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
       <div class="bg-note">The two colors crossfade over the background. Transparency 0 = no tint, 100 = fully opaque.</div>
     </div>
     <label>API URL</label>
-    <input type="text" id="setApiUrl" value="http://localhost:8000">
+    <input type="text" id="setApiUrl" value="http://127.0.0.1:8080">
     <label>System Prompt</label>
     <textarea id="setSysPrompt"></textarea>
     <label>Max Tokens (0 = unlimited)</label>
@@ -2622,7 +2642,10 @@ Prism.languages.sql={comment:{pattern:/(^|[^\\])(?:\/\*[\s\S]*?\*\/|(?:--|\/\/|#
 
 </script>
 <script>
-let API_URL = localStorage.getItem('chat_api_url') || 'http://localhost:8000';
+let API_URL = localStorage.getItem('chat_api_url') || 'http://127.0.0.1:8080';
+let isLlamaCpp = null; // backend flag: llama.cpp serves /props (vLLM does not) — see detectBackend()
+let _backendKnown = false; // true once a probe got a definitive answer (models owned_by or /props status)
+let _thinkRetry = false; // one-shot self-heal: retry a thinking-only response with thinking OFF
 let SYSTEM_PROMPT = localStorage.getItem('chat_system_prompt') || '';
 let MAX_TOKENS = parseInt(localStorage.getItem('chat_max_tokens') || '0');
 if (isNaN(MAX_TOKENS) || MAX_TOKENS < 0) MAX_TOKENS = 0;
@@ -2633,7 +2656,7 @@ let TOP_P = parseFloat(localStorage.getItem('chat_top_p') || '0.9');
 let currentModel = localStorage.getItem('chat_current_model') || '';
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '2.2.9';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '2.3.1';   // keep in sync with the sidebar footer version text
 let abortController = null;
 let isStreaming = false;
 let currentStreamingEl = null;
@@ -2742,7 +2765,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const input = document.getElementById('chatInput');
   input.addEventListener('input', autoResize);
   input.focus();
-  loadModels();
+  loadModels().then(() => { if (!_backendKnown) detectBackend(); });
   loadHistory();
   if (currentChatId) {
     loadConversation(currentChatId);
@@ -2887,6 +2910,7 @@ function openSettings() {
 function closeSettings() { document.getElementById('settingsModal').classList.remove('show'); }
 function saveSettings() {
   API_URL = document.getElementById('setApiUrl').value.replace(/\/+$/, '');
+  isLlamaCpp = null; _backendKnown = false; detectBackend(); // API URL changed -> re-probe backend
   SYSTEM_PROMPT = document.getElementById('setSysPrompt').value;
   const mt = parseInt(document.getElementById('setMaxTokens').value);
   MAX_TOKENS = (!isNaN(mt) && mt > 0) ? mt : 0;
@@ -3059,6 +3083,51 @@ function applyBgYoutube() {
   BG.yt = raw; BG.type = 'youtube';
   saveBgState(); applyChatBg(); updateBgSettingsUI();
 }
+// ── YouTube background presets (2026-08-30): save/load/delete pills like the launchers ──
+const YT_PRESETS_KEY = 'chat_yt_presets';
+function getYtPresets() { try { return JSON.parse(localStorage.getItem(YT_PRESETS_KEY)) || []; } catch (e) { return []; } }
+function setYtPresets(list) { localStorage.setItem(YT_PRESETS_KEY, JSON.stringify(list)); }
+function ytPresetName(url) {
+  const vm = url.match(/[?&]v=([\w-]{6,})/);
+  const lm = url.match(/[?&]list=([\w-]{6,})/);
+  if (vm) return 'video-' + vm[1];
+  if (lm) return 'playlist-' + lm[1];
+  return url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '').slice(0, 28);
+}
+function renderYtPresets() {
+  const cont = document.getElementById('ytPresetPills');
+  if (!cont) return;
+  const list = getYtPresets();
+  cont.innerHTML = list.length
+    ? list.map((p, i) => `<span class="yt-preset-pill" title="${escAttr(p.url)}" onclick="loadYtPreset(${i})">${escHtml(p.name)}<span class="yt-preset-x" title="Delete preset" onclick="event.stopPropagation();deleteYtPreset(${i})">✕</span></span>`).join('')
+    : '<span class="yt-presets-empty">No presets yet — enter a URL above and hit Save Preset.</span>';
+}
+function saveYtPreset() {
+  const raw = (document.getElementById('bgYtInput').value.trim() || BG.yt || '').trim();
+  if (!raw || !ytEmbedURL(raw)) { showToast('Nothing to save', 'Enter a valid YouTube URL first', true); return; }
+  const list = getYtPresets();
+  if (list.some(p => p.url === raw)) { showToast('Already saved', 'That URL is already a preset', true); return; }
+  const suggested = ytPresetName(raw);
+  const name = (prompt('Preset name:', suggested) || '').trim() || suggested;
+  list.push({ name: name, url: raw });
+  setYtPresets(list); renderYtPresets();
+  showToast('Preset saved', name);
+}
+function loadYtPreset(i) {
+  const list = getYtPresets();
+  const p = list[i]; if (!p) return;
+  document.getElementById('bgYtInput').value = p.url;
+  BG.yt = p.url; BG.type = 'youtube';
+  saveBgState(); applyChatBg(); updateBgSettingsUI();
+  setBgType('youtube');
+  showToast('Preset loaded', p.name);
+}
+function deleteYtPreset(i) {
+  const list = getYtPresets();
+  const p = list[i]; if (!p) return;
+  list.splice(i, 1); setYtPresets(list); renderYtPresets();
+  showToast('Preset deleted', p.name);
+}
 function setBgColor(c) { BG.color = c; saveBgState(); applyChatBg(); }
 function setBgColorAlpha(v) { BG.colorAlpha = parseInt(v, 10); document.getElementById('bgColorAlphaVal').textContent = v + '%'; saveBgState(); applyChatBg(); }
 function setBgOverlay(on) {
@@ -3086,6 +3155,7 @@ function updateBgSettingsUI() {
   document.getElementById('bgOv2Pick').value = BG.ov2;
   document.getElementById('bgOvAlpha').value = BG.ovAlpha;
   document.getElementById('bgOvAlphaVal').textContent = BG.ovAlpha + '%';
+  renderYtPresets();
 }
 function initChatBg() { loadBgState(); applyChatBg(); setBgType(BG.type); }
 
@@ -3373,7 +3443,7 @@ document.addEventListener('click', (e) => {
 
 // ---- API ----
 function loadModels() {
-  fetch(API_URL + '/v1/models')
+  return fetch(API_URL + '/v1/models')
     .then(r => r.json())
     .then(data => {
       const models = (data.data || []).filter(m => m.id);
@@ -3382,6 +3452,13 @@ function loadModels() {
         sel.innerHTML = models.map(m => `<option value="${escAttr(m.id)}">${escHtml(m.id)}</option>`).join('');
         currentModel = models[0].id;
         localStorage.setItem('chat_current_model', currentModel);
+        // PRIMARY backend signal: llama.cpp reports owned_by:"llamacpp" in /v1/models.
+        // This rides the same fetch that populates the model list (retried every 10s on
+        // failure), so the flag is set whenever the server is actually reachable — the
+        // /props probe is only the fallback (a probe that failed once at page load used
+        // to leave the flag false forever, sending uncapped requests -> blank loops).
+        if (data.data[0] && data.data[0].owned_by === 'llamacpp') { isLlamaCpp = true; _backendKnown = true; }
+        else if (data.data[0] && data.data[0].owned_by) { isLlamaCpp = false; _backendKnown = true; } // vLLM/other: no reasoning cap
         const mml = models[0].max_model_len || models[0].context_length;
         if (mml > 0 && mml !== contextLimit) {
           contextLimit = mml;
@@ -3405,6 +3482,33 @@ function loadModels() {
       // the model list (and the stats-bar model badge) without a page reload
       setTimeout(loadModels, 10000);
     });
+}
+
+// llama.cpp exposes GET /props (vLLM returns 404). Used to send per-request
+// chat_template_kwargs only to llama.cpp: Qwen4 GGUFs default reasoning_effort to
+// xhigh, which at aggressive quants (IQ1_S/IQ3_XXS) loops forever in reasoning and
+// returns ZERO content tokens — the empty-bubble bug. Capping at 'low' still yields
+// a reasoning pill plus an actual answer (verified 2026-08-29).
+// The /props probe is ONLY the fallback: loadModels' /v1/models owned_by check is the
+// primary signal and sets _backendKnown itself — so skip the probe entirely once the
+// backend is known (a vLLM 404 is definitive but logs a noisy console error; 2026-08-31).
+async function detectBackend() {
+  if (_backendKnown) return isLlamaCpp;   // already definitive — no noisy /props probe
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 3000);
+    const r = await fetch(API_URL + '/props', { signal: ctrl.signal });
+    clearTimeout(t);
+    isLlamaCpp = r.ok;
+    _backendKnown = true;   // definitive either way (llama.cpp 200 / vLLM 404)
+  } catch (e) {
+    isLlamaCpp = false;
+    _backendKnown = false;  // transient — keep re-probing (send-time + 10s retry)
+    // transient failure (server down/restarting at page load): re-probe like loadModels —
+    // otherwise every later request would go out WITHOUT the reasoning cap -> blank loops
+    setTimeout(detectBackend, 10000);
+  }
+  return isLlamaCpp;
 }
 
 function selectModel(val) {
@@ -3531,6 +3635,33 @@ async function streamFromHistory() {
   catch (e) {
     if (e.name !== 'AbortError') appendMessage('system', 'Error: ' + e.message);
   }
+  // Thinking-loop self-heal: if the stream finished with a reasoning pill but ZERO
+  // content tokens (Qwen4 xhigh-effort loop at aggressive quants), pop the blank
+  // response and retry ONCE with thinking disabled — never leave an empty bubble.
+  // Fires regardless of the backend flag: an uncapped request (flag unset/failed
+  // probe) is exactly the case that loops, and the retry's thinking-off kwarg is
+  // sent unconditionally below.
+  if (!_thinkRetry && !(abortController && abortController.signal.aborted)) {
+    const last = conversationHistory[conversationHistory.length - 1];
+    if (last && last.role === 'assistant' && !last.content && last.thinking) {
+      conversationHistory.pop();
+      renderAllMessages();
+      conversationHistory.push({ role: 'assistant', content: '' });
+      _thinkRetry = true;
+      try { await streamResponse(); }
+      catch (e2) { if (e2.name !== 'AbortError') appendMessage('system', 'Error: ' + e2.message); }
+      finally { _thinkRetry = false; }
+      if (streamChatId === currentChatId) {
+        const b = document.querySelector('.msg:last-of-type .bubble');
+        if (b) {
+          const n = document.createElement('div');
+          n.className = 'trunc-note';
+          n.textContent = '⚠ Thinking disabled for this retry — the model stayed in reasoning (thinking loop).';
+          b.appendChild(n);
+        }
+      }
+    }
+  }
   ensureBranchBar();
   saveCurrentChat();
   isStreaming = false;
@@ -3552,11 +3683,17 @@ function copyMessage(btn) {
   navigator.clipboard.writeText(text).then(() => showToast('Copied')).catch(() => {});
 }
 
-function recycleMessage(btn) {
+async function recycleMessage(btn) {
   const msgEl = btn.closest('.msg');
   if (!msgEl) return;
-  // abort streaming if this is the live message
-  if (isStreaming) stopGeneration();
+  // abort streaming if this is the live message, and WAIT for the abort to fully
+  // unwind (isStreaming only flips false in streamFromHistory's cleanup) — otherwise
+  // the old stream's catch can clobber the rebuilt DOM and the resend gets skipped
+  if (isStreaming) {
+    stopGeneration();
+    let waited = 0;
+    while (isStreaming && waited < 50) { await new Promise(r => setTimeout(r, 100)); waited++; }
+  }
   const idx = parseInt(msgEl.dataset.hidx, 10);
   if (isNaN(idx) || idx < 0) return;
   // find the user prompt that produced this response (nearest user at or before idx)
@@ -3571,8 +3708,7 @@ function recycleMessage(btn) {
   saveCurrentChat();
   updateTokenBar();
   // resend the prompt — the user message is already the history tail, just stream
-  if (isStreaming) return;
-  streamFromHistory();
+  await streamFromHistory();
 }
 
 function deleteMessage(btn) {
@@ -3733,7 +3869,7 @@ function appendMessage(role, content, thinking = null, stats = null, hidx = null
     if (thinking) {
       bubbleHtml = thinkingPillHTML(thinking, false);
     }
-    bubbleHtml += escapeAndFormat(content);
+    bubbleHtml += content ? escapeAndFormat(content) : (thinking ? '<div class="loop-warn">⚠ No answer text — thinking loop.</div>' : '');
   } else {
     bubbleHtml = escapeAndFormat(content);
     if (attachments && attachments.length) bubbleHtml += attachmentChipsHTML(attachments);
@@ -3809,8 +3945,16 @@ async function streamResponse() {
   let thinkingStarted = false;
   let finalUsage = null;
   let finishReason = null;
+  let serverTimings = null;
 
   try {
+    // probe whenever the backend is NOT confirmed llama.cpp AND not definitively known
+    // otherwise — a probe that failed earlier (server restarting) must never leave the
+    // cap off; models owned_by already sets the flag in the common case (no throttle:
+    // throttling re-introduced exactly the blank-loop it was meant to prevent)
+    if (isLlamaCpp !== true && !_backendKnown) {
+      try { await detectBackend(); } catch (e) { isLlamaCpp = false; }
+    }
     const res = await fetch(API_URL + '/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -3820,6 +3964,12 @@ async function streamResponse() {
         stream: true,
         // 0 = unlimited: omit max_tokens so vLLM uses the model's full context
         ...(MAX_TOKENS > 0 ? { max_tokens: MAX_TOKENS } : {}),
+        // llama.cpp Qwen4: cap reasoning_effort at 'low' — the GGUF template defaults
+        // to xhigh which loops at aggressive quants (zero content tokens = empty bubble);
+        // _thinkRetry (one-shot self-heal) retries with thinking OFF, UNCONDITIONALLY —
+        // it must fire even when the backend flag was never confirmed true
+        ...(_thinkRetry ? { chat_template_kwargs: { enable_thinking: false } }
+          : (isLlamaCpp ? { chat_template_kwargs: { reasoning_effort: 'low' } } : {})),
         temperature: TEMPERATURE,
         top_p: TOP_P,
         stream_options: { include_usage: true }
@@ -3845,19 +3995,26 @@ async function streamResponse() {
         if (data === '[DONE]') continue;
         try {
           const json = JSON.parse(data);
+          // surface SSE error events (llama.cpp template failures etc.) instead of
+          // silently dropping them — a dropped error event used to leave an EMPTY bubble
+          if (json.error) throw new Error((json.error.message || json.error.type || 'Server error') + (json.error.code ? ' (' + json.error.code + ')' : ''));
           // vLLM sends a final chunk with usage and no choices when include_usage
           if (json.usage) finalUsage = json.usage;
+          // llama.cpp sends exact generation timings in the final chunk
+          if (json.timings) serverTimings = json.timings;
           if (json.choices?.[0]?.finish_reason) finishReason = json.choices[0].finish_reason;
           const delta = json.choices?.[0]?.delta;
           if (!delta) continue;
 
-          if (delta.reasoning) {
+          // vLLM streams thinking as delta.reasoning; llama.cpp as delta.reasoning_content
+          const reasoningText = delta.reasoning || delta.reasoning_content;
+          if (reasoningText) {
             if (!msgFirstTokenTime) msgFirstTokenTime = Date.now();
             streamTokens++;
-            streamChars += delta.reasoning.length;
-            streamThinkingChars += delta.reasoning.length;
+            streamChars += reasoningText.length;
+            streamThinkingChars += reasoningText.length;
             thinkingStarted = true;
-            thinking += delta.reasoning;
+            thinking += reasoningText;
             updateThinkingUI(thinking, inThinking);
             if (!inThinking) {
               inThinking = true;
@@ -3881,12 +4038,14 @@ async function streamResponse() {
     }
     // Finalize
     const finalEl = liveBubble();
-    if (finalEl && (fullText || thinking)) {
+    if (finalEl) {
       let html = '';
       if (thinking) {
         html = thinkingPillHTML(thinking, false);
       }
       if (fullText) html += escapeAndFormat(fullText);
+      else if (thinking) html += '<div class="loop-warn">⚠ No answer text generated — the model stayed in reasoning (thinking loop). Retry the message.</div>';
+      else html += '<div class="loop-warn">⚠ No response received from the server.</div>';
       finalEl.innerHTML = html;
       finalEl.querySelectorAll('pre').forEach(pre => {
         const btn = document.createElement('button');
@@ -3906,9 +4065,13 @@ async function streamResponse() {
     const totalMs = Date.now() - streamStartTime;
     const genMs = msgFirstTokenTime > 0 ? Date.now() - msgFirstTokenTime : totalMs;
     const exactTokens = (finalUsage && finalUsage.completion_tokens > 0) ? finalUsage.completion_tokens : streamTokens;
-    // llama.cpp formula: predicted_n / predicted_ms * 1000 (cumulative since gen start)
-    const finalStats = { tokens: exactTokens, timeMs: totalMs, tps: genMs > 0 ? (exactTokens / (genMs / 1000)) : 0, truncated: finishReason === 'length' || undefined, model: currentModel };
-    if (msgStatsEl) msgStatsEl.innerHTML = statsBarHTML(exactTokens, totalMs, finalStats.tps, false, currentModel);
+    // llama.cpp reports exact speed in the final chunk (predicted_n / predicted_ms * 1000);
+    // vLLM has no timings field, so fall back to the measured rate
+    const exactTps = (serverTimings && serverTimings.predicted_per_second > 0)
+      ? serverTimings.predicted_per_second
+      : (genMs > 0 ? (exactTokens / (genMs / 1000)) : 0);
+    const finalStats = { tokens: exactTokens, timeMs: totalMs, tps: exactTps, truncated: finishReason === 'length' || undefined, model: currentModel };
+    if (msgStatsEl) msgStatsEl.innerHTML = statsBarHTML(exactTokens, totalMs, exactTps, false, currentModel);
 
     // Truncation notice: finish_reason "length" = hit the token cap mid-generation
     if (finishReason === 'length' && finalEl) {
@@ -3947,7 +4110,11 @@ async function streamResponse() {
     if (msgStatsTimer) { clearInterval(msgStatsTimer); msgStatsTimer = null; }
     const errEl = liveBubble();
     if (e.name === 'AbortError') {
-      if (errEl) errEl.innerHTML = fullText ? escapeAndFormat(fullText) + '<span style="color:var(--dim);font-size:12px"> — [stopped]</span>' : '<span style="color:var(--dim)">[stopped]</span>';
+      // only paint [stopped] into an ASSISTANT bubble — after a recycle-triggered
+      // abort the last bubble may be the user's (chat rebuilt); never clobber it
+      if (errEl && errEl.closest('.msg') && errEl.closest('.msg').classList.contains('assistant')) {
+        errEl.innerHTML = fullText ? escapeAndFormat(fullText) + '<span style="color:var(--dim);font-size:12px"> — [stopped]</span>' : '<span style="color:var(--dim)">[stopped]</span>';
+      }
       // persist whatever streamed so far into the stream's thread (2026-08-27)
       if (streamChatId === currentChatId) {
         const lastAi = conversationHistory.length ? conversationHistory[conversationHistory.length - 1] : null;
@@ -4027,6 +4194,11 @@ function buildMessages() {
   let msgs = [];
   if (SYSTEM_PROMPT) msgs.push({ role: 'system', content: SYSTEM_PROMPT });
   for (const m of conversationHistory) {
+    // Skip empty assistant turns — the streaming placeholder and any old blank
+    // responses carry zero information, and with thinking OFF the qwen4exp
+    // template renders a trailing empty assistant as a COMPLETE turn, so the
+    // model emits an immediate EOS: 0 tokens, "No response received" (2026-08-29).
+    if (m.role === 'assistant' && !m.content) continue;
     if (m.role === 'user' && m.attachments && m.attachments.length) {
       // text attachments inline as fenced blocks (works with any model);
       // images as OpenAI vision content parts (needs a vision-capable model)
