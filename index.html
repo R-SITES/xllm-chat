@@ -4834,7 +4834,7 @@ async function agentRunTurn() {
     if (!el) return;
     let html = '';
     if (thinking) html += thinkingPillHTML(thinking, true);
-    html += escapeAndFormat(fullText);
+    html += renderAssistantContent(fullText);
     el.innerHTML = html;
     if (currentChatId === streamChatId) chatScrollBottom();
   };
@@ -4854,9 +4854,9 @@ async function agentRunTurn() {
     if (msgStatsEl) msgStatsEl.innerHTML = statsBarHTML(exactTokens, totalMs, tps, false, displayModelBadge());
     if (finalEl) {
       let html = '';
-      if (thinking && fullText) html = thinkingPillHTML(thinking, false) + escapeAndFormat(fullText);
+      if (thinking && fullText) html = thinkingPillHTML(thinking, false) + renderAssistantContent(fullText);
       else if (thinking && !fullText) html = thinkingPillHTML(thinking, false);
-      else if (fullText) html = escapeAndFormat(fullText);
+      else if (fullText) html = renderAssistantContent(fullText);
       else if (runEnded === 'error') html = '<div class="loop-warn">⚠ Agent run failed' + (runErr ? ' — ' + escHtml(shortTxt(runErr, 300)) : '') + '.</div>';
       else if (runEnded === 'cancelled') html = '<span style="color:var(--dim)">[stopped]</span>';
       else html = '<div class="loop-warn">⚠ No response received from the agent.</div>';
@@ -5214,7 +5214,7 @@ async function agentChatSimpleTurn(ag, sessId, reuseExisting) {
           if (el) {
             let html = '';
             if (thinking) html += thinkingPillHTML(thinking, true);
-            html += escapeAndFormat(fullText);
+            html += renderAssistantContent(fullText);
             el.innerHTML = html;
             if (currentChatId === streamChatId) chatScrollBottom();
           }
@@ -5233,7 +5233,7 @@ async function agentChatSimpleTurn(ag, sessId, reuseExisting) {
     if (finalEl) {
       let html = '';
       if (thinking) html += thinkingPillHTML(thinking, false);
-      if (fullText) html += escapeAndFormat(fullText);
+      if (fullText) html += renderAssistantContent(fullText);
       else html += '<div class="loop-warn">⚠ No response received from the agent.</div>';
       finalEl.innerHTML = html;
     }
