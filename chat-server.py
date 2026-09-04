@@ -48,10 +48,18 @@ _MODEL_CACHE = {}          # base url -> (model_id, fetched_ts) — default mode
 #    client renders <img src="/api/media?path=…"> and we resolve + serve the bytes here.
 #    Resolution mirrors R1 Connect's resolve_image_path() exactly (battle-tested against
 #    the same gateway). Relative refs resolve against the R1 base roots in R1's order.
-MEDIA_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
+MEDIA_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp",
+              ".mp4", ".mov", ".m4v", ".webm", ".mp3", ".wav", ".m4a",
+              ".aac", ".ogg", ".flac", ".opus"}
+MEDIA_IMG_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 MEDIA_CT = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-            ".webp": "image/webp", ".gif": "image/gif", ".bmp": "image/bmp"}
+            ".webp": "image/webp", ".gif": "image/gif", ".bmp": "image/bmp",
+            ".mp4": "video/mp4", ".mov": "video/quicktime", ".m4v": "video/x-m4v",
+            ".webm": "video/webm", ".mp3": "audio/mpeg", ".wav": "audio/wav",
+            ".m4a": "audio/mp4", ".aac": "audio/aac", ".ogg": "audio/ogg",
+            ".flac": "audio/flac", ".opus": "audio/ogg"}
 MAX_MEDIA_BYTES = 8 * 1024 * 1024   # 8 MB cap per image (Krea/ComfyUI PNGs run 1-3 MB)
+MAX_MEDIA_VIDEO_BYTES = 256 * 1024 * 1024  # 256 MB cap per video/audio file
 MEDIA_BASE_PATHS = [                # relative refs resolve against these, in order
     os.path.expanduser("~/ComfyUI/output"),
     os.path.expanduser("~/ComfyUI/output/img2ltx"),
@@ -297,11 +305,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().do_GET()
 
     def _handle_media(self):
-        """Serve a resolved local image file for the chat's <img src="/api/media">.
+        """Serve a resolved local media file (image/video/audio) for the chat.
 
         The query 'path' is the raw token from the model's text (MEDIA:/abs/path,
-        ~/rel.png, ComfyUI/output/x.png). Resolution rules live in
+        ~/rel.mp4, ComfyUI/output/x.png). Resolution rules live in
         resolve_media_path(); this handler only guards ext/size and streams bytes.
+        Supports single-range requests (Accept-Ranges: bytes, 206) so <video> can
+        seek without downloading the whole file.
         """
         params = {}
         qs = self.path.split("?", 1)
@@ -320,19 +330,59 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return
         try:
             size = os.path.getsize(resolved)
-            if size > MAX_MEDIA_BYTES:
-                self._json({"error": f"media too large ({size} bytes)"}, 413)
-                return
-            with open(resolved, "rb") as f:
-                data = f.read()
         except OSError as e:
             self._json({"error": str(e)}, 404)
             return
-        self.send_response(200)
-        self.send_header("Content-Type", MEDIA_CT[ext])
-        self.send_header("Content-Length", str(len(data)))
+        cap = MAX_MEDIA_BYTES if ext in MEDIA_IMG_EXTS else MAX_MEDIA_VIDEO_BYTES
+        if size > cap:
+            self._json({"error": f"media too large ({size} bytes)"}, 413)
+            return
+        ctype = MEDIA_CT[ext]
+        start, end = 0, size - 1
+        rng = self.headers.get("Range")
+        if rng:
+            m = re.match(r"bytes=(\d*)-(\d*)$", rng.strip())
+            if not m:
+                self._json({"error": "invalid range"}, 416)
+                return
+            if m.group(1):
+                start = int(m.group(1))
+            if m.group(2):
+                end = min(int(m.group(2)), size - 1)
+            if start > end or start >= size:
+                self.send_response(416)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.end_headers()
+                return
+            partial = True
+        else:
+            partial = False
+        length = end - start + 1
+        self.send_response(206 if partial else 200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Content-Length", str(length))
+        if partial:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
         self.end_headers()
-        self.wfile.write(data)
+        try:
+            with open(resolved, "rb") as f:
+                if start:
+                    f.seek(start)
+                remaining = length
+                while remaining > 0:
+                    chunk = f.read(min(65536, remaining))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    remaining -= len(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except OSError as e:
+            try:
+                self._json({"error": str(e)}, 404)
+            except Exception:
+                pass
 
     def do_POST(self):
         path = self.path.split("?")[0]

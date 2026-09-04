@@ -449,7 +449,34 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
    resolves + serves them — a browser can't read the local disk). */
 .bubble-media{margin-top:10px;display:flex;flex-wrap:wrap;gap:10px}
 .bubble-media-item{display:inline-block;border-radius:10px;overflow:hidden;border:1px solid var(--border);line-height:0;background:var(--bg3);max-width:100%}
-.bubble-media-item img{display:block;max-width:min(100%,560px);max-height:460px;width:auto;height:auto;object-fit:contain}
+.bubble-media-item img{display:block;max-width:min(100%,560px);max-height:460px;width:auto;height:auto;object-fit:contain;cursor:zoom-in}
+.bubble-media-item video{display:block;max-width:min(100%,560px);max-height:220px;width:auto;height:auto;background:#000;object-fit:contain}
+.mv-kind-video{position:relative;cursor:pointer}
+.mv-kind-video::after{content:'\25B6';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:36px;text-shadow:0 2px 12px rgba(0,0,0,.85);pointer-events:none;opacity:.9}
+.mv-kind-video:hover::after{color:var(--accent)}
+.mv-kind-image:hover{outline:1px solid var(--accentLine)}
+.mv-kind-audio{display:flex;align-items:center;gap:10px;padding:10px 14px;line-height:1.2;cursor:pointer;max-width:min(100%,420px)}
+.mv-kind-audio:hover{border-color:var(--accent);background:var(--accentBg)}
+.mva-ico{color:var(--accent);font-size:12px;flex-shrink:0}
+.mva-name{font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#mediaViewer{background:rgba(2,4,6,.94);backdrop-filter:blur(2px)}
+.mv-box{position:relative;width:100%;height:100%;display:flex;flex-direction:column}
+.mv-top{display:flex;align-items:center;gap:12px;padding:10px 18px;color:var(--text);border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(10,14,18,.6)}
+.mv-fname{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:56%;font-family:var(--mono)}
+.mv-count{font-size:11px;color:var(--dim);flex-shrink:0}
+.mv-flex{flex:1}
+.mv-dl{color:var(--dim);cursor:pointer;text-decoration:none;font-size:15px;padding:5px 9px;border-radius:8px;flex-shrink:0}
+.mv-dl:hover{color:var(--accent);background:var(--accentBg)}
+.mv-close{background:none;border:none;color:var(--dim);font-size:15px;cursor:pointer;padding:5px 9px;border-radius:8px;flex-shrink:0}
+.mv-close:hover{color:#fff;background:var(--red)}
+.mv-stage{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:14px}
+.mv-stage img,.mv-stage video{max-width:calc(100vw - 160px);max-height:calc(100vh - 120px);border-radius:8px;background:#000;box-shadow:0 8px 34px rgba(0,0,0,.55);object-fit:contain}
+.mv-stage video{max-width:calc(100vw - 120px)}
+.mv-stage audio{width:min(600px,84vw)}
+.mv-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;border:1px solid var(--border);background:rgba(16,20,26,.85);color:var(--text);font-size:24px;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:5;line-height:1;padding:0 0 3px}
+.mv-nav:hover{color:var(--accent);border-color:var(--accent)}
+.mv-prev{left:18px}.mv-next{right:18px}
+.mv-box.has-nav .mv-nav{display:flex}
 </style>
 <script>
 /* ── Theme engine — head: applies the stored theme BEFORE first paint (no flash). THEMES keys double as localStorage 'chat_theme' values; each key maps 1:1 to CSS custom props (minus 'name'). ── */
@@ -804,6 +831,22 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <div class="approval-q" id="approvalQ"></div>
     <div class="approval-actions" id="approvalActions"></div>
     <div class="bg-note" id="approvalNote" style="display:none">Waiting for Hermes…</div>
+  </div>
+</div>
+
+<!-- Media viewer (2026-09-05): click an image/video/audio tile -> in-app lightbox -->
+<div class="modal-overlay" id="mediaViewer">
+  <div class="mv-box">
+    <div class="mv-top">
+      <span class="mv-fname" id="mvName"></span>
+      <span class="mv-count" id="mvCount"></span>
+      <span class="mv-flex"></span>
+      <a class="mv-dl" id="mvDl" download title="Download">⬇</a>
+      <button class="mv-close" id="mvClose" title="Close (Esc)">✕</button>
+    </div>
+    <div class="mv-stage" id="mvStage"></div>
+    <button class="mv-nav mv-prev" id="mvPrev" title="Previous (←)">‹</button>
+    <button class="mv-nav mv-next" id="mvNext" title="Next (→)">›</button>
   </div>
 </div>
 
@@ -2856,6 +2899,7 @@ function updatePill() {
   const lab = document.getElementById('modelLabel');
   const pill = document.getElementById('modelPill');
   if (!lab || !pill) return;
+  syncSourceContext();   // token bar limit follows the ACTIVE source (agent vs local)
   pill.classList.toggle('agent-mode', !!ag);
   if (ag) {
     lab.innerHTML = `<span class="pill-dot"></span>${escHtml(ag.name || ag.id)}`;
@@ -2946,6 +2990,22 @@ function pickAgent(id) {
   if (!isAgentConnected(id)) pingAgent(id);   // async status fill
   showToast('Chatting with ' + (AGENTS[id].name || id));
 }
+// Agent-mode context for the token bar: an agent's context is the MODEL Hermes is
+// using (deepseek default 200k per hermes agent models_dev), NOT the local API
+// URL's server. Optional per-agent override: AGENTS[id].context (tokens).
+const AGENT_CTX_DEFAULT = 200000;
+function syncSourceContext() {
+  const ag = activeAgent();
+  let want;
+  if (ag) {
+    want = parseInt(String((AGENTS[ag.id] && AGENTS[ag.id].context) || ''), 10) || AGENT_CTX_DEFAULT;
+  } else {
+    want = parseInt(localStorage.getItem('chat_context_limit') || '', 10);
+    if (!(want > 0)) want = 180000;
+  }
+  if (want > 0 && contextLimit !== want) { contextLimit = want; updateTokenBar(); }
+}
+syncSourceContext();   // page load: honor the restored chat_source (agent or local)
 // ── Agent connectivity ──
 function pingAgent(id) {
   const a = AGENTS[id];
@@ -4112,7 +4172,7 @@ function loadModels() {
         // vLLM reports context top-level (max_model_len); llama.cpp hides it in
         // meta.n_ctx / n_ctx_train — read both so the token bar shows the real limit
         const mml = models[0].max_model_len || models[0].context_length || meta.n_ctx || meta.n_ctx_train || 0;
-        if (mml > 0 && mml !== contextLimit) {
+        if (mml > 0 && mml !== contextLimit && !activeAgent()) {
           contextLimit = mml;
           localStorage.setItem('chat_context_limit', contextLimit);
         }
@@ -5668,8 +5728,24 @@ function highlightCodeBlocks(html) {
 //    chat-server.py's /api/media (same resolution roots as R1). Path-qualified
 //    tokens (MEDIA:/, /, ~/, ./) are stripped from the bubble TEXT (protocol
 //    syntax, not prose); bare filenames stay visible above their image.
-const MEDIA_TOKEN_RE = /(\S*?\.(?:png|jpe?g|webp|gif|bmp))\b/gi;
+const MEDIA_TOKEN_RE = /(\S*?\.(?:png|jpe?g|webp|gif|bmp|mp4|mov|m4v|webm|mp3|wav|m4a|aac|ogg|flac|opus))\b/gi;
 const MEDIA_BAD_PREFIX = /^(?:https?|data|file|blob|ftp):/i;
+const MEDIA_IMG_RE = /(png|jpe?g|webp|gif|bmp)$/i;
+const MEDIA_VID_RE = /(mp4|mov|m4v|webm)$/i;
+function mediaPathQualified(tok) {
+  // Only path-qualified tokens become live media (prose bare filenames stay text):
+  // MEDIA:/abs, /abs, ~/abs, ./abs, and R1's ComfyUI/output convenience root.
+  return /^MEDIA:/i.test(tok) || tok.startsWith('/') || tok.startsWith('~/') ||
+         tok.startsWith('./') || /^ComfyUI\//i.test(tok);
+}
+function mediaKindOf(tok) {
+  const t = String(tok).trim().replace(/[.,;:!?)]+$/, '');
+  if (MEDIA_IMG_RE.test(t)) return 'image';
+  if (MEDIA_VID_RE.test(t)) return 'video';
+  return 'audio';
+}
+function mediaBaseName(tok) { return String(tok).split(/[\\/]/).pop() || tok; }
+function mediaApiUrl(tok) { return '/api/media?path=' + encodeURIComponent(tok); }
 
 function mediaCodeSpans(text) {
   // ```fenced``` + `inline` code regions — image-looking strings inside code are
@@ -5716,8 +5792,7 @@ function stripMediaPathTokens(text) {
   let m;
   while ((m = re.exec(text))) {
     const tok = m[1];
-    const pathQualified = /^MEDIA:/i.test(tok) || tok.startsWith('/') || tok.startsWith('~/') || tok.startsWith('./');
-    if (!pathQualified) continue;
+    if (!mediaPathQualified(tok)) continue;
     if (inAnySpan(spans, m.index)) continue;
     if (m.index > 0 && /[(\[]/.test(text[m.index - 1])) continue;
     let end = m.index + m[0].length;
@@ -5731,12 +5806,22 @@ function stripMediaPathTokens(text) {
   return out.join('');
 }
 
+function mediaItemHTML(tok) {
+  const href = mediaApiUrl(tok);
+  const kind = mediaKindOf(tok);
+  const title = 'Open ' + kind + ': ' + tok;
+  if (kind === 'video') {
+    return `<a class="bubble-media-item mv-kind-video" href="${href}" title="${escAttr(title)}"><video muted playsinline preload="metadata" src="${href}"></video></a>`;
+  }
+  if (kind === 'audio') {
+    return `<a class="bubble-media-item mv-kind-audio" href="${href}" title="${escAttr(title)}"><span class="mva-ico">▶</span><span class="mva-name">${escHtml(mediaBaseName(tok))}</span></a>`;
+  }
+  return `<a class="bubble-media-item mv-kind-image" href="${href}" title="${escAttr(title)}"><img loading="lazy" src="${href}" alt="" onerror="this.closest('.bubble-media-item').remove()"></a>`;
+}
 function mediaItemsHTML(text) {
-  const toks = mediaTokensIn(text);
+  const toks = mediaTokensIn(text).filter(mediaPathQualified);
   if (!toks.length) return '';
-  return '<div class="bubble-media">' + toks.map(tok =>
-    `<a class="bubble-media-item" href="/api/media?path=${encodeURIComponent(tok)}" target="_blank" rel="noopener" title="${escAttr(tok)}"><img loading="lazy" src="/api/media?path=${encodeURIComponent(tok)}" alt="" onerror="this.closest('.bubble-media-item').remove()"></a>`
-  ).join('') + '</div>';
+  return '<div class="bubble-media">' + toks.map(mediaItemHTML).join('') + '</div>';
 }
 
 function renderAssistantContent(text) {
@@ -5744,6 +5829,86 @@ function renderAssistantContent(text) {
   // partial, history) — stripped markdown text + inline media below it.
   return (text ? escapeAndFormat(stripMediaPathTokens(text)) : '') + mediaItemsHTML(text);
 }
+
+// ── Media viewer modal (2026-09-05): image/video/audio lightbox ──
+let _mvItems = [];
+let _mvIdx = 0;
+function mvOpenState() { return document.getElementById('mediaViewer').classList.contains('show'); }
+function mvBaseNameFromHref(href) {
+  try {
+    const p = new URL(href, location.href).searchParams.get('path') || '';
+    return decodeURIComponent(p).split(/[\\/]/).pop() || href;
+  } catch (e) { return href; }
+}
+function mvBuildStage() {
+  const stage = document.getElementById('mvStage');
+  stage.innerHTML = '';
+  const src = _mvItems[_mvIdx];
+  if (!src) return;
+  const kind = mediaKindOf(decodeURIComponent(new URL(src, location.href).searchParams.get('path') || src));
+  let el;
+  if (kind === 'video') {
+    el = document.createElement('video');
+    el.src = src; el.controls = true; el.autoplay = true; el.playsInline = true;
+  } else if (kind === 'audio') {
+    el = document.createElement('audio');
+    el.src = src; el.controls = true; el.autoplay = true;
+  } else {
+    el = document.createElement('img');
+    el.src = src; el.alt = '';
+  }
+  stage.appendChild(el);
+  document.getElementById('mvName').textContent = mvBaseNameFromHref(src);
+  document.getElementById('mvCount').textContent = _mvItems.length > 1 ? (_mvIdx + 1) + ' / ' + _mvItems.length : '';
+  document.getElementById('mvDl').href = src;
+  document.getElementById('mediaViewer').querySelector('.mv-box').classList.toggle('has-nav', _mvItems.length > 1);
+  document.getElementById('mvPrev').style.visibility = _mvIdx > 0 ? 'visible' : 'hidden';
+  document.getElementById('mvNext').style.visibility = _mvIdx < _mvItems.length - 1 ? 'visible' : 'hidden';
+}
+function mvStep(d) { _mvIdx = Math.min(_mvItems.length - 1, Math.max(0, _mvIdx + d)); mvBuildStage(); }
+function mvOpen(idx) {
+  _mvIdx = Math.min(_mvItems.length - 1, Math.max(0, idx || 0));
+  mvBuildStage();
+  document.getElementById('mediaViewer').classList.add('show');
+  document.addEventListener('keydown', mvKey);
+}
+function mvClose() {
+  document.getElementById('mediaViewer').classList.remove('show');
+  document.getElementById('mvStage').innerHTML = '';   // stops video/audio playback
+  document.removeEventListener('keydown', mvKey);
+}
+function mvKey(e) {
+  if (!mvOpenState()) return;
+  if (e.key === 'Escape') { e.preventDefault(); mvClose(); }
+  else if (e.key === 'ArrowRight' && _mvItems.length > 1) { e.preventDefault(); mvStep(1); }
+  else if (e.key === 'ArrowLeft' && _mvItems.length > 1) { e.preventDefault(); mvStep(-1); }
+}
+function openMediaViewerFrom(itemEl) {
+  const wrap = itemEl.closest('.bubble-media');
+  if (!wrap) return;
+  _mvItems = Array.from(wrap.querySelectorAll('.bubble-media-item')).map(a => a.href);
+  const clickIdx = _mvItems.indexOf(itemEl.href);
+  mvOpen(clickIdx >= 0 ? clickIdx : 0);
+}
+// Delegated: any media tile click opens the viewer (images no longer open a new tab)
+document.addEventListener('click', (e) => {
+  const it = e.target.closest('.bubble-media-item');
+  if (!it) return;
+  e.preventDefault();
+  openMediaViewerFrom(it);
+});
+(function initMediaViewer() {
+  const v = document.getElementById('mediaViewer');
+  if (!v) return;
+  v.addEventListener('click', (e) => {
+    if (e.target === v || e.target.classList.contains('mv-stage')) { mvClose(); return; }
+    if (e.target.closest('#mvClose')) { mvClose(); return; }
+    if (e.target.closest('#mvPrev')) { mvStep(-1); return; }
+    if (e.target.closest('#mvNext')) { mvStep(1); return; }
+    if (e.target.closest('#mvDl')) { e.stopPropagation(); return; }
+    e.stopPropagation();
+  });
+})();
 
 function escapeAndFormat(text) {
   if (!text) return '';
