@@ -336,6 +336,15 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 #bgOv1{background:var(--bgOv1,#000)}
 #bgOv2{background:var(--bgOv2,#000);animation:bgCrossfade 10s ease-in-out infinite alternate}
 @keyframes bgCrossfade{0%{opacity:0}45%{opacity:0}55%{opacity:1}100%{opacity:1}}
+/* Image slideshow layers (2026-09-05): two stacked full-screen layers crossfade via the
+   base opacity transition; the incoming layer additionally slides/zooms via a per-frame
+   animation class when the chosen transition isn't a plain crossfade. */
+#chatBg .bg-slide-layer{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 1s ease;will-change:opacity,transform;pointer-events:none}
+#chatBg .bg-slide-layer.active{opacity:1}
+#chatBg .bg-slide-layer.anim-slide{animation:bgSlideIn 1s ease}
+#chatBg .bg-slide-layer.anim-zoom{animation:bgZoomIn 1.2s ease}
+@keyframes bgSlideIn{from{transform:translateX(7%)}to{transform:none}}
+@keyframes bgZoomIn{from{transform:scale(1.07)}to{transform:scale(1)}}
 /* Chat area shows the background nearly clean (no blur — bubbles are opaque so text stays
    readable); only the chrome surfaces (header/sidebar/input) keep a frost for their own text. */
 body.has-bg .chat-area{background:color-mix(in srgb,var(--bg) 38%,transparent)}
@@ -408,8 +417,19 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
 .yt-preset-x{color:var(--dim);font-size:10px;line-height:1;padding:2px;border-radius:50%}
 .yt-preset-x:hover{color:var(--red)}
 .yt-presets-empty{font-size:11px;color:var(--dim);font-style:italic}
-.bg-thumb-row{display:flex;align-items:center;gap:10px}
-.bg-thumb{width:72px;height:44px;border-radius:8px;border:1px solid var(--border);background-size:cover;background-position:center;flex-shrink:0}
+.bg-img-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.bg-img-row .bg-btn{flex-shrink:0}
+.bg-img-row select.bg-trans-sel{width:auto;margin:0;flex-shrink:0;padding:6px 10px;font-size:12px;cursor:pointer}
+.bg-timer-wrap{display:inline-flex;align-items:center;gap:5px;flex-shrink:0}
+.bg-timer-wrap svg{width:14px;height:14px;color:var(--dim);flex-shrink:0}
+.bg-timer-wrap input#bgSlideSec{width:52px;margin:0;padding:5px 4px 5px 8px;font-size:12px;text-align:left;font-variant-numeric:tabular-nums;cursor:pointer}
+.bg-timer-wrap input#bgSlideSec::-webkit-inner-spin-button{opacity:.9}
+.bg-slide-chips{display:flex;flex-wrap:wrap;gap:8px}
+.bg-slide-chip{position:relative;width:76px;height:54px;border-radius:8px;border:1px solid var(--border);background-size:cover;background-position:center;flex-shrink:0;transition:border-color .15s}
+.bg-slide-chip:hover{border-color:var(--accent)}
+.bg-slide-x{position:absolute;top:-7px;right:-7px;width:19px;height:19px;border:none;border-radius:50%;background:#e11d48;color:#fff;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.5);padding:0;transition:transform .12s,background .12s}
+.bg-slide-x:hover{background:#f43f5e;transform:scale(1.12)}
+.bg-slides-empty{font-size:11px;color:var(--dim);font-style:italic;padding:2px 0}
 .bg-slider-row{display:flex;align-items:center;gap:10px}
 .bg-slider-row label{font-size:11px;color:var(--dim);width:86px;flex-shrink:0}
 .bg-slider-row input[type=range]{flex:1;accent-color:var(--accent)}
@@ -530,7 +550,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.0.0</span>
+    <span class="footer-version">xLLM Chat v3.1.0</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -681,13 +701,23 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
       <button class="bg-type-btn" data-bgtype="color" onclick="setBgType('color')">Color</button>
     </div>
     <div class="bg-opt" id="bgOptImage" hidden>
-      <div class="bg-thumb-row">
-        <div class="bg-thumb" id="bgThumb" style="display:none"></div>
-        <button class="bg-btn" onclick="document.getElementById('bgFile').click()">Choose Image…</button>
-        <button class="bg-btn" id="bgImageRemove" onclick="clearBgImage()" style="display:none">Remove</button>
+      <div class="bg-img-row">
+        <button class="bg-btn" onclick="document.getElementById('bgFile').click()">Choose Images…</button>
+        <button class="bg-btn" id="bgSlidesClear" onclick="clearBgSlides()" style="display:none" title="Remove every image from the slideshow">Clear All</button>
+        <select id="bgTransSel" class="bg-trans-sel" onchange="setBgTransition(this.value)">
+          <option value="random">Random</option>
+          <option value="fade">Crossfade</option>
+          <option value="slide">Slide</option>
+          <option value="zoom">Zoom</option>
+        </select>
+        <span class="bg-timer-wrap" title="Seconds each image stays on screen">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/><path d="M6.38 18.7 4 21"/><path d="M17.64 18.67 20 21"/></svg>
+          <input type="number" id="bgSlideSec" min="2" max="60" step="1" value="5" onchange="setBgSlideSec(this.value)">
+        </span>
       </div>
-      <input type="file" id="bgFile" accept="image/*" style="display:none" onchange="bgFilePicked(this)">
-      <div class="bg-note">Local image (max 1.5 MB).</div>
+      <div class="bg-slide-chips" id="bgSlideChips"></div>
+      <input type="file" id="bgFile" accept="image/*" multiple style="display:none" onchange="bgFilesPicked(this)">
+      <div class="bg-note">Pick one or more images — they rotate behind the chat. Hi-res files are fine (large ones are scaled for smooth transitions). Hover a thumbnail and hit the red ✕ to drop it from the show.</div>
     </div>
     <div class="bg-opt" id="bgOptUrl" hidden>
       <div class="bg-url-row">
@@ -2835,7 +2865,7 @@ let TOP_P = parseFloat(localStorage.getItem('chat_top_p') || '0.9');
 let currentModel = localStorage.getItem('chat_current_model') || '';
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.0.0';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.1.0';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -3636,8 +3666,13 @@ function saveSettings() {
 
 // ---- Chat Background (2026-08-27): image / image-URL / YouTube (muted autoplay, playlists) /
 // color, plus a crossfading dual-color overlay. Persisted under chat_bg_*; applies LIVE, no Save.
-const BG_DEFAULTS = { type: 'none', image: null, url: '', yt: '', color: '#0d1117', colorAlpha: 0, overlayOn: false, ov1: '#000000', ov2: '#000000', ovAlpha: 35 };
+// 2026-09-05: the Image type is now a multi-image SLIDESHOW — frames stored in IndexedDB
+// (hi-res dataURLs blow localStorage), transitions picked per frame (Random/Crossfade/Slide/Zoom),
+// per-slide dwell set by the timer input (slideSec seconds).
+const BG_DEFAULTS = { type: 'none', image: null, url: '', yt: '', color: '#0d1117', colorAlpha: 0, overlayOn: false, ov1: '#000000', ov2: '#000000', ovAlpha: 35, transition: 'fade', slideSec: 5 };
 let BG = Object.assign({}, BG_DEFAULTS);
+BG.slides = [];                    // slideshow frames [{name,data}] — IndexedDB-backed, NOT in BG_DEFAULTS/localStorage
+let bgSlidesLoaded = false;        // true once IndexedDB frames are hydrated (legacy chat_bg_image is the fallback until then)
 let bgMuted = true;
 function loadBgState() {
   for (const k of Object.keys(BG_DEFAULTS)) {
@@ -3712,18 +3747,18 @@ function toggleBgMute() {
 }
 function applyChatBg() {
   const bg = document.getElementById('chatBg');
-  const ov = document.getElementById('chatBgOverlay');
   const unmute = document.getElementById('bgUnmute');
   if (!bg) return;
+  stopBgCapWatchdog();   // captions watchdog runs only while a video bg is active
+  stopBgSlideshow();
   bg.innerHTML = '';
   bg.style.background = '';
-  stopBgCapWatchdog();   // captions watchdog runs only while a video bg is active
   document.body.classList.toggle('has-bg', BG.type !== 'none');
   if (unmute) unmute.style.display = 'none';
   if (BG.type === 'color') {
     bg.style.background = hexToRgba(BG.color, BG.colorAlpha / 100);
   } else if (BG.type === 'image') {
-    if (BG.image) bg.style.background = 'url("' + BG.image + '") center/cover no-repeat';
+    startBgSlideshow(bg);
   } else if (BG.type === 'url') {
     if (BG.url) bg.style.background = 'url("' + BG.url + '") center/cover no-repeat';
   } else if (BG.type === 'youtube') {
@@ -3739,16 +3774,212 @@ function applyChatBg() {
       if (unmute) { unmute.style.display = 'flex'; bgMuted = true; updateBgMuteBtn(); }
     }
   }
-  if (ov) {
-    if (BG.overlayOn) {
-      ov.style.display = 'block';
-      ov.style.opacity = BG.ovAlpha / 100;
-      ov.style.setProperty('--bgOv1', BG.ov1);
-      ov.style.setProperty('--bgOv2', BG.ov2);
-    } else {
-      ov.style.display = 'none';
-    }
+  applyBgOverlay();
+}
+function applyBgOverlay() {
+  const ov = document.getElementById('chatBgOverlay');
+  if (!ov) return;
+  if (BG.overlayOn) {
+    ov.style.display = 'block';
+    ov.style.opacity = BG.ovAlpha / 100;
+    ov.style.setProperty('--bgOv1', BG.ov1);
+    ov.style.setProperty('--bgOv2', BG.ov2);
+  } else {
+    ov.style.display = 'none';
   }
+}
+// ── Image slideshow engine (2026-09-05) ──────────────────────────────────────────────
+// Multiple Image-type backgrounds rotate behind the chat (dwell = the timer input, default
+// 5s). Frames live in IndexedDB (localStorage can't hold hi-res dataURLs); two stacked
+// layers crossfade via CSS with a per-frame transition pick (Random / Crossfade / Slide /
+// Zoom). Every change applies LIVE — nothing here is gated on a stream running.
+const BG_TRANSITIONS = ['fade', 'slide', 'zoom'];
+function bgSlideMs() { const s = parseInt(BG.slideSec, 10); return (s >= 2 && s <= 60 ? s : 5) * 1000; }
+let bgSlideLayers = [null, null];   // the two reused layers; bgSlideLayerIdx = currently visible one
+let bgSlideLayerIdx = 0;
+let bgSlideIdx = 0;                 // index into the effective slides array now on screen
+let bgSlideTimer = null;
+let bgSlideAnimTimer = null;
+function bgDbOpen() {
+  return new Promise((resolve, reject) => {
+    let rq;
+    try { rq = indexedDB.open('xllm-chat-bg', 1); } catch (e) { reject(e); return; }
+    rq.onupgradeneeded = () => { try { rq.result.createObjectStore('kv'); } catch (e) {} };
+    rq.onsuccess = () => resolve(rq.result);
+    rq.onerror = () => reject(rq.error);
+  });
+}
+function bgDbGet(key) {
+  return bgDbOpen().then(db => new Promise((resolve, reject) => {
+    const rq = db.transaction('kv', 'readonly').objectStore('kv').get(key);
+    rq.onsuccess = () => resolve(rq.result);
+    rq.onerror = () => reject(rq.error);
+  }));
+}
+function bgDbSet(key, val) {
+  return bgDbOpen().then(db => new Promise((resolve, reject) => {
+    const rq = db.transaction('kv', 'readwrite').objectStore('kv').put(val, key);
+    rq.onsuccess = () => resolve();
+    rq.onerror = () => reject(rq.error);
+  }));
+}
+function persistBgSlides() { return bgDbSet('slides', BG.slides); }
+function effBgSlides() {
+  // IDB frames are the source of truth; the legacy single chat_bg_image is only a
+  // fallback until IndexedDB hydration finishes (or if IDB is unavailable).
+  return (BG.slides && BG.slides.length) ? BG.slides
+    : ((!bgSlidesLoaded && BG.image) ? [{ name: 'Chat background', data: BG.image }] : []);
+}
+function pickBgTransition() {
+  if (BG.transition === 'random') return BG_TRANSITIONS[Math.floor(Math.random() * BG_TRANSITIONS.length)];
+  return BG_TRANSITIONS.indexOf(BG.transition) >= 0 ? BG.transition : 'fade';
+}
+function stopBgSlideshow() {
+  if (bgSlideTimer) { clearTimeout(bgSlideTimer); bgSlideTimer = null; }
+  if (bgSlideAnimTimer) { clearTimeout(bgSlideAnimTimer); bgSlideAnimTimer = null; }
+  bgSlideLayers = [null, null];
+}
+function startBgSlideshow(bg) {
+  stopBgSlideshow();
+  const slides = effBgSlides();
+  if (!slides.length || !bg) return;
+  bgSlideLayers[0] = document.createElement('div');
+  bgSlideLayers[0].className = 'bg-slide-layer active';
+  bgSlideLayers[0].style.backgroundImage = 'url("' + slides[0].data + '")';
+  bg.appendChild(bgSlideLayers[0]);
+  bgSlideIdx = 0;
+  bgSlideLayerIdx = 0;
+  if (slides.length > 1) {
+    bgSlideLayers[1] = document.createElement('div');
+    bgSlideLayers[1].className = 'bg-slide-layer';
+    bg.appendChild(bgSlideLayers[1]);
+    bgSlideTimer = setTimeout(bgSlideAdvance, bgSlideMs());
+  }
+}
+function bgSlideAdvance() {
+  bgSlideTimer = null;
+  const slides = effBgSlides();
+  if (!slides || slides.length < 2) return;
+  let ni;
+  do { ni = Math.floor(Math.random() * slides.length); } while (ni === bgSlideIdx && slides.length > 1);
+  const trans = pickBgTransition();
+  bgSlideIdx = ni;
+  const cur = bgSlideLayers[bgSlideLayerIdx];
+  const nxt = bgSlideLayers[1 - bgSlideLayerIdx];
+  nxt.classList.remove('anim-slide', 'anim-zoom');
+  if (trans === 'slide') nxt.classList.add('anim-slide');
+  else if (trans === 'zoom') nxt.classList.add('anim-zoom');
+  nxt.style.backgroundImage = 'url("' + slides[ni].data + '")';
+  void nxt.offsetWidth;            // reflow so the fade-in actually animates
+  nxt.classList.add('active');
+  bgSlideLayerIdx = 1 - bgSlideLayerIdx;
+  cur.classList.remove('active');  // CSS opacity transition fades it out under the new layer
+  const retired = cur;
+  bgSlideAnimTimer = setTimeout(() => {   // drop the retired frame once its fade finished
+    retired.classList.remove('anim-slide', 'anim-zoom');
+    retired.style.backgroundImage = '';
+  }, 1100);
+  bgSlideTimer = setTimeout(bgSlideAdvance, bgSlideMs());
+}
+function setBgSlideSec(v) {
+  let s = parseInt(v, 10);
+  if (isNaN(s)) s = 5;
+  s = Math.min(60, Math.max(2, s));
+  BG.slideSec = s;
+  saveBgState();
+  const inp = document.getElementById('bgSlideSec');
+  if (inp) inp.value = s;            // normalize clamped input
+  if (bgSlideTimer) {                // re-arm the countdown so the new dwell applies from now
+    clearTimeout(bgSlideTimer);
+    bgSlideTimer = setTimeout(bgSlideAdvance, bgSlideMs());
+  }
+}
+function readFileDataURL(f) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(f);
+  });
+}
+function bgImageEl(src) {
+  return new Promise((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = () => reject(new Error('decode-failed'));
+    im.src = src;
+  });
+}
+const BG_SLIDE_MAX_EDGE = 2560;    // hi-res Krea renders are scaled down only as much as needed
+async function prepBgImage(file) {
+  const src = await readFileDataURL(file);
+  const img = await bgImageEl(src);
+  const w = img.naturalWidth, h = img.naturalHeight;
+  if (!w || !h) return null;
+  const scale = Math.min(1, BG_SLIDE_MAX_EDGE / Math.max(w, h));
+  if (scale >= 1) return src;      // already fits — keep the original bytes untouched
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w * scale));
+  c.height = Math.max(1, Math.round(h * scale));
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0, c.width, c.height);
+  let hasAlpha = false;
+  if (/png|gif/i.test(file.type)) {   // only lossless sources can carry transparency
+    try {
+      const d = ctx.getImageData(0, 0, c.width, c.height).data;
+      for (let i = 3; i < d.length; i += 4) { if (d[i] < 250) { hasAlpha = true; break; } }
+    } catch (e) { hasAlpha = true; }
+  }
+  // Photos (no alpha) become compact JPEGs so a big slideshow stays light in IndexedDB;
+  // genuinely transparent images stay PNG.
+  return hasAlpha ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.88);
+}
+async function bgFilesPicked(input) {
+  const files = Array.from((input && input.files) || []);
+  if (input) input.value = '';     // allow re-picking the same files later
+  if (!files.length) return;
+  let added = 0;
+  for (const f of files) {
+    try {
+      const data = await prepBgImage(f);
+      if (data) { BG.slides.push({ name: f.name || ('image ' + (BG.slides.length + 1)), data: data }); added++; }
+    } catch (e) {}
+  }
+  if (!added) { showToast('Could not read those images'); return; }
+  persistBgSlides().catch(() => {});
+  if (BG.type !== 'image') setBgType('image');   // picking images arms the image background
+  else { applyChatBg(); updateBgSettingsUI(); }
+  const skipped = files.length - added;
+  showToast(added + (added === 1 ? ' image' : ' images') + ' added' + (skipped ? ' · ' + skipped + ' skipped' : ''));
+}
+function removeBgSlide(i) {
+  if (!BG.slides[i]) return;
+  BG.slides.splice(i, 1);
+  if (!BG.slides.length) {
+    BG.image = null;               // clear the legacy fallback too, or it would resurrect
+    bgSlidesLoaded = true;
+    saveBgState();
+    persistBgSlides().catch(() => {});
+    setBgType('none');
+    showToast('Background cleared');
+    return;
+  }
+  persistBgSlides().catch(() => {});
+  applyChatBg(); updateBgSettingsUI();
+}
+function clearBgSlides() {
+  if (!effBgSlides().length) return;
+  BG.slides = [];
+  BG.image = null;
+  bgSlidesLoaded = true;
+  saveBgState();
+  persistBgSlides().catch(() => {});
+  setBgType('none');
+  showToast('Background cleared');
+}
+function setBgTransition(v) {
+  BG.transition = v;
+  saveBgState();                   // takes effect on the next slide change — no rebuild needed
 }
 // settings UI wiring (applies live, no Save)
 function setBgType(t) {
@@ -3761,15 +3992,6 @@ function setBgType(t) {
   document.getElementById('bgOptColor').hidden = t !== 'color';
   updateBgSettingsUI();
 }
-function bgFilePicked(input) {
-  const f = input.files && input.files[0];
-  if (!f) return;
-  if (f.size > 1.5 * 1024 * 1024) { showToast('Too big', 'Background image must be under 1.5 MB', true); input.value = ''; return; }
-  const r = new FileReader();
-  r.onload = () => { BG.image = r.result; saveBgState(); applyChatBg(); updateBgSettingsUI(); };
-  r.readAsDataURL(f);
-}
-function clearBgImage() { BG.image = null; saveBgState(); applyChatBg(); updateBgSettingsUI(); }
 function applyBgUrl() {
   const raw = document.getElementById('bgUrlInput').value.trim();
   if (!raw) return;
@@ -3839,17 +4061,24 @@ function setBgColorAlpha(v) { BG.colorAlpha = parseInt(v, 10); document.getEleme
 function setBgOverlay(on) {
   BG.overlayOn = on;
   document.getElementById('bgOptOverlay').hidden = !on;
-  saveBgState(); applyChatBg();
+  saveBgState(); applyBgOverlay();   // overlay-only — don't rebuild the bg (would restart the video/slideshow)
 }
-function setBgOvColor(n, c) { if (n === 1) BG.ov1 = c; else BG.ov2 = c; saveBgState(); applyChatBg(); }
-function setBgOvAlpha(v) { BG.ovAlpha = parseInt(v, 10); document.getElementById('bgOvAlphaVal').textContent = v + '%'; saveBgState(); applyChatBg(); }
+function setBgOvColor(n, c) { if (n === 1) BG.ov1 = c; else BG.ov2 = c; saveBgState(); applyBgOverlay(); }
+function setBgOvAlpha(v) { BG.ovAlpha = parseInt(v, 10); document.getElementById('bgOvAlphaVal').textContent = v + '%'; saveBgState(); applyBgOverlay(); }
 function updateBgSettingsUI() {
-  const thumb = document.getElementById('bgThumb');
-  const rm = document.getElementById('bgImageRemove');
-  if (thumb) {
-    if (BG.image) { thumb.style.display = 'block'; thumb.style.backgroundImage = 'url("' + BG.image + '")'; rm.style.display = 'inline-block'; }
-    else { thumb.style.display = 'none'; rm.style.display = 'none'; }
+  const chips = document.getElementById('bgSlideChips');
+  if (chips) {
+    const list = effBgSlides();
+    chips.innerHTML = list.length
+      ? list.map((s, i) => '<div class="bg-slide-chip" title="' + escAttr(s.name || 'image') + '" style="background-image:url(\'' + s.data + '\')"><button type="button" class="bg-slide-x" title="Remove from slideshow" onclick="removeBgSlide(' + i + ')">✕</button></div>').join('')
+      : '<span class="bg-slides-empty">No images yet — choose one or more above to start the slideshow.</span>';
+    const clr = document.getElementById('bgSlidesClear');
+    if (clr) clr.style.display = list.length ? 'inline-block' : 'none';
   }
+  const transSel = document.getElementById('bgTransSel');
+  if (transSel) transSel.value = (BG.transition === 'random' || BG_TRANSITIONS.indexOf(BG.transition) >= 0) ? BG.transition : 'fade';
+  const secInp = document.getElementById('bgSlideSec');
+  if (secInp) secInp.value = parseInt(BG.slideSec, 10) || 5;
   document.getElementById('bgUrlInput').value = BG.url;
   document.getElementById('bgYtInput').value = BG.yt;
   document.getElementById('bgColorPick').value = BG.color;
@@ -3863,7 +4092,22 @@ function updateBgSettingsUI() {
   document.getElementById('bgOvAlphaVal').textContent = BG.ovAlpha + '%';
   renderYtPresets();
 }
-function initChatBg() { loadBgState(); applyChatBg(); setBgType(BG.type); }
+function initChatBg() {
+  loadBgState();
+  initBgSlidesAsync().then(() => { applyChatBg(); setBgType(BG.type); });
+}
+async function initBgSlidesAsync() {
+  let ok = false;
+  try {
+    const stored = await bgDbGet('slides');
+    if (Array.isArray(stored) && stored.length) { BG.slides = stored; ok = true; }
+    else if (BG.image) { BG.slides = [{ name: 'Chat background', data: BG.image }]; ok = true; try { await persistBgSlides(); } catch (e) {} }
+    else ok = true;
+    if (ok) { BG.image = null; saveBgState(); }   // legacy single frame is now slide[0]
+  } catch (e) { /* IDB unavailable (private mode?) — legacy chat_bg_image keeps working below */ }
+  bgSlidesLoaded = ok;
+  if (ok) { applyChatBg(); updateBgSettingsUI(); }
+}
 
 // ---- System Prompt Bar ----
 function toggleSysPrompt() {
