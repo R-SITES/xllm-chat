@@ -1,5 +1,5 @@
 #!/bin/bash
-# vLLM Chat Client — llama.cpp-style chat window for vLLM on :8000
+# xLLM Chat — chat window for local LLMs (llama.cpp / vLLM / OpenAI-compatible) and connected agents
 set -e
 
 cd "$(dirname "$0")" || exit 1

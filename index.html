@@ -6,12 +6,12 @@
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>vLLM Chat</title>
+<title>xLLM Chat</title>
 <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="favicon-16.png" sizes="16x16" type="image/png">
 <link rel="icon" href="favicon-48.png" sizes="48x48" type="image/png">
 <style>
-:root{--bg:#0d1117;--bg2:#161b22;--bg3:#1c2333;--border:#30363d;--text:#e6edf3;--dim:#8b949e;--accent:#58a6ff;--accentBg:rgba(88,166,255,.15);--accentSoft:rgba(88,166,255,.08);--accentLine:rgba(88,166,255,.30);--accentStrong:rgba(88,166,255,.45);--userBg:#1f6feb;--asstBg:#161b22;--sysBg:#2d1b2e;--sysText:#d2a8ff;--sysLine:rgba(210,168,255,.22);--sysBgSoft:rgba(210,168,255,.10);--sysGlow:rgba(210,168,255,.30);--purple:#b388ff;--quoteBg:rgba(188,140,255,.06);--r:8px;--font:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;--mono:'JetBrains Mono','Fira Code','Cascadia Code',monospace;--green:#3fb950;--red:#f85149}
+:root{--bg:#0d1117;--bg2:#161b22;--bg3:#1c2333;--border:#30363d;--text:#e6edf3;--dim:#8b949e;--accent:#58a6ff;--accentBg:rgba(88,166,255,.15);--accentSoft:rgba(88,166,255,.08);--accentLine:rgba(88,166,255,.30);--accentStrong:rgba(88,166,255,.45);--userBg:#1f6feb;--asstBg:#161b22;--sysBg:#2d1b2e;--sysText:#d2a8ff;--sysLine:rgba(210,168,255,.22);--sysBgSoft:rgba(210,168,255,.10);--sysGlow:rgba(210,168,255,.30);--purple:#b388ff;--quoteBg:rgba(188,140,255,.06);--r:8px;--font:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;--mono:'JetBrains Mono','Fira Code','Cascadia Code',monospace;--green:#3fb950;--red:#f85149;--bubbleFs:14px}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
 .header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
@@ -31,6 +31,26 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .model-pill .model-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;pointer-events:none}
 .model-pill select{position:absolute;inset:0;width:100%;height:100%;padding:6px 14px;background:transparent;border:none;color:inherit;font-size:12px;font-family:var(--font);cursor:pointer;opacity:0;-webkit-appearance:none;-moz-appearance:none;appearance:none}
 .model-pill select option{background:var(--bg2);color:var(--text)}
+/* Agent source dropdown (2026-09-04): touch the pill to flip between the local
+   model and any connected agent (Hermes / Pi / DS Harness / local server). */
+.model-pill .model-name{max-width:210px}
+.model-pill .pill-chev{font-size:9px;color:var(--dim);opacity:.85;pointer-events:none;transition:transform .15s;flex-shrink:0}
+.model-pill.open .pill-chev{transform:rotate(180deg)}
+.model-pill .pill-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;display:inline-block;margin-right:2px}
+.model-pill.agent-mode{border-color:var(--accentLine);color:var(--accent)}
+.source-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:900;min-width:260px;max-width:min(430px,calc(100vw - 32px));background:var(--bg2);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.35);padding:6px;max-height:min(60vh,420px);overflow-y:auto}
+.source-menu[hidden]{display:none}
+.src-group-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);opacity:.85;padding:7px 10px 3px}
+.src-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;font-size:12px;color:var(--text);cursor:pointer;transition:background .12s;min-width:0}
+.src-item:hover{background:var(--accentBg);color:var(--accent)}
+.src-item.active{background:var(--accentBg);color:var(--accent)}
+.src-item .src-check{width:14px;flex-shrink:0;text-align:center;color:var(--accent);font-size:11px}
+.src-item .src-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.src-item .src-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
+.src-item .src-sub{font-size:10px;color:var(--dim);opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;flex-shrink:1}
+.src-item.off{cursor:default;opacity:.6}
+.src-item.off:hover{background:transparent;color:var(--text)}
+.src-empty{font-size:11px;color:var(--dim);font-style:italic;padding:10px;text-align:center}
 .icon-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--dim);cursor:pointer;transition:all .15s;padding:0}
 .icon-btn:hover{background:var(--accentBg);color:var(--accent);border-color:var(--accent)}
 .icon-btn svg{width:16px;height:16px}
@@ -59,7 +79,7 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .msg.user .avatar{background:var(--userBg);color:#fff}
 .msg.assistant .avatar{background:var(--accentBg);color:var(--accent)}
 .msg.system .avatar{background:var(--sysBg);color:var(--sysText)}
-.bubble{max-width:85%;padding:12px 16px;border-radius:16px;line-height:1.75;font-size:14px;word-wrap:break-word;position:relative}
+.bubble{max-width:85%;padding:12px 16px;border-radius:16px;line-height:1.75;font-size:var(--bubbleFs,14px);word-wrap:break-word;position:relative}
 .msg.user .bubble{background:var(--userBg);border:1px solid var(--border);border-radius:16px 4px 0px 16px;color:#fff}
 .msg.assistant .bubble{background:var(--asstBg);border:1px solid var(--border);border-radius:4px 16px 16px 0px}
 .msg.system .bubble{background:var(--sysBg);border:1px solid var(--sysLine);border-radius:var(--r);color:var(--sysText);font-size:12px}
@@ -301,12 +321,12 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .sidebar-body::-webkit-scrollbar-thumb:active{background:var(--accentStrong);border:2px solid transparent;background-clip:content-box}
 /* Same slim theme-aware scrollbars for the whole-chat area, in-chat code blocks,
    thinking panels, and modals (2026-08-27) */
-.chat-area,.bubble pre,.thinking-block .thinking-content,.modal{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
-.chat-area::-webkit-scrollbar,.bubble pre::-webkit-scrollbar,.thinking-block .thinking-content::-webkit-scrollbar,.modal::-webkit-scrollbar{width:8px;height:8px}
-.chat-area::-webkit-scrollbar-track,.bubble pre::-webkit-scrollbar-track,.thinking-block .thinking-content::-webkit-scrollbar-track,.modal::-webkit-scrollbar-track{background:transparent}
-.chat-area::-webkit-scrollbar-thumb,.bubble pre::-webkit-scrollbar-thumb,.thinking-block .thinking-content::-webkit-scrollbar-thumb,.modal::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;border:2px solid transparent;background-clip:content-box}
-.chat-area::-webkit-scrollbar-thumb:hover,.bubble pre::-webkit-scrollbar-thumb:hover,.thinking-block .thinking-content::-webkit-scrollbar-thumb:hover,.modal::-webkit-scrollbar-thumb:hover{background:var(--accentLine);border:2px solid transparent;background-clip:content-box}
-.chat-area::-webkit-scrollbar-thumb:active,.bubble pre::-webkit-scrollbar-thumb:active,.thinking-block .thinking-content::-webkit-scrollbar-thumb:active,.modal::-webkit-scrollbar-thumb:active{background:var(--accentStrong);border:2px solid transparent;background-clip:content-box}
+.chat-area,.bubble pre,.thinking-block .thinking-content,.modal,.agent-activity{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.chat-area::-webkit-scrollbar,.bubble pre::-webkit-scrollbar,.thinking-block .thinking-content::-webkit-scrollbar,.modal::-webkit-scrollbar,.agent-activity::-webkit-scrollbar{width:8px;height:8px}
+.chat-area::-webkit-scrollbar-track,.bubble pre::-webkit-scrollbar-track,.thinking-block .thinking-content::-webkit-scrollbar-track,.modal::-webkit-scrollbar-track,.agent-activity::-webkit-scrollbar-track{background:transparent}
+.chat-area::-webkit-scrollbar-thumb,.bubble pre::-webkit-scrollbar-thumb,.thinking-block .thinking-content::-webkit-scrollbar-thumb,.modal::-webkit-scrollbar-thumb,.agent-activity::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;border:2px solid transparent;background-clip:content-box}
+.chat-area::-webkit-scrollbar-thumb:hover,.bubble pre::-webkit-scrollbar-thumb:hover,.thinking-block .thinking-content::-webkit-scrollbar-thumb:hover,.modal::-webkit-scrollbar-thumb:hover,.agent-activity::-webkit-scrollbar-thumb:hover{background:var(--accentLine);border:2px solid transparent;background-clip:content-box}
+.chat-area::-webkit-scrollbar-thumb:active,.bubble pre::-webkit-scrollbar-thumb:active,.thinking-block .thinking-content::-webkit-scrollbar-thumb:active,.modal::-webkit-scrollbar-thumb:active,.agent-activity::-webkit-scrollbar-thumb:active{background:var(--accentStrong);border:2px solid transparent;background-clip:content-box}
 /* ── Chat Background engine (2026-08-27) — fixed layers behind the app; when a background is
    active the main surfaces go translucent + blurred so messages stay readable ── */
 #chatBg{position:fixed;inset:0;z-index:0;background-size:cover;background-position:center;background-repeat:no-repeat;pointer-events:none;overflow:hidden}
@@ -327,6 +347,53 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
 .bg-type-btn.active{background:var(--accentBg);border-color:var(--accentLine);color:var(--accent)}
 .bg-opt{margin-top:10px;display:flex;flex-direction:column;gap:8px}
 .bg-opt[hidden]{display:none}
+/* ── Settings tabs + Voice tab (2026-08-31) ── */
+.settings-tabs{display:flex;gap:6px;margin-bottom:14px}
+.settings-tab{flex:1;padding:7px 0;border:1px solid var(--border);background:var(--bg3);color:var(--dim);border-radius:8px;font-size:12px;cursor:pointer;font-family:var(--font);transition:all .15s}
+.settings-tab.active{background:var(--accentBg);border-color:var(--accentLine);color:var(--accent)}
+.settings-pane[hidden]{display:none}
+.voice-row{display:flex;align-items:center;gap:10px;margin-top:10px}
+.voice-row .voice-label{flex:1;margin:0;font-size:13px;color:var(--text);font-weight:500}
+.voice-row select{flex:1;margin:0;width:auto;min-width:0}
+.voice-row .bg-btn{flex-shrink:0}
+.switch{position:relative;display:inline-block;width:42px;height:24px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.switch .slider{position:absolute;cursor:pointer;inset:0;background:var(--bg3);border:1px solid var(--border);border-radius:999px;transition:all .2s}
+.switch .slider:before{content:'';position:absolute;height:16px;width:16px;left:3px;top:3px;background:var(--dim);border-radius:50%;transition:all .2s}
+.switch input:checked + .slider{background:var(--accentBg);border-color:var(--accentLine)}
+.switch input:checked + .slider:before{transform:translateX(18px);background:var(--accent)}
+.switch input:disabled + .slider{opacity:.4;cursor:not-allowed}
+.msg-act.voice-toggle.on{opacity:1;color:var(--accent)}
+.msg-act.voice-toggle.speaking{animation:voicePulse 1.1s ease-in-out infinite}
+@keyframes voicePulse{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}
+/* Connect Agent settings pane (2026-09-04) */
+.agent-status{display:flex;align-items:center;gap:7px;flex:1;font-size:12px;color:var(--dim);min-width:0}
+.agent-status .status-dot{flex-shrink:0}
+.agent-status.ok{color:var(--green)}
+.agent-status.err{color:var(--red)}
+.agent-key-hint{font-weight:400;opacity:.75;margin-left:6px}
+/* Agent run activity feed + steer note + approval modal (2026-09-05) */
+.agent-activity{display:flex;flex-direction:column;gap:2px;padding:5px 10px;margin-bottom:6px;border:1px solid var(--border);border-radius:10px;background:var(--bg3);position:relative;font-family:ui-monospace,Consolas,Menlo,monospace;font-size:11px;line-height:1.55;max-height:150px;overflow-y:auto;scrollbar-width:thin;max-width:85%;width:fit-content;min-width:200px}
+.aa-line{display:flex;gap:6px;align-items:baseline;white-space:nowrap;color:var(--dim);min-width:0}
+.aa-line .aa-glyph{flex-shrink:0;width:13px;text-align:center}
+.aa-line .aa-tool{color:var(--accent);flex-shrink:0}
+.aa-line .aa-label{overflow:hidden;text-overflow:ellipsis}
+.aa-line.run .aa-glyph{animation:aaPulse 1s ease-in-out infinite}
+.aa-line.wait{color:var(--accent)}
+.aa-line.wait .aa-glyph{animation:aaPulse 1s ease-in-out infinite;color:var(--accent)}
+.aa-line.ok .aa-glyph{color:var(--green)}
+.aa-line.err .aa-glyph{color:var(--red)}
+.aa-line.note .aa-glyph{color:var(--purple)}
+.aa-line.note{font-style:italic}
+@keyframes aaPulse{0%,100%{opacity:.35}50%{opacity:1}}
+.steer-note{margin-top:6px;padding:4px 10px;border-left:2px solid var(--accentLine);background:var(--accentSoft);border-radius:4px;font-size:12px;color:var(--accent);font-style:italic;white-space:pre-wrap;position:relative;word-break:break-word;max-width:85%;width:fit-content}
+.approval-q{margin-top:4px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12px;color:var(--text);white-space:pre-wrap;word-break:break-word;max-height:170px;overflow-y:auto}
+.approval-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.approval-actions .btn{flex:1;min-width:108px;padding:9px 10px;justify-content:center;display:inline-flex;align-items:center}
+.approval-actions .btn.allow{background:var(--green);border-color:var(--green);color:#fff}
+.approval-actions .btn.session{background:var(--accent);border-color:var(--accent);color:#fff}
+.approval-actions .btn.always{background:var(--accentBg);border-color:var(--accentLine);color:var(--accent)}
+.approval-actions .btn.deny{background:var(--bg3);border-color:var(--red);color:var(--red)}
 .bg-url-row{display:flex;gap:6px}
 .bg-url-row input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:12px;font-family:var(--font);outline:none;min-width:0}
 .bg-url-row input:focus{border-color:var(--accent)}
@@ -347,6 +414,7 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
 .bg-slider-row label{font-size:11px;color:var(--dim);width:86px;flex-shrink:0}
 .bg-slider-row input[type=range]{flex:1;accent-color:var(--accent)}
 .bg-slider-row .val{font-size:11px;color:var(--accent);width:38px;text-align:right;font-variant-numeric:tabular-nums}
+.fs-scale{font-size:10px;color:var(--dim);opacity:.8;flex-shrink:0;font-variant-numeric:tabular-nums}
 .bg-color-row{display:flex;align-items:center;gap:10px}
 .bg-color-row label{font-size:11px;color:var(--dim);width:86px;flex-shrink:0}
 .bg-color-row input[type=color]{width:34px;height:28px;border:1px solid var(--border);border-radius:6px;background:none;padding:0;cursor:pointer}
@@ -375,6 +443,13 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
 .import-status.ok{color:var(--accent)}
 .import-status.err{color:var(--red)}
 .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:2000;animation:fadeIn .2s}
+/* ── Media responses (2026-09-05): inline agent-generated images. The gateway
+   references local files as MEDIA:/path tokens in the text; matched tokens are
+   stripped from the bubble text and rendered here via /api/media (chat-server
+   resolves + serves them — a browser can't read the local disk). */
+.bubble-media{margin-top:10px;display:flex;flex-wrap:wrap;gap:10px}
+.bubble-media-item{display:inline-block;border-radius:10px;overflow:hidden;border:1px solid var(--border);line-height:0;background:var(--bg3);max-width:100%}
+.bubble-media-item img{display:block;max-width:min(100%,560px);max-height:460px;width:auto;height:auto;object-fit:contain}
 </style>
 <script>
 /* ── Theme engine — head: applies the stored theme BEFORE first paint (no flash). THEMES keys double as localStorage 'chat_theme' values; each key maps 1:1 to CSS custom props (minus 'name'). ── */
@@ -397,6 +472,8 @@ function applyTheme(key,persist){
   document.querySelectorAll('#themeRow .theme-swatch').forEach(b=>b.classList.toggle('active',b.dataset.theme===key));
 }
 applyTheme(localStorage.getItem('chat_theme')||'blue',false);
+// Chat bubble font size — applied pre-paint with the theme (no size flash)
+(function(){try{var f=parseInt(localStorage.getItem('chat_font_size')||'14',10);if(f>=12&&f<=26)document.documentElement.style.setProperty('--bubbleFs',f+'px');}catch(e){}})();
 </script>
 </head>
 <body>
@@ -426,7 +503,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">vLLM Chat v2.3.2</span>
+    <span class="footer-version">xLLM Chat v3.0.0</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -453,9 +530,18 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
       <span class="status-dot" id="statusDot"></span>
       <span id="statusText">Connecting...</span>
     </div>
-    <div class="model-pill">
+    <div class="model-pill" id="modelPill" onclick="toggleSourceMenu()" title="Chat source — click to switch between the local model and a connected agent">
       <span class="model-name" id="modelLabel">Loading...</span>
-      <select id="modelSelect" title="Model" onchange="selectModel(this.value)"></select>
+      <span class="pill-chev">▾</span>
+      <!-- kept hidden: loadModels() populates it as the model registry -->
+      <select id="modelSelect" title="Model" style="display:none" aria-hidden="true" tabindex="-1"></select>
+      <div class="source-menu" id="sourceMenu" hidden>
+        <div class="src-group-label">Local models</div>
+        <div id="srcModelList"></div>
+        <div class="src-group-label" id="srcAgentLabel" hidden>Connected agents</div>
+        <div id="srcAgentList"></div>
+        <div class="src-empty" id="srcEmpty" hidden>No local models or connected agents — start a local server, or connect an agent in Settings → Connect Agent.</div>
+      </div>
     </div>
     <button class="icon-btn" onclick="openSettings()" title="Settings">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.46.27a2 2 0 0 0-1.54.5l-.2.18a2 2 0 0 1-1.06 2.43l.14.46a2 2 0 0 1 0 1.92l-.14.47a2 2 0 0 1-.18.93l-.52.52a2 2 0 0 0 0 2.82l.52.52a2 2 0 0 1 .18.93l.14.47a2 2 0 0 1 0 1.92l.2.18a2 2 0 0 0 1.54.5l.46.27a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.46-.27a2 2 0 0 0 1.54-.5l.2-.18a2 2 0 0 1 1.06 2.43l.14.46a2 2 0 0 1 0 1.92l.14.47a2 2 0 0 1 .18.93l.52.52a2 2 0 0 0 0 2.82l.52.52a2 2 0 0 1-.18.93l-.14.47a2 2 0 0 1 0 1.92l-.2-.18a2 2 0 0 0-1.54-.5l-.46-.27a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -530,6 +616,12 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
 <div class="modal-overlay" id="settingsModal">
   <div class="modal">
     <h2>⚙ Settings</h2>
+    <div class="settings-tabs">
+      <button class="settings-tab active" data-tab="general" onclick="settingsTab('general')">General</button>
+      <button class="settings-tab" data-tab="voice" onclick="settingsTab('voice')">Voice</button>
+      <button class="settings-tab" data-tab="agent" onclick="settingsTab('agent')">Connect Agent</button>
+    </div>
+    <div class="settings-pane" id="paneGeneral">
     <label>Theme</label>
     <div class="theme-groups" id="themeRow">
       <div class="theme-group">
@@ -615,6 +707,13 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
       </div>
       <div class="bg-note">The two colors crossfade over the background. Transparency 0 = no tint, 100 = fully opaque.</div>
     </div>
+    <label>Chat Bubble Font</label>
+    <div class="bg-slider-row">
+      <span class="fs-scale">12</span>
+      <input type="range" id="chatFontSize" min="12" max="26" step="1" value="14" oninput="setChatFontSize(this.value)" title="Bubble text size — applies to user and assistant messages">
+      <span class="val" id="fontSizeVal">14px</span>
+      <span class="fs-scale">26px</span>
+    </div>
     <label>API URL</label>
     <input type="text" id="setApiUrl" value="http://127.0.0.1:8080">
     <label>System Prompt</label>
@@ -625,6 +724,33 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <input type="number" id="setTemp" value="0.7" min="0" max="2" step="0.1">
     <label>Top P</label>
     <input type="number" id="setTopP" value="0.9" min="0" max="1" step="0.01">
+    </div>
+    <div class="settings-pane" id="paneVoice" hidden>
+      <div class="voice-row">
+        <span class="voice-label">Read replies aloud</span>
+        <label class="switch"><input type="checkbox" id="voiceEnable" onchange="setVoiceEnabled(this.checked)"><span class="slider"></span></label>
+      </div>
+      <div class="voice-row">
+        <span class="voice-label">Voice</span>
+        <select id="voiceSelect" onchange="setVoiceName(this.value)"></select>
+        <button class="bg-btn" onclick="testVoice()">Test</button>
+      </div>
+      <div class="bg-note" id="voiceStatus"></div>
+    </div>
+    <div class="settings-pane" id="paneAgent" hidden>
+      <div class="bg-note" style="margin-bottom:2px">Chat with a connected agent instead of the local model — flip the source in the header pill. Agents you aren't running yet (Pi, DS Harness) are ready here: give them a server URL + key when you install them.</div>
+      <label>Agent</label>
+      <select id="agentSelect" onchange="agentSelectChanged(this.value)"></select>
+      <label>Server URL</label>
+      <input type="text" id="agentUrl" placeholder="http://host:port — OpenAI-compatible base URL">
+      <label>API Key<span class="agent-key-hint" id="agentKeyHint"></span></label>
+      <input type="password" id="agentKey" placeholder="optional" autocomplete="off">
+      <div class="voice-row">
+        <span class="agent-status" id="agentStatus"><span class="status-dot"></span><span>Not connected</span></span>
+        <button class="bg-btn" id="agentReconnectBtn" onclick="reconnectAgent()">Reconnect</button>
+      </div>
+      <div class="bg-note">Each chat thread keeps its own live agent session automatically — returning to a thread resumes the same conversation, and multiple turns continue it. Reconnect tests the server and starts a fresh session for this thread. Local model mode uses the API URL on the General tab.</div>
+    </div>
     <div class="btn-row">
       <button class="btn" onclick="closeSettings()">Cancel</button>
       <button class="btn primary" onclick="saveSettings()">Save</button>
@@ -661,13 +787,23 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
 <div class="modal-overlay" id="importModal">
   <div class="modal">
     <h2>Import Chats</h2>
-    <p class="import-hint">Select a JSON file exported from vLLM Chat. Imported chats are added; chats with the same ID are updated.</p>
+    <p class="import-hint">Select a JSON file exported from xLLM Chat. Imported chats are added; chats with the same ID are updated.</p>
     <input type="file" id="importFileInput" accept=".json,application/json" style="display:none" onchange="importChatsFromFile(this)">
     <button class="btn primary import-pick-btn" onclick="document.getElementById('importFileInput').click()">Select File</button>
     <div class="import-status" id="importStatus"></div>
     <div class="btn-row">
       <button class="btn" onclick="closeImportModal()">Close</button>
     </div>
+  </div>
+</div>
+
+<!-- Agent approval modal (2026-09-05) — Allow once / Allow this session / Always allow / Deny -->
+<div class="modal-overlay" id="approvalModal">
+  <div class="modal">
+    <h2>Hermes needs approval</h2>
+    <div class="approval-q" id="approvalQ"></div>
+    <div class="approval-actions" id="approvalActions"></div>
+    <div class="bg-note" id="approvalNote" style="display:none">Waiting for Hermes…</div>
   </div>
 </div>
 
@@ -2656,7 +2792,292 @@ let TOP_P = parseFloat(localStorage.getItem('chat_top_p') || '0.9');
 let currentModel = localStorage.getItem('chat_current_model') || '';
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '2.3.2';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.0.0';   // keep in sync with the sidebar footer version text
+// ── Agent connect (2026-09-04): flip the chat source between the local model and
+//    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
+//    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
+//    Harness (not installed yet — the user keeps them here so a phone install is
+//    ready), and Local server (any custom OpenAI-compatible endpoint).
+const AGENT_PRESETS = {
+  hermes: { name: 'Hermes',       url: 'http://127.0.0.1:8642', key: '' },
+  pi:     { name: 'Pi',           url: '',                       key: '' },
+  ds:     { name: 'DS Harness',   url: '',                       key: '' },
+  custom: { name: 'Local server', url: '',                       key: '' }
+};
+let AGENTS = loadAgents();
+let agentState = {};                       // id -> {connected, error} — in-memory, re-pinged
+let chatSource = localStorage.getItem('chat_source') || 'local';  // 'local' | 'agent:<id>'
+let cfgAgentId = localStorage.getItem('chat_agent_cfg') || 'hermes';  // agent being configured
+let chatAgentSessions = {};                // per-THREAD agent session ids (keep-alive continuity)
+
+function loadAgents() {
+  let stored = {};
+  try { stored = JSON.parse(localStorage.getItem('chat_agents') || '{}') || {}; } catch (e) {}
+  const out = {};
+  for (const id of Object.keys(AGENT_PRESETS)) {
+    out[id] = Object.assign({}, AGENT_PRESETS[id], stored[id] || {});
+    out[id].name = AGENT_PRESETS[id].name;   // preset names are fixed
+  }
+  return out;
+}
+function saveAgents() { localStorage.setItem('chat_agents', JSON.stringify(AGENTS)); }
+function agentList() { return Object.keys(AGENTS).map(id => Object.assign({ id }, AGENTS[id])); }
+function activeAgent() {
+  if (!chatSource.startsWith('agent:')) return null;
+  const a = AGENTS[chatSource.slice(6)];
+  return a ? Object.assign({ id: chatSource.slice(6) }, a) : null;
+}
+function agentConfigured(id) { const a = AGENTS[id]; return !!(a && a.url && a.url.trim()); }
+function isAgentConnected(id) { return !!(agentState[id] && agentState[id].connected); }
+// Badge model shown on agent messages ("◆ Hermes") instead of the local model id
+function displayModelBadge() { const ag = activeAgent(); return ag ? (ag.name || ag.id) : currentModel; }
+
+function agentSessionId(id, rotate) {
+  // ALWAYS-ON sessions (2026-09-05): one stable session per agent per THREAD —
+  // survives reloads (persisted on the chat object) and gives the gateway
+  // continuity via X-Hermes-Session-Id (the R1 Connect gateway trick). When the
+  // user reopens a thread, loadConversation restores chatAgentSessions, so the
+  // NEXT message auto-jumps back into the SAME working session. rotate = fresh.
+  if (rotate) delete chatAgentSessions[id];
+  let sid = chatAgentSessions[id];
+  if (!sid) {
+    sid = 'web-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+    chatAgentSessions[id] = sid;
+    if (currentChatId) saveCurrentChat();
+  }
+  return sid;
+}
+function newAgentSessionId() {
+  return 'web-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+}
+// ── Pill source dropdown ──
+function updatePill() {
+  const ag = activeAgent();
+  const lab = document.getElementById('modelLabel');
+  const pill = document.getElementById('modelPill');
+  if (!lab || !pill) return;
+  pill.classList.toggle('agent-mode', !!ag);
+  if (ag) {
+    lab.innerHTML = `<span class="pill-dot"></span>${escHtml(ag.name || ag.id)}`;
+    lab.title = `Chatting with the ${escHtml(ag.name || ag.id)} agent${ag.url ? ' — ' + escHtml(ag.url) : ''}. Click to switch source.`;
+  } else {
+    lab.textContent = currentModel || 'Local model';
+    lab.title = 'Chatting with the local model. Click to switch source.';
+  }
+}
+function refreshStatusPill() {
+  // Local mode: loadModels owns the pill. Agent mode: show the agent's state.
+  const ag = activeAgent();
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  if (!dot || !txt) return;
+  if (!ag) return;
+  if (!agentConfigured(ag.id)) {
+    dot.className = 'status-dot err';
+    txt.textContent = (ag.name || ag.id) + ' — no server set';
+    return;
+  }
+  const st = agentState[ag.id];
+  if (!st) { dot.className = 'status-dot'; txt.textContent = 'Checking ' + (ag.name || ag.id) + '…'; return; }
+  if (st.connected) { dot.className = 'status-dot ok'; txt.textContent = (ag.name || ag.id) + ' connected'; }
+  else {
+    dot.className = 'status-dot err';
+    txt.textContent = (ag.name || ag.id) + ' offline' + (st.error ? ' — ' + st.error : '');
+  }
+}
+function renderSourceMenu() {
+  const mlist = document.getElementById('srcModelList');
+  const alist = document.getElementById('srcAgentList');
+  const agLabel = document.getElementById('srcAgentLabel');
+  const empty = document.getElementById('srcEmpty');
+  const sel = document.getElementById('modelSelect');
+  const opts = sel ? Array.from(sel.options).map(o => o.value) : [];
+  const localActive = !activeAgent();
+  let html = '';
+  for (const id of opts) {
+    const active = localActive && id === currentModel;
+    // data-attributes + delegation: model ids can contain ANY character (paths,
+    // quotes) — embedding them in an inline onclick breaks the attribute (2026-09-04)
+    html += `<div class="src-item${active ? ' active' : ''}" data-src="model" data-val="${escAttr(id)}" title="${escAttr(id)}"><span class="src-check">${active ? '✓' : ''}</span><span class="src-name">${escHtml(shortModel(id))}</span></div>`;
+  }
+  mlist.innerHTML = html;
+  const ag = activeAgent();
+  let ahtml = '';
+  let shown = 0;
+  for (const a of agentList()) {
+    const connected = isAgentConnected(a.id);
+    const active = !!ag && ag.id === a.id;
+    if (active && !connected) {
+      // active agent went offline: keep it visible as a disabled row so the user
+      // makes a conscious choice (dropdown only offers agents WHEN connected)
+      ahtml += `<div class="src-item active off" title="${escAttr(agentState[a.id] && agentState[a.id].error || 'offline')}"><span class="src-check">✓</span><span class="src-dot" style="background:var(--red)"></span><span class="src-name">${escHtml(a.name)}</span><span class="src-sub">offline</span></div>`;
+      shown++;
+    } else if (connected) {
+      ahtml += `<div class="src-item${active ? ' active' : ''}" onclick="pickAgent('${escAttr(a.id)}')" title="Chat with ${escAttr(a.name)} — ${escAttr(a.url || '')}"><span class="src-check">${active ? '✓' : ''}</span><span class="src-dot"></span><span class="src-name">${escHtml(a.name)}</span><span class="src-sub">${escHtml(String(a.url || '').replace(/^https?:\/\//i, ''))}</span></div>`;
+      shown++;
+    }
+  }
+  alist.innerHTML = ahtml;
+  agLabel.hidden = shown === 0;
+  const none = opts.length === 0 && shown === 0 && !(ag && !isAgentConnected(ag.id));
+  empty.hidden = !none;
+  if (none) mlist.innerHTML = '';
+}
+function toggleSourceMenu() {
+  const m = document.getElementById('sourceMenu');
+  const pill = document.getElementById('modelPill');
+  if (!m || m.hidden === false && pill.classList.contains('open')) { closeSourceMenu(); return; }
+  renderSourceMenu();
+  m.hidden = false;
+  pill.classList.add('open');
+}
+function closeSourceMenu() {
+  const m = document.getElementById('sourceMenu');
+  const pill = document.getElementById('modelPill');
+  if (m) m.hidden = true;
+  if (pill) pill.classList.remove('open');
+}
+function pickAgent(id) {
+  if (!AGENTS[id] || !agentConfigured(id)) return;
+  chatSource = 'agent:' + id;
+  localStorage.setItem('chat_source', chatSource);
+  closeSourceMenu();
+  updatePill(); refreshStatusPill();
+  if (!isAgentConnected(id)) pingAgent(id);   // async status fill
+  showToast('Chatting with ' + (AGENTS[id].name || id));
+}
+// ── Agent connectivity ──
+function pingAgent(id) {
+  const a = AGENTS[id];
+  if (!a) return Promise.resolve(false);
+  const body = { id: id, url: (a.url || '').trim(), key: (a.key || '') };
+  agentState[id] = null;                       // "checking…" — clears stale state
+  if (activeAgent() && activeAgent().id === id) refreshStatusPill();
+  if (cfgAgentId === id) updateAgentStatusLine();
+  return fetch('/api/agent/ping', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(r => r.json()).then(d => {
+    agentState[id] = { connected: !!d.ok, error: d.ok ? '' : (d.error || ('HTTP ' + (d.status || '?'))) };
+    if (activeAgent() && activeAgent().id === id) refreshStatusPill();
+    if (cfgAgentId === id) updateAgentStatusLine();
+    if (!document.getElementById('sourceMenu').hidden) renderSourceMenu();
+    return !!d.ok;
+  }).catch(err => {
+    agentState[id] = { connected: false, error: 'proxy unreachable' };
+    if (activeAgent() && activeAgent().id === id) refreshStatusPill();
+    if (cfgAgentId === id) updateAgentStatusLine();
+    return false;
+  });
+}
+function pingAllAgents() {
+  for (const id of Object.keys(AGENTS)) {
+    if (agentConfigured(id)) pingAgent(id);
+  }
+}
+// ── Settings → Connect Agent pane ──
+function populateAgentPane() {
+  const sel = document.getElementById('agentSelect');
+  if (!sel) return;
+  sel.innerHTML = agentList().map(a =>
+    `<option value="${escAttr(a.id)}">${escHtml(a.name)}${a.url ? '' : '  (not configured)'}</option>`
+  ).join('');
+  if (!agentList().some(a => a.id === cfgAgentId)) cfgAgentId = 'hermes';
+  sel.value = cfgAgentId;
+  fillAgentFields(cfgAgentId);
+}
+function fillAgentFields(id) {
+  const a = AGENTS[id];
+  document.getElementById('agentUrl').value = (a && a.url) || '';
+  document.getElementById('agentKey').value = (a && a.key) || '';
+  document.getElementById('agentKeyHint').textContent = id === 'hermes'
+    ? '— blank = this machine\u2019s gateway key (stored in .agent-keys.json)'
+    : (id === 'custom' ? '— required if your server needs one' : '— required if the agent needs one');
+  updateAgentStatusLine();
+}
+function agentSelectChanged(id) {
+  cfgAgentId = id;
+  localStorage.setItem('chat_agent_cfg', id);
+  fillAgentFields(id);
+}
+function updateAgentStatusLine() {
+  const st = document.getElementById('agentStatus');
+  const btn = document.getElementById('agentReconnectBtn');
+  if (!st) return;
+  const id = cfgAgentId;
+  const a = AGENTS[id];
+  const dot = st.querySelector('.status-dot');
+  const label = st.querySelector('span:last-child');
+  if (!a || !a.url) {
+    st.className = 'agent-status err';
+    if (dot) dot.className = 'status-dot err';
+    label.textContent = 'No server URL — enter one above, then Reconnect';
+    btn.textContent = 'Reconnect';
+    btn.disabled = false;
+    return;
+  }
+  const s = agentState[id];
+  if (!s) {
+    st.className = 'agent-status';
+    if (dot) dot.className = 'status-dot';
+    label.textContent = 'Checking…';
+  } else if (s.connected) {
+    st.className = 'agent-status ok';
+    if (dot) dot.className = 'status-dot ok';
+    label.textContent = 'Connected';
+  } else {
+    st.className = 'agent-status err';
+    if (dot) dot.className = 'status-dot err';
+    label.textContent = 'Offline' + (s.error ? ' — ' + s.error : '');
+  }
+  btn.textContent = (s && !s.connected) ? 'Retry' : 'Reconnect';
+  btn.disabled = false;
+}
+async function reconnectAgent() {
+  const id = cfgAgentId;
+  const btn = document.getElementById('agentReconnectBtn');
+  const st = document.getElementById('agentStatus');
+  const url = document.getElementById('agentUrl').value.trim();
+  const key = document.getElementById('agentKey').value;
+  if (!url) {
+    st.className = 'agent-status err';
+    st.querySelector('.status-dot').className = 'status-dot err';
+    st.querySelector('span:last-child').textContent = 'Enter a server URL first';
+    return;
+  }
+  // test what's TYPED (works before Save) — apply on success so the pill can use it
+  btn.disabled = true; btn.textContent = 'Testing…';
+  try {
+    const d = await fetch('/api/agent/ping', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id, url: url, key: key })
+    }).then(r => r.json());
+    if (d.ok) {
+      // apply typed config so Reconnect alone is enough (Save optional)
+      AGENTS[id].url = url; AGENTS[id].key = key;
+      saveAgents();
+      agentState[id] = { connected: true, error: '' };
+      agentSessionId(id, true);              // reconnect always starts a FRESH session for this thread
+      st.className = 'agent-status ok';
+      st.querySelector('.status-dot').className = 'status-dot ok';
+      st.querySelector('span:last-child').textContent = 'Connected';
+      if (activeAgent() && activeAgent().id === id) refreshStatusPill();
+      showToast((AGENTS[id].name || id) + ' connected');
+    } else {
+      agentState[id] = { connected: false, error: d.error || ('HTTP ' + (d.status || '?')) };
+      st.className = 'agent-status err';
+      st.querySelector('.status-dot').className = 'status-dot err';
+      st.querySelector('span:last-child').textContent = 'Offline — ' + (agentState[id].error || 'unreachable');
+    }
+  } catch (e) {
+    st.className = 'agent-status err';
+    st.querySelector('.status-dot').className = 'status-dot err';
+    st.querySelector('span:last-child').textContent = 'Proxy error';
+  }
+  btn.disabled = false; btn.textContent = 'Reconnect';
+}
 let abortController = null;
 let isStreaming = false;
 let currentStreamingEl = null;
@@ -2683,6 +3104,9 @@ const STAT_ICON_TRASH = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24
 const STAT_ICON_COPY = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
 const STAT_ICON_RECYCLE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>';
 const STAT_ICON_EDIT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>';
+const STAT_ICON_VOICE_ON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
+const STAT_ICON_VOICE_OFF = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M11 5 6 9H2v6h4l5 4z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></svg>';
+const STAT_ICON_VOICE_PLAY = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="m6 3 14 9-14 9V3z"/></svg>';
 
 // llama.cpp formatPerformanceTime port
 function formatPerfTime(ms) {
@@ -2709,7 +3133,11 @@ function msgActionsHTML(isUser, minimal) {
     </span>`;
   }
   const edit = isUser ? `<button class="msg-act" onclick="editMessage(this)" title="Edit message">${STAT_ICON_EDIT}</button>` : '';
+  const voice = !isUser && !minimal ? voiceToggleHTML() : '';
+  const replay = !isUser && !minimal && voiceEnabled && voiceAvailable ? voiceReplayHTML() : '';
   return `<span class="msg-actions">
+    ${voice}
+    ${replay}
     ${edit}
     <button class="msg-act" onclick="copyMessage(this)" title="Copy">${STAT_ICON_COPY}</button>
     <button class="msg-act" onclick="recycleMessage(this)" title="Recycle: resend this prompt, delete responses below">${STAT_ICON_RECYCLE}</button>
@@ -2735,6 +3163,192 @@ function shortModel(m) {
   return s.length > 26 ? s.slice(0, 24) + '…' : s;
 }
 
+// ── Voice read-aloud (2026-08-31): Qwen3 cloned voices via the chat-server
+//    proxy (/api/voices + /api/tts). Enabled state mirrors between the Settings
+//    → Voice tab switch and the per-bubble speaker icon in the stats bar.
+let voiceEnabled = localStorage.getItem('chat_voice_enabled') === '1';
+let voiceName = localStorage.getItem('chat_voice_name') || '';
+let voiceList = [];
+let voiceAvailable = false;
+let _ttsQueue = [];
+let _ttsAudio = null;
+let _ttsSpeaking = false;
+
+function loadVoices() {
+  fetch('/api/voices').then(r => r.json()).then(d => {
+    voiceList = Array.isArray(d.voices) ? d.voices : [];
+    voiceAvailable = !!d.available;
+    if (voiceList.length && !voiceList.some(v => v.name === voiceName)) {
+      voiceName = voiceList.some(v => v.name === 'Dad') ? 'Dad' : voiceList[0].name;
+    }
+    updateVoiceUI();
+  }).catch(() => { voiceList = []; voiceAvailable = false; updateVoiceUI(); });
+}
+
+function updateVoiceUI() {
+  const sel = document.getElementById('voiceSelect');
+  if (sel) {
+    sel.innerHTML = voiceList.map(v => `<option value="${escAttr(v.name)}">${escHtml(v.name)}</option>`).join('')
+      || '<option value="">No voices</option>';
+    sel.value = voiceList.some(v => v.name === voiceName) ? voiceName : '';
+    sel.disabled = !voiceAvailable || !voiceList.length;
+  }
+  const sw = document.getElementById('voiceEnable');
+  if (sw) { sw.checked = voiceEnabled; sw.disabled = !voiceAvailable; }
+  const st = document.getElementById('voiceStatus');
+  if (st) {
+    st.textContent = !voiceAvailable
+      ? 'Qwen3 TTS offline — start the qwen3-tts service (port 5093) to use voice.'
+      : (voiceList.length
+        ? `Qwen3 TTS ready — ${voiceList.length} cloned voice${voiceList.length === 1 ? '' : 's'} loaded.`
+        : 'Qwen3 TTS ready, but no cloned voices found yet.');
+  }
+  const on = voiceEnabled && voiceAvailable;
+  document.querySelectorAll('.voice-toggle').forEach(b => {
+    b.innerHTML = on ? STAT_ICON_VOICE_ON : STAT_ICON_VOICE_OFF;
+    b.classList.toggle('on', on);
+    b.classList.toggle('speaking', _ttsSpeaking);
+    b.title = on
+      ? `Read replies aloud: ON (${voiceName || 'no voice'}) — click to mute`
+      : 'Read replies aloud: OFF — click to enable';
+  });
+  // Keep the replay button (right of the speaker) in sync on existing bubbles:
+  // present only while voice is on; inserted/removed without a full re-render.
+  document.querySelectorAll('.msg-actions').forEach(actions => {
+    const toggle = actions.querySelector('.voice-toggle');
+    if (!toggle) return;
+    let rep = toggle.nextElementSibling;
+    if (rep && rep.classList.contains('voice-replay')) {
+      if (!on) rep.remove();
+    } else if (on) {
+      const r = document.createElement('button');
+      r.className = 'msg-act voice-replay';
+      r.title = 'Replay this reply aloud';
+      r.innerHTML = STAT_ICON_VOICE_PLAY;
+      r.onclick = () => replayVoice(r);
+      toggle.after(r);
+    }
+  });
+}
+
+function setVoiceEnabled(on) {
+  voiceEnabled = !!on;
+  localStorage.setItem('chat_voice_enabled', voiceEnabled ? '1' : '0');
+  if (!voiceEnabled) stopTTS();
+  updateVoiceUI();
+}
+function voiceToggleHTML() {
+  const on = voiceEnabled && voiceAvailable;
+  const tip = on
+    ? `Read replies aloud: ON (${voiceName || 'no voice'}) — click to mute`
+    : 'Read replies aloud: OFF — click to enable';
+  return `<button class="msg-act voice-toggle${on ? ' on' : ''}${_ttsSpeaking ? ' speaking' : ''}" onclick="toggleVoice()" title="${escAttr(tip)}">${on ? STAT_ICON_VOICE_ON : STAT_ICON_VOICE_OFF}</button>`;
+}
+function voiceReplayHTML() {
+  return `<button class="msg-act voice-replay" onclick="replayVoice(this)" title="Replay this reply aloud">${STAT_ICON_VOICE_PLAY}</button>`;
+}
+// Re-play THIS message's content in the selected voice (restart, not queue)
+function replayVoice(btn) {
+  const msg = btn.closest('.msg');
+  const hidx = msg ? parseInt(msg.dataset.hidx || '-1', 10) : -1;
+  const m = (hidx >= 0 && conversationHistory[hidx]) ? conversationHistory[hidx] : null;
+  const text = m ? (m.content || '') : '';
+  if (!text.trim()) return;
+  stopTTS();
+  speakText(text);
+}
+function toggleVoice() { setVoiceEnabled(!voiceEnabled); }
+function setVoiceName(name) {
+  voiceName = name;
+  localStorage.setItem('chat_voice_name', voiceName);
+  updateVoiceUI();
+}
+function settingsTab(tab) {
+  document.querySelectorAll('.settings-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  const p1 = document.getElementById('paneGeneral');
+  const p2 = document.getElementById('paneVoice');
+  const p3 = document.getElementById('paneAgent');
+  if (p1) p1.hidden = tab !== 'general';
+  if (p2) p2.hidden = tab !== 'voice';
+  if (p3) p3.hidden = tab !== 'agent';
+  if (tab === 'voice') loadVoices();   // refresh availability + list each visit
+  if (tab === 'agent') { populateAgentPane(); pingAgent(cfgAgentId); }  // refresh + status each visit
+}
+function testVoice() {
+  if (!voiceEnabled) setVoiceEnabled(true);
+  speakText(`This is a test of the ${voiceName || 'selected'} voice. Does it sound right?`);
+}
+
+// Strip markdown to plain speech (code blocks → a spoken note, links → text)
+function mdToSpeech(md) {
+  return String(md || '')
+    .replace(/```[\s\S]*?```/g, ' code block. ')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[#>*_~|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+// Split into ~420-char sentence-ish chunks so long replies start speaking fast
+// and each /api/tts call stays well under the backend timeout.
+function chunkForTTS(text) {
+  const sents = text.match(/[^.!?\n]+[.!?\n]*/g) || [text];
+  const out = []; let cur = '';
+  for (const s of sents) {
+    if (cur && (cur + s).length > 420) { out.push(cur); cur = s; }
+    else cur += s;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+function speakText(text) {
+  if (!voiceEnabled || !voiceAvailable || !voiceName) return;
+  const plain = mdToSpeech(text);
+  if (!plain) return;
+  _ttsQueue.push(...chunkForTTS(plain));
+  pumpTTS();
+}
+async function pumpTTS() {
+  if (_ttsSpeaking) return;
+  _ttsSpeaking = true; updateVoiceUI();
+  while (_ttsQueue.length && voiceEnabled) {
+    const chunk = _ttsQueue.shift();
+    try {
+      const r = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voice: voiceName, text: chunk }),
+      });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        console.warn('TTS failed:', e.error || r.status);
+        break;
+      }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      await new Promise((resolve) => {
+        let done = false;
+        const finish = () => { if (!done) { done = true; resolve(); } };
+        const a = new Audio(url);
+        _ttsAudio = a;
+        a.addEventListener('ended', finish);   // natural end → next chunk
+        a.addEventListener('pause', finish);   // stopTTS() → exit loop
+        a.addEventListener('error', finish);
+        a.play().catch(finish);                // autoplay rejection → skip chunk
+      });
+      URL.revokeObjectURL(url);
+      _ttsAudio = null;
+    } catch (err) { console.warn('TTS playback error:', err); break; }
+  }
+  _ttsSpeaking = false; _ttsAudio = null; updateVoiceUI();
+}
+function stopTTS() {
+  _ttsQueue = [];
+  if (_ttsAudio) { try { _ttsAudio.pause(); } catch (e) {} _ttsAudio = null; }
+  _ttsSpeaking = false; updateVoiceUI();
+}
+
 // Live refresh of the streaming message's stats bar (called ~4x/sec)
 // Token estimate: vLLM+MTP4 batches many tokens per SSE chunk, so counting
 // chunks badly undercounts (~38 t/s shown vs 164 real). Char-based estimate
@@ -2757,7 +3371,7 @@ function updateMsgStatsLive() {
     const genMs = now - msgFirstTokenTime;
     if (genMs > 0) tps = (tokens / genMs) * 1000;
   }
-  msgStatsEl.innerHTML = statsBarHTML(tokens, elapsed, tps, true, currentModel);
+  msgStatsEl.innerHTML = statsBarHTML(tokens, elapsed, tps, true, displayModelBadge());
 }
 
 
@@ -2772,6 +3386,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   wireTokenTip();
   updateTokenBar();
+  loadVoices();   // voice read-aloud: availability + cloned voice list
 });
 
 function autoResize(e) {
@@ -2898,13 +3513,32 @@ function stopStatsTracking() {
 }
 
 // ---- Settings ----
+// Chat bubble font size (2026-09-05): the Settings slider scales BOTH user and
+// assistant bubble text via --bubbleFs (head script pre-applies the stored px
+// before first paint so there is no size flash on load).
+function setChatFontSize(v) {
+  const n = parseInt(v, 10);
+  if (isNaN(n)) return;
+  document.documentElement.style.setProperty('--bubbleFs', n + 'px');
+  localStorage.setItem('chat_font_size', String(n));
+  const val = document.getElementById('fontSizeVal');
+  if (val) val.textContent = n + 'px';
+}
 function openSettings() {
   document.getElementById('setApiUrl').value = API_URL;
   document.getElementById('setSysPrompt').value = SYSTEM_PROMPT;
   document.getElementById('setMaxTokens').value = MAX_TOKENS;
   document.getElementById('setTemp').value = TEMPERATURE;
   document.getElementById('setTopP').value = TOP_P;
+  // bubble font slider mirrors the stored size
+  const fs = parseInt(localStorage.getItem('chat_font_size') || '14', 10);
+  const fsEl = document.getElementById('chatFontSize');
+  if (fsEl) fsEl.value = (fs >= 12 && fs <= 26) ? fs : 14;
+  const fsV = document.getElementById('fontSizeVal');
+  if (fsV) fsV.textContent = ((fs >= 12 && fs <= 26) ? fs : 14) + 'px';
   updateBgSettingsUI();
+  loadVoices();   // refresh qwen3 availability + voice list each open
+  populateAgentPane();   // Connect Agent: fill fields from stored config (agent tab default-hidden; fields kept live)
   document.getElementById('settingsModal').classList.add('show');
 }
 function closeSettings() { document.getElementById('settingsModal').classList.remove('show'); }
@@ -2922,6 +3556,18 @@ function saveSettings() {
   updateTokenBar();
   localStorage.setItem('chat_temperature', TEMPERATURE);
   localStorage.setItem('chat_top_p', TOP_P);
+  // Connect Agent: persist the configured agent's URL / key (sessions are
+  // always kept alive automatically — no toggle)
+  const cfgUrl = document.getElementById('agentUrl').value.trim();
+  const cfgKey = document.getElementById('agentKey').value;
+  if (AGENTS[cfgAgentId]) {
+    const urlChanged = AGENTS[cfgAgentId].url !== cfgUrl || AGENTS[cfgAgentId].key !== cfgKey;
+    AGENTS[cfgAgentId].url = cfgUrl;
+    AGENTS[cfgAgentId].key = cfgKey;
+    saveAgents();
+    if (urlChanged && cfgUrl) pingAgent(cfgAgentId);   // re-check reachability after a change
+    if (activeAgent() && activeAgent().id === cfgAgentId) refreshStatusPill();
+  }
   if (currentChatId) saveCurrentChat();   // settings prompt edits stick to this thread
   updateSysPromptBar(); updateTokenBar();
   closeSettings();
@@ -3298,6 +3944,7 @@ function formatDate(ts) {
 function newChat() {
   currentChatId = null;
   conversationHistory = [];
+  chatAgentSessions = {};   // new thread = fresh agent sessions (keep-alive continuity per thread)
   updateTokenBar();
   resetJumpIndex();
   // New threads inherit the last known system prompt (2026-08-18)
@@ -3320,6 +3967,7 @@ function saveCurrentChat() {
   // Custom titles (Rename menu) are kept; only auto-title from the first user message when not renamed
   if (!existing.renamed) existing.title = threadTitle(conversationHistory.find(m => m.role === 'user')?.content);
   existing.systemPrompt = SYSTEM_PROMPT;   // per-thread system prompt (2026-08-18)
+  existing.agentSessions = chatAgentSessions;   // per-thread agent keep-alive sessions (2026-09-04)
   let serialized = JSON.stringify(chats);
   if (serialized.length > 4500000) {
     // attachment payloads (image base64, big extractions) can blow the
@@ -3341,6 +3989,7 @@ function loadConversation(chatId) {
   currentChatId = chatId;
   localStorage.setItem('chat_current_id', chatId);
   conversationHistory = JSON.parse(JSON.stringify(chat.messages || []));
+  chatAgentSessions = (chat.agentSessions && typeof chat.agentSessions === 'object') ? chat.agentSessions : {};
   updateTokenBar();
   // Per-thread system prompt: the thread's own if it has one, else last-known.
   // The global always tracks the ACTIVE thread so a new chat inherits it.
@@ -3459,12 +4108,14 @@ function loadModels() {
         // to leave the flag false forever, sending uncapped requests -> blank loops).
         if (data.data[0] && data.data[0].owned_by === 'llamacpp') { isLlamaCpp = true; _backendKnown = true; }
         else if (data.data[0] && data.data[0].owned_by) { isLlamaCpp = false; _backendKnown = true; } // vLLM/other: no reasoning cap
-        const mml = models[0].max_model_len || models[0].context_length;
+        const meta = models[0].meta || {};
+        // vLLM reports context top-level (max_model_len); llama.cpp hides it in
+        // meta.n_ctx / n_ctx_train — read both so the token bar shows the real limit
+        const mml = models[0].max_model_len || models[0].context_length || meta.n_ctx || meta.n_ctx_train || 0;
         if (mml > 0 && mml !== contextLimit) {
           contextLimit = mml;
           localStorage.setItem('chat_context_limit', contextLimit);
         }
-        document.getElementById('modelLabel').textContent = currentModel;
         document.getElementById('statusDot').className = 'status-dot ok';
         document.getElementById('statusText').textContent = 'Connected';
       } else {
@@ -3474,10 +4125,14 @@ function loadModels() {
         document.getElementById('statusText').textContent = 'Connected (no models)';
       }
       updateTokenBar();
+      updatePill();   // local mode: label = freshly loaded model; agent mode: pill shows the agent
+      if (activeAgent()) refreshStatusPill();   // agent status owns the header pill in agent mode
     }).catch(() => {
-      document.getElementById('statusDot').className = 'status-dot err';
-      document.getElementById('statusText').textContent = 'API unavailable';
-      document.getElementById('modelLabel').textContent = 'Connection error';
+      if (!activeAgent()) {
+        document.getElementById('statusDot').className = 'status-dot err';
+        document.getElementById('statusText').textContent = 'API unavailable';
+        document.getElementById('modelLabel').textContent = 'Connection error';
+      } else { updatePill(); refreshStatusPill(); }
       // keep retrying every 10s so a server that comes back later re-populates
       // the model list (and the stats-bar model badge) without a page reload
       setTimeout(loadModels, 10000);
@@ -3512,17 +4167,26 @@ async function detectBackend() {
 }
 
 function selectModel(val) {
-  if (val) {
-    currentModel = val;
-    localStorage.setItem('chat_current_model', val);
-    document.getElementById('modelLabel').textContent = val;
-  }
+  // Picking a model from the source dropdown = chat with the LOCAL model.
+  if (!val) return;
+  chatSource = 'local';
+  localStorage.setItem('chat_source', chatSource);
+  currentModel = val;
+  localStorage.setItem('chat_current_model', val);
+  closeSourceMenu();
+  updatePill(); refreshStatusPill();
 }
 
 async function sendMessage() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
-  if ((!text && attachments.length === 0) || isStreaming) return;
+  if (!text && attachments.length === 0) return;
+  if (isStreaming) {
+    // R1-Connect-style interrupt: while an AGENT run streams, typing + Enter
+    // steers the live run instead of being swallowed (local model: unchanged)
+    if (activeAgent() && _agentRun && _agentRun.runId) { doAgentSteer(text); }
+    return;
+  }
   input.value = '';
   input.style.height = 'auto';
   document.getElementById('emptyState')?.remove();
@@ -3622,11 +4286,13 @@ function attachmentChipsHTML(list) {
 // and by recycle — the user prompt is already in history, don't re-add it)
 async function streamFromHistory() {
   const input = document.getElementById('chatInput');
+  const agentStream = !!activeAgent();   // agent runs keep the input OPEN so the user can steer mid-run
   isStreaming = true;
   abortController = new AbortController();
   document.getElementById('sendBtn').style.display = 'none';
   document.getElementById('stopBtn').style.display = 'flex';
-  input.disabled = true;
+  if (!agentStream) input.disabled = true;
+  input.placeholder = agentStream ? 'Type to steer the agent… (Enter)' : input.placeholder;
   startStatsTracking();
   conversationHistory.push({ role: 'assistant', content: '' });
   saveCurrentChat();   // persist prompt+placeholder NOW — a mid-stream chat switch can't lose the prompt (2026-08-27)
@@ -3670,6 +4336,7 @@ async function streamFromHistory() {
   document.getElementById('sendBtn').style.display = 'flex';
   document.getElementById('stopBtn').style.display = 'none';
   input.disabled = false;
+  input.placeholder = 'Type a message...';
   input.focus();
   stopStatsTracking();
 }
@@ -3736,7 +4403,23 @@ function deleteMessage(btn) {
   saveCurrentChat();
 }
 
-function stopGeneration() { if (abortController) abortController.abort(); }
+function stopGeneration() {
+  // Agent runs are server-side: closing the events stream does NOT cancel the
+  // run, so tell the gateway to stop it first (best-effort), then abort.
+  if (_agentRun && _agentRun.runId && !_agentStopFired) {
+    _agentStopFired = true;
+    agentPostRunAction('stop').catch(() => {});
+  }
+  // If an approval modal is open, unblock it (deny, no POST — the stop above
+  // cancels the run) so the turn loop can unwind to the abort.
+  _agentAborted = true;
+  if (_agentApprovalResolve) {
+    const r = _agentApprovalResolve; _agentApprovalResolve = null; _agentApprovalPending = false;
+    r('deny');
+    document.getElementById('approvalModal')?.classList.remove('show');
+  }
+  if (abortController) abortController.abort();
+}
 
 // ── Edit user message + branch versions (llama.cpp/Qwen port) ──
 // Model: editing a user message that already has a response saves the old
@@ -3869,7 +4552,7 @@ function appendMessage(role, content, thinking = null, stats = null, hidx = null
     if (thinking) {
       bubbleHtml = thinkingPillHTML(thinking, false);
     }
-    bubbleHtml += content ? escapeAndFormat(content) : (thinking ? '<div class="loop-warn">⚠ No answer text — thinking loop.</div>' : '');
+    bubbleHtml += content ? renderAssistantContent(content) : (thinking ? '<div class="loop-warn">⚠ No answer text — thinking loop.</div>' : '');
   } else {
     bubbleHtml = escapeAndFormat(content);
     if (attachments && attachments.length) bubbleHtml += attachmentChipsHTML(attachments);
@@ -3922,8 +4605,690 @@ function appendStreamingMessage(role) {
   return div;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Agent-mode runs protocol (2026-09-05): chatting with a connected agent uses
+// the gateway's /v1/runs lifecycle — POST /api/agent/run creates a run, POST
+// /api/agent/runevents streams typed events (message.delta, reasoning.available,
+// tool.started/completed, subagent.*, approval.request, run.steered/completed/
+// failed/cancelled), POST /api/agent/runaction resolves approvals (choice:
+// once|session|always|deny), steers, and stops. chat/completions never emits
+// approvals or tool lifecycle — this protocol is what CLI-style frontends use.
+let _agentRun = null;          // {runId, agentId, url, key} of the live run
+let _agentStopFired = false;   // one-shot: stopGeneration() fired the run-stop
+let _agentApprovalPending = false;
+let _agentAborted = false;     // stream aborted while an approval modal was open
+let _agentApprovalResolve = null;   // pending approval promise resolver (unblocks on stop)
+let _agentActEl = null;        // activity feed of the CURRENT run (per-message; never by id — duplicate ids across turns made lines land in the PREVIOUS message's box)
+let _agentActPinned = true;    // feed auto-sticks to bottom unless the user scrolled up
+let _agentWaitTimer = null;    // "waiting for Hermes — Ns" pulse while the run is silent
+let _agentWaitLine = null;
+let _agentLastEvent = 0;       // monotonic stamp of the last received event
+
+function onAgentActScroll(e) {
+  const el = e.target;
+  _agentActPinned = (el.scrollHeight - el.scrollTop - el.clientHeight) < 30;
+}
+function pinAgentAct(el) {
+  el = el || agentActEl();
+  if (el && _agentActPinned) el.scrollTop = el.scrollHeight;
+}
+
+function agentWake() { _agentLastDate = Date.now(); }
+let _agentLastDate = 0;        // wall-clock of last event (pulse math)
+function agentActEl() {
+  if (_agentActEl && _agentActEl.isConnected) return _agentActEl;
+  return null;
+}
+function startAgentWaitPulse() {
+  if (_agentWaitTimer) return;
+  _agentWaitTimer = setInterval(() => {
+    const el = agentActEl();
+    if (!el || _agentApprovalPending || _agentLastDate === 0) return;
+    const idle = Date.now() - _agentLastDate;
+    if (idle < 1500) { if (_agentWaitLine) { _agentWaitLine.remove(); _agentWaitLine = null; } return; }
+    if (!_agentWaitLine) {
+      _agentWaitLine = document.createElement('div');
+      _agentWaitLine.className = 'aa-line wait';
+      _agentWaitLine.innerHTML = '<span class="aa-glyph">▸</span><span class="aa-label wait-label"></span>';
+      el.appendChild(_agentWaitLine);
+      pinAgentAct(el);
+    }
+    const wl = _agentWaitLine.querySelector('.wait-label');
+    if (wl) {
+      const secs = Math.round(idle / 1000);
+      wl.textContent = secs < 12
+        ? 'Hermes is working — ' + secs + 's'
+        : 'Hermes is working — ' + secs + 's (cold start: first reply can take 30s+)';
+    }
+    pinAgentAct(el);
+  }, 500);
+}
+function stopAgentWaitPulse() {
+  if (_agentWaitTimer) { clearInterval(_agentWaitTimer); _agentWaitTimer = null; }
+  if (_agentWaitLine) { _agentWaitLine.remove(); _agentWaitLine = null; }
+}
+
+function agentRunAgent() {
+  const ag = activeAgent();
+  return ag ? Object.assign({}, ag) : null;
+}
+// Plain text of the LAST user turn (runs accept string content; image content
+// parts are not supported on this protocol yet — flagged in the activity feed).
+function agentLastUserText() {
+  for (let i = conversationHistory.length - 1; i >= 0; i--) {
+    const m = conversationHistory[i];
+    if (m.role !== 'user') continue;
+    const c = m.content;
+    if (typeof c === 'string') return c;
+    if (Array.isArray(c)) {
+      return c.filter(p => p && p.type === 'text').map(p => p.text || '').join('\n');
+    }
+    return '';
+  }
+  return '';
+}
+function agentHasImageAttachments() {
+  for (let i = conversationHistory.length - 1; i >= 0; i--) {
+    const m = conversationHistory[i];
+    if (m.role !== 'user') continue;
+    if (m.attachments && m.attachments.some(a => a.kind === 'image' && a.data)) return true;
+  }
+  return false;
+}
+function shortTxt(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+function chatScrollBottom() {
+  const ca = document.getElementById('chatArea');
+  if (ca) ca.scrollTop = ca.scrollHeight;
+}
+
+// ── Activity feed (CLI-style tool lines under the streaming agent bubble) ──
+function addActivity(kind, tool, label) {
+  const el = agentActEl();
+  if (!el) return null;
+  const line = document.createElement('div');
+  line.className = 'aa-line ' + kind;
+  const glyph = kind === 'run' ? '▸' : kind === 'ok' ? '✓' : kind === 'err' ? '✕' : kind === 'wait' ? '▸' : '·';
+  const toolTxt = tool ? `<span class="aa-tool">${escHtml(tool)}</span>` : '';
+  line.innerHTML = `<span class="aa-glyph">${glyph}</span>${toolTxt}<span class="aa-label">${escHtml(shortTxt(label, 160))}</span>`;
+  el.appendChild(line);
+  while (el.children.length > 60) el.removeChild(el.firstChild);   // keep the feed bounded
+  pinAgentAct(el);
+  chatScrollBottom();
+  return line;
+}
+function addActivityNote(txt) { return addActivity('note', '', txt); }
+function setActivityLine(line, kind, tool, label) {
+  if (!line) return;
+  line.className = 'aa-line ' + kind;
+  const glyph = kind === 'run' ? '▸' : kind === 'ok' ? '✓' : kind === 'err' ? '✕' : kind === 'wait' ? '▸' : '·';
+  line.innerHTML = `<span class="aa-glyph">${glyph}</span>${tool ? `<span class="aa-tool">${escHtml(tool)}</span>` : ''}<span class="aa-label">${escHtml(shortTxt(label, 160))}</span>`;
+}
+
+function agentPostRunAction(action, extra) {
+  const ag = agentRunAgent();
+  if (!ag || !_agentRun) return Promise.resolve(null);
+  return fetch('/api/agent/runaction', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({
+      id: ag.id, url: (ag.url || '').trim(), key: ag.key || '',
+      run_id: _agentRun.runId, action: action
+    }, extra || {}))
+  }).then(r => r.json()).catch(() => null);
+}
+
+// ── Approval modal (Allow once / Allow this session / Always allow / Deny) ──
+function showApprovalModal(data) {
+  return new Promise((resolve) => {
+    _agentApprovalPending = true;
+    _agentApprovalResolve = resolve;
+    const q = document.getElementById('approvalQ');
+    const actions = document.getElementById('approvalActions');
+    const note = document.getElementById('approvalNote');
+    const text = data.command || data.message || data.question
+      || (data.tool ? 'Hermes wants to use: ' + data.tool : '')
+      || 'Hermes is waiting for your approval.';
+    q.textContent = text;
+    const choices = Array.isArray(data.choices) && data.choices.length ? data.choices : ['once', 'deny'];
+    const LABELS = {
+      once: { label: 'Allow once', cls: 'allow' },
+      session: { label: 'Allow this session', cls: 'session' },
+      always: { label: 'Always allow', cls: 'always' },
+      deny: { label: 'Deny', cls: 'deny' }
+    };
+    actions.innerHTML = '';
+    for (const c of choices) {
+      const m = LABELS[c] || { label: c, cls: '' };
+      const b = document.createElement('button');
+      b.className = 'btn ' + m.cls;
+      b.textContent = m.label;
+      b.onclick = () => { _agentApprovalPending = false; _agentApprovalResolve = null; document.getElementById('approvalModal').classList.remove('show'); resolve(c); };
+      actions.appendChild(b);
+    }
+    note.style.display = 'none';
+    addActivityNote('Hermes needs approval — ' + shortTxt(text, 80));
+    document.getElementById('approvalModal').classList.add('show');
+  });
+}
+
+// ── The run turn: create → stream events → activity/approval/steer/stop ──
+function agentHistoryMessages() {
+  // Full thread context (strings only) for agents WITHOUT server-side sessions
+  // (chat-completions fallback path — plain OpenAI servers ignore the session
+  // header). The gateway-session path (runs) never sends this — it would
+  // double the memory the session already carries.
+  const msgs = [];
+  if (SYSTEM_PROMPT) msgs.push({ role: 'system', content: SYSTEM_PROMPT });
+  for (const m of conversationHistory) {
+    if (typeof m.content !== 'string' || !m.content.trim()) continue;   // skips the streaming placeholder
+    if (m.role === 'user' || m.role === 'assistant') msgs.push({ role: m.role, content: m.content });
+  }
+  return msgs;
+}
+async function agentRunTurn() {
+  const ag = agentRunAgent();
+  if (!ag || !ag.url) throw new Error('Agent has no server URL — set it in Settings → Connect Agent');
+  _agentRun = { runId: null, agentId: ag.id, url: (ag.url || '').trim(), key: ag.key || '' };
+  _agentStopFired = false;
+  _agentAborted = false;
+
+  // ── UI FIRST — zero dead air: the bubble, activity feed, and stats appear the
+  // moment the user sends, BEFORE the run is created (a slow run-create or a
+  // long cold-start first model call used to leave an empty bubble + no feed).
+  let responseDiv = appendStreamingMessage('assistant');
+  const bubble = responseDiv.querySelector('.bubble');
+  currentStreamingEl = bubble;
+  const msgMain = responseDiv.querySelector('.msg-main');
+
+  // activity strip sits ABOVE the bubble (tools ran before the answer came).
+  // Reference it directly — never by id (duplicate ids across turns sent the
+  // second turn's lines into the FIRST message's box — hit live 2026-09-04).
+  const act = document.createElement('div');
+  act.className = 'agent-activity';
+  msgMain.insertBefore(act, msgMain.firstChild);
+  _agentActEl = act;
+  _agentActPinned = true;
+  act.addEventListener('scroll', onAgentActScroll);
+
+  msgStatsEl = document.createElement('div');
+  msgStatsEl.className = 'msg-stats';
+  msgStatsEl.innerHTML = statsBarHTML(0, 0, null, true, displayModelBadge());
+  msgMain.appendChild(msgStatsEl);
+  msgFirstTokenTime = 0;
+  msgRateSamples = [];
+  if (msgStatsTimer) clearInterval(msgStatsTimer);
+  msgStatsTimer = setInterval(updateMsgStatsLive, 250);
+
+  let fullText = '';
+  let thinking = '';
+  let inThinking = false;
+  let thinkingStarted = false;
+  let runEnded = 'open';
+  let runErr = '';
+  let usage = null;
+  let steerNoteSeen = false;
+
+  const finishRun = (ended, err) => { runEnded = ended; runErr = err || ''; };
+  const renderContent = () => {
+    const el = liveBubble();
+    if (!el) return;
+    let html = '';
+    if (thinking) html += thinkingPillHTML(thinking, true);
+    html += escapeAndFormat(fullText);
+    el.innerHTML = html;
+    if (currentChatId === streamChatId) chatScrollBottom();
+  };
+  const finalizeRun = () => {
+    const finalEl = liveBubble();
+    stopAgentWaitPulse();
+    if (msgStatsTimer) { clearInterval(msgStatsTimer); msgStatsTimer = null; }
+    const totalMs = Date.now() - streamStartTime;
+    // Agent runs: usage.output_tokens COUNTS reasoning tokens and tool time
+    // happens inside the turn — rate over the whole turn (content-only timing
+    // inflated t/s to absurd values like 265k — hit live 2026-09-04).
+    const genMs = totalMs;
+    const exactTokens = (usage && usage.output_tokens > 0) ? usage.output_tokens
+      : Math.max(streamTokens, Math.round(streamThinkingChars / 4 + streamContentChars / 2.6));
+    const tps = genMs > 0 ? (exactTokens / (genMs / 1000)) : 0;
+    const finalStats = { tokens: exactTokens, timeMs: totalMs, tps: tps, truncated: false, model: displayModelBadge() };
+    if (msgStatsEl) msgStatsEl.innerHTML = statsBarHTML(exactTokens, totalMs, tps, false, displayModelBadge());
+    if (finalEl) {
+      let html = '';
+      if (thinking && fullText) html = thinkingPillHTML(thinking, false) + escapeAndFormat(fullText);
+      else if (thinking && !fullText) html = thinkingPillHTML(thinking, false);
+      else if (fullText) html = escapeAndFormat(fullText);
+      else if (runEnded === 'error') html = '<div class="loop-warn">⚠ Agent run failed' + (runErr ? ' — ' + escHtml(shortTxt(runErr, 300)) : '') + '.</div>';
+      else if (runEnded === 'cancelled') html = '<span style="color:var(--dim)">[stopped]</span>';
+      else html = '<div class="loop-warn">⚠ No response received from the agent.</div>';
+      finalEl.innerHTML = html;
+      if (!thinking || fullText) {
+        finalEl.querySelectorAll('pre').forEach(pre => {
+          const btn = document.createElement('button');
+          btn.className = 'copy-btn'; btn.textContent = 'Copy';
+          btn.onclick = () => {
+            const code = pre.querySelector('code');
+            navigator.clipboard.writeText(code ? code.textContent : pre.textContent.replace('Copy', '').trim());
+            btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 1500);
+          };
+          pre.appendChild(btn);
+        });
+      }
+    }
+    // Persist into the RIGHT thread (same rules as the local-model path)
+    if (streamChatId === currentChatId) {
+      const lastAi = conversationHistory.length ? conversationHistory[conversationHistory.length - 1] : null;
+      if (lastAi && lastAi.role === 'assistant') {
+        lastAi.content = fullText;
+        if (thinking) lastAi.thinking = thinking;
+        lastAi.stats = finalStats;
+      }
+    } else {
+      const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+      const chat = chats.find(c => c.id === streamChatId);
+      const la = chat && chat.messages ? chat.messages[chat.messages.length - 1] : null;
+      if (la && la.role === 'assistant') {
+        la.content = fullText;
+        if (thinking) la.thinking = thinking;
+        la.stats = finalStats;
+        localStorage.setItem('chat_history', JSON.stringify(chats));
+        loadHistory();
+      }
+    }
+    updateTokenBar();
+    resetJumpIndex();
+    if (fullText && fullText.trim() && voiceEnabled && voiceAvailable && voiceName && runEnded !== 'cancelled') {
+      speakText(fullText);
+    }
+    if (msgStatsEl) msgStatsEl.innerHTML = statsBarHTML(exactTokens, totalMs, tps, false, displayModelBadge());
+  };
+
+  if (agentHasImageAttachments()) addActivityNote('Image attachments are not sent in agent mode yet — text only');
+  const connecting = addActivityNote('connecting to ' + (ag.name || ag.id) + '…');
+  agentWake();
+  startAgentWaitPulse();
+
+  // Auto keep-alive (2026-09-05): every chat thread owns its agent session —
+  // the gateway remembers the conversation server-side (session_id on the run =
+  // X-Hermes-Session-Id continuity). Returning to a thread resumes its session.
+  const sessId = agentSessionId(ag.id, false);
+  const body = {
+    id: ag.id, url: (ag.url || '').trim(), key: ag.key || '',
+    session_id: sessId,
+    input: [{ role: 'user', content: agentLastUserText() }]
+  };
+  if (SYSTEM_PROMPT) body.instructions = SYSTEM_PROMPT;
+  const r0 = await fetch('/api/agent/run', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body), signal: abortController.signal
+  });
+  if (!r0.ok) {
+    // 404/405 = this agent's server does NOT speak /v1/runs (Pi / DS Harness /
+    // custom OpenAI servers) — fall back to the classic chat-completions turn
+    // INTO the feed we already built.
+    if (r0.status === 404 || r0.status === 405) {
+      setActivityLine(connecting, 'note', '', 'no /v1/runs — falling back to chat stream');
+      return agentChatSimpleTurn(ag, sessId, true);
+    }
+    setActivityLine(connecting, 'err', '', 'run start failed');
+    let msg = 'Agent error HTTP ' + r0.status;
+    try { const e = await r0.json(); if (e && e.error) msg = String(e.error); } catch (_) {}
+    throw new Error(msg);
+  }
+  const rd = await r0.json();
+  const runId = rd.run_id || rd.id;
+  if (!runId) {
+    // 200 without a run id = not runs-capable
+    setActivityLine(connecting, 'note', '', 'no /v1/runs — falling back to chat stream');
+    return agentChatSimpleTurn(ag, sessId, true);
+  }
+  _agentRun.runId = runId;
+  setActivityLine(connecting, 'ok', '', 'connected to ' + (ag.name || ag.id) + ' — run started');
+
+  try {
+    const evRes = await fetch('/api/agent/runevents', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: ag.id, url: (ag.url || '').trim(), key: ag.key || '', run_id: runId }),
+      signal: abortController.signal
+    });
+    if (!evRes.ok) {
+      let msg = 'Event stream error HTTP ' + evRes.status;
+      try { const e = await evRes.json(); if (e && e.error) msg = String(e.error); } catch (_) {}
+      throw new Error(msg);
+    }
+    const reader = evRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t.startsWith('data:')) continue;      // skip event:/comments/blank
+        const data = t.slice(5).trim();
+        if (!data || data.startsWith('[')) continue;
+        let ev;
+        try { ev = JSON.parse(data); } catch (e) { continue; }
+        agentWake();
+        const evt = ev.event || '';
+        if (evt === 'message.delta') {
+          const d = ev.delta;
+          if (!d) continue;
+          if (thinkingStarted && inThinking) { inThinking = false; thinkingStarted = false; }
+          if (!msgFirstTokenTime) msgFirstTokenTime = Date.now();
+          fullText += d;
+          streamChars += d.length;
+          streamContentChars += d.length;
+          streamTokens++;
+          renderContent();
+          updateStatsUI();
+        } else if (evt === 'reasoning.available') {
+          const rt = ev.text || '';
+          if (!rt) continue;
+          if (!msgFirstTokenTime) msgFirstTokenTime = Date.now();
+          streamTokens++;
+          streamChars += rt.length;
+          streamThinkingChars += rt.length;
+          thinkingStarted = true;
+          inThinking = true;
+          thinking += rt;
+          updateThinkingUI(thinking, true);
+        } else if (evt === 'tool.started') {
+          addActivity('run', ev.tool, ev.preview || '');
+        } else if (evt === 'tool.completed') {
+          const el = agentActEl();
+          if (el && el.lastChild) el.lastChild.className = 'aa-line ' + (ev.error ? 'err' : 'ok');
+          if (ev.error) addActivityNote('tool ' + (ev.tool || '') + ' errored');
+        } else if (evt === 'subagent.start') {
+          addActivity('run', 'subagent', ev.preview || 'spawned');
+        } else if (evt === 'subagent.complete') {
+          const el = agentActEl();
+          if (el && el.lastChild) el.lastChild.className = 'aa-line ok';
+        } else if (evt === 'approval.request') {
+          const choice = await showApprovalModal(ev);
+          if (!_agentAborted) {
+            addActivityNote('approval: ' + choice);
+            const ar = await agentPostRunAction('approval', { choice: choice });
+            if (ar && ar.error) addActivityNote('approval failed: ' + shortTxt(ar.error, 80));
+          }
+        } else if (evt === 'approval.responded') {
+          addActivityNote('approval ' + (ev.accepted === false ? 'declined' : 'granted'));
+        } else if (evt === 'run.steered') {
+          if (!steerNoteSeen) { addActivityNote('steer accepted'); steerNoteSeen = true; }
+        } else if (evt === 'run.completed') {
+          usage = ev.usage || null;
+          if (!fullText && ev.output) { fullText = ev.output; }
+          finishRun('done', '');
+          finalizeRun();
+          break;
+        } else if (evt === 'run.failed') {
+          finishRun('error', ev.error || (ev.message) || 'run failed');
+          finalizeRun();
+          break;
+        } else if (evt === 'run.cancelled') {
+          finishRun('cancelled', '');
+          finalizeRun();
+          break;
+        }
+      }
+      if (runEnded !== 'open') break;
+    }
+    if (runEnded === 'open') {
+      // stream closed without a terminal event — abnormal (proxy died, etc.)
+      addActivityNote('run stream ended without a terminal event');
+      finishRun(fullText ? 'done' : 'error', fullText ? '' : 'stream ended unexpectedly');
+      finalizeRun();
+    }
+  } catch (e) {
+    stopAgentWaitPulse();
+    if (msgStatsTimer) { clearInterval(msgStatsTimer); msgStatsTimer = null; }
+    _agentAborted = true;
+    // unblock a pending approval modal so the loop can unwind to the abort
+    if (_agentApprovalResolve) {
+      const r = _agentApprovalResolve; _agentApprovalResolve = null; _agentApprovalPending = false;
+      r('deny');
+      document.getElementById('approvalModal')?.classList.remove('show');
+    }
+    // user stop: tell the SERVER to cancel the run (the events stream closing
+    // alone does NOT cancel a /v1/runs run — it keeps going server-side)
+    if (e.name === 'AbortError' && _agentRun && _agentRun.runId && !_agentStopFired) {
+      _agentStopFired = true;
+      agentPostRunAction('stop').catch(() => {});
+    }
+    const errEl = liveBubble();
+    if (e.name === 'AbortError') {
+      if (errEl && errEl.closest('.msg') && errEl.closest('.msg').classList.contains('assistant')) {
+        errEl.innerHTML = fullText ? renderAssistantContent(fullText) + '<span style="color:var(--dim);font-size:12px"> — [stopped]</span>' : '<span style="color:var(--dim)">[stopped]</span>';
+      }
+      if (streamChatId === currentChatId) {
+        const lastAi = conversationHistory.length ? conversationHistory[conversationHistory.length - 1] : null;
+        if (lastAi && lastAi.role === 'assistant') lastAi.content = fullText;
+      }
+    } else {
+      if (errEl) errEl.innerHTML = '<span style="color:var(--dim)">Error: ' + escHtml(e.message) + '</span>';
+      if (currentChatId === streamChatId) {
+        const lastAi = conversationHistory.length ? conversationHistory[conversationHistory.length - 1] : null;
+        if (lastAi && lastAi.role === 'assistant') lastAi.content = fullText;
+      }
+    }
+    if (msgStatsEl && (streamTokens > 0 || streamChars > 0)) {
+      const totalMs = Date.now() - streamStartTime;
+      msgStatsEl.innerHTML = statsBarHTML(streamTokens, totalMs, totalMs > 0 ? (streamTokens / (totalMs / 1000)) : 0, false, displayModelBadge());
+    }
+    resetJumpIndex();
+  } finally {
+    stopAgentWaitPulse();
+    _agentRun = null;
+    _agentApprovalPending = false;
+    _agentActEl = null;
+    document.getElementById('approvalModal')?.classList.remove('show');
+    chatScrollBottom();
+  }
+}
+
+// Steering while a run streams (R1-Connect-style interrupt): typing a message
+// mid-run sends it to the live agent as steer guidance — the same run absorbs it.
+async function doAgentSteer(text) {
+  const ag = agentRunAgent();
+  if (!ag || !_agentRun || !_agentRun.runId) return;
+  const input = document.getElementById('chatInput');
+  input.value = ''; input.style.height = 'auto';
+  const mm = document.querySelector('.msg:last-of-type .msg-main');
+  if (mm) {
+    const n = document.createElement('div');
+    n.className = 'steer-note';
+    n.textContent = '↳ you steered: ' + text;
+    mm.appendChild(n);
+    chatScrollBottom();
+  }
+  addActivityNote('steering: ' + shortTxt(text, 70));
+  try {
+    const r = await fetch('/api/agent/runaction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: ag.id, url: (ag.url || '').trim(), key: ag.key || '',
+        run_id: _agentRun.runId, action: 'steer', message: text
+      })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || d.accepted === false) showToast('Steer not accepted — ' + (d.error || ('HTTP ' + r.status)));
+  } catch (e) {
+    showToast('Steer failed: ' + e.message);
+  }
+  input.focus();
+}
+
+// Classic chat-completions agent turn — used when the agent's server does NOT
+// speak /v1/runs (Pi / DS Harness / custom OpenAI-compatible endpoints). Same
+// UI as the runs path (activity box, stats, thinking) but streamed from
+// /api/agent/chat (OpenAI SSE). No approvals/steer — those need the runs API.
+async function agentChatSimpleTurn(ag, sessId, reuseExisting) {
+  if (!ag || !ag.url) throw new Error('Agent has no server URL — set it in Settings → Connect Agent');
+  let responseDiv = null, bubble = null, msgMain = null;
+  if (!reuseExisting) {
+    // standalone path: build the message UI like the runs path
+    responseDiv = appendStreamingMessage('assistant');
+    bubble = responseDiv.querySelector('.bubble');
+    currentStreamingEl = bubble;
+    msgMain = responseDiv.querySelector('.msg-main');
+    const act = document.createElement('div');
+    act.className = 'agent-activity';
+    msgMain.insertBefore(act, msgMain.firstChild);
+    _agentActEl = act;
+    _agentActPinned = true;
+    act.addEventListener('scroll', onAgentActScroll);
+    msgStatsEl = document.createElement('div');
+    msgStatsEl.className = 'msg-stats';
+    msgStatsEl.innerHTML = statsBarHTML(0, 0, null, true, displayModelBadge());
+    msgMain.appendChild(msgStatsEl);
+    msgFirstTokenTime = 0;
+    msgRateSamples = [];
+    if (msgStatsTimer) clearInterval(msgStatsTimer);
+    msgStatsTimer = setInterval(updateMsgStatsLive, 250);
+  }
+  let fullText = '';
+  let thinking = '';
+  let inThinking = false;
+  let thinkingStarted = false;
+  let finishReason = null;
+
+  addActivityNote('connected to ' + (ag.name || ag.id) + ' — chat stream');
+  if (agentHasImageAttachments()) addActivityNote('Image attachments are not sent in agent mode yet — text only');
+  agentWake();
+  startAgentWaitPulse();
+
+  try {
+    const body = {
+      id: ag.id, url: (ag.url || '').trim(), key: ag.key || '',
+      messages: agentHistoryMessages(), stream: true,
+      ...(MAX_TOKENS > 0 ? { max_tokens: MAX_TOKENS } : {}),
+      temperature: TEMPERATURE, top_p: TOP_P,
+      session_id: sessId || newAgentSessionId()
+    };
+    const res = await fetch('/api/agent/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body), signal: abortController.signal
+    });
+    if (!res.ok) {
+      let msg = 'Agent error HTTP ' + res.status;
+      try { const e = await res.json(); if (e && e.error) msg = String(e.error); } catch (_) {}
+      throw new Error(msg);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t.startsWith('data: ')) continue;
+        const data = t.slice(6);
+        if (data === '[DONE]') continue;
+        let json;
+        try { json = JSON.parse(data); } catch (_) { continue; }
+        agentWake();
+        if (json.error) throw new Error((json.error.message || json.error.type || 'Server error') + (json.error.code ? ' (' + json.error.code + ')' : ''));
+        if (json.choices?.[0]?.finish_reason) finishReason = json.choices[0].finish_reason;
+        const delta = json.choices?.[0]?.delta;
+        if (!delta) continue;
+        const reasoningText = delta.reasoning || delta.reasoning_content;
+        if (reasoningText) {
+          if (!msgFirstTokenTime) msgFirstTokenTime = Date.now();
+          streamTokens++; streamChars += reasoningText.length; streamThinkingChars += reasoningText.length;
+          thinkingStarted = true; inThinking = true; thinking += reasoningText;
+          updateThinkingUI(thinking, true);
+        }
+        if (delta.content) {
+          if (thinkingStarted && inThinking) { inThinking = false; thinkingStarted = false; }
+          if (!msgFirstTokenTime) msgFirstTokenTime = Date.now();
+          fullText += delta.content;
+          streamChars += delta.content.length; streamContentChars += delta.content.length;
+          const el = liveBubble();
+          if (el) {
+            let html = '';
+            if (thinking) html += thinkingPillHTML(thinking, true);
+            html += escapeAndFormat(fullText);
+            el.innerHTML = html;
+            if (currentChatId === streamChatId) chatScrollBottom();
+          }
+          streamTokens++;
+        }
+      }
+    }
+    stopAgentWaitPulse();
+    if (msgStatsTimer) { clearInterval(msgStatsTimer); msgStatsTimer = null; }
+    const totalMs = Date.now() - streamStartTime;
+    const genMs = msgFirstTokenTime > 0 ? Date.now() - msgFirstTokenTime : totalMs;
+    const exactTokens = Math.max(streamTokens, Math.round(streamThinkingChars / 4 + streamContentChars / 2.6));
+    const tps = genMs > 0 ? (exactTokens / (genMs / 1000)) : 0;
+    const finalStats = { tokens: exactTokens, timeMs: totalMs, tps: tps, truncated: finishReason === 'length' || undefined, model: displayModelBadge() };
+    const finalEl = liveBubble();
+    if (finalEl) {
+      let html = '';
+      if (thinking) html += thinkingPillHTML(thinking, false);
+      if (fullText) html += escapeAndFormat(fullText);
+      else html += '<div class="loop-warn">⚠ No response received from the agent.</div>';
+      finalEl.innerHTML = html;
+    }
+    if (msgStatsEl) msgStatsEl.innerHTML = statsBarHTML(exactTokens, totalMs, tps, false, displayModelBadge());
+    if (streamChatId === currentChatId) {
+      const lastAi = conversationHistory.length ? conversationHistory[conversationHistory.length - 1] : null;
+      if (lastAi && lastAi.role === 'assistant') {
+        lastAi.content = fullText;
+        if (thinking) lastAi.thinking = thinking;
+        lastAi.stats = finalStats;
+      }
+    } else {
+      const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+      const chat = chats.find(c => c.id === streamChatId);
+      const la = chat && chat.messages ? chat.messages[chat.messages.length - 1] : null;
+      if (la && la.role === 'assistant') {
+        la.content = fullText;
+        if (thinking) la.thinking = thinking;
+        la.stats = finalStats;
+        localStorage.setItem('chat_history', JSON.stringify(chats));
+        loadHistory();
+      }
+    }
+    updateTokenBar();
+    resetJumpIndex();
+  } catch (e) {
+    stopAgentWaitPulse();
+    if (msgStatsTimer) { clearInterval(msgStatsTimer); msgStatsTimer = null; }
+    const errEl = liveBubble();
+    if (e.name === 'AbortError') {
+      if (errEl && errEl.closest('.msg') && errEl.closest('.msg').classList.contains('assistant')) {
+        errEl.innerHTML = fullText ? renderAssistantContent(fullText) + '<span style="color:var(--dim);font-size:12px"> — [stopped]</span>' : '<span style="color:var(--dim)">[stopped]</span>';
+      }
+      if (streamChatId === currentChatId) {
+        const lastAi = conversationHistory.length ? conversationHistory[conversationHistory.length - 1] : null;
+        if (lastAi && lastAi.role === 'assistant') lastAi.content = fullText;
+      }
+    } else {
+      if (errEl) errEl.innerHTML = '<span style="color:var(--dim)">Error: ' + escHtml(e.message) + '</span>';
+    }
+    if (msgStatsEl && (streamTokens > 0 || streamChars > 0)) {
+      const totalMs = Date.now() - streamStartTime;
+      msgStatsEl.innerHTML = statsBarHTML(streamTokens, totalMs, totalMs > 0 ? (streamTokens / (totalMs / 1000)) : 0, false, displayModelBadge());
+    }
+    resetJumpIndex();
+  } finally {
+    stopAgentWaitPulse();
+    _agentActEl = null;
+    chatScrollBottom();
+  }
+}
+
 async function streamResponse() {
-  const messages = buildMessages();
+  if (activeAgent()) { await agentRunTurn(); return; }   // agent mode: /v1/runs protocol (activity/approval/steer)
+  const messages = buildMessages();   // local-model path below (unchanged)
   let responseDiv = appendStreamingMessage('assistant');
   const bubble = responseDiv.querySelector('.bubble');
   currentStreamingEl = bubble;
@@ -3932,7 +5297,7 @@ async function streamResponse() {
   const msgMain = responseDiv.querySelector('.msg-main');
   msgStatsEl = document.createElement('div');
   msgStatsEl.className = 'msg-stats';
-  msgStatsEl.innerHTML = statsBarHTML(0, 0, null, true, currentModel);
+  msgStatsEl.innerHTML = statsBarHTML(0, 0, null, true, displayModelBadge());
   msgMain.appendChild(msgStatsEl);
   msgFirstTokenTime = 0;
   msgRateSamples = [];
@@ -3948,6 +5313,7 @@ async function streamResponse() {
   let serverTimings = null;
 
   try {
+    let res;
     // probe whenever the backend is NOT confirmed llama.cpp AND not definitively known
     // otherwise — a probe that failed earlier (server restarting) must never leave the
     // cap off; models owned_by already sets the flag in the common case (no throttle:
@@ -3955,28 +5321,28 @@ async function streamResponse() {
     if (isLlamaCpp !== true && !_backendKnown) {
       try { await detectBackend(); } catch (e) { isLlamaCpp = false; }
     }
-    const res = await fetch(API_URL + '/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: currentModel || '',
-        messages: messages,
-        stream: true,
-        // 0 = unlimited: omit max_tokens so vLLM uses the model's full context
-        ...(MAX_TOKENS > 0 ? { max_tokens: MAX_TOKENS } : {}),
-        // llama.cpp Qwen4: cap reasoning_effort at 'low' — the GGUF template defaults
-        // to xhigh which loops at aggressive quants (zero content tokens = empty bubble);
-        // _thinkRetry (one-shot self-heal) retries with thinking OFF, UNCONDITIONALLY —
-        // it must fire even when the backend flag was never confirmed true
-        ...(_thinkRetry ? { chat_template_kwargs: { enable_thinking: false } }
-          : (isLlamaCpp ? { chat_template_kwargs: { reasoning_effort: 'low' } } : {})),
-        temperature: TEMPERATURE,
-        top_p: TOP_P,
-        stream_options: { include_usage: true }
-      }),
-      signal: abortController.signal
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    res = await fetch(API_URL + '/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: currentModel || '',
+          messages: messages,
+          stream: true,
+          // 0 = unlimited: omit max_tokens so vLLM uses the model's full context
+          ...(MAX_TOKENS > 0 ? { max_tokens: MAX_TOKENS } : {}),
+          // llama.cpp Qwen4: cap reasoning_effort at 'low' — the GGUF template defaults
+          // to xhigh which loops at aggressive quants (zero content tokens = empty bubble);
+          // _thinkRetry (one-shot self-heal) retries with thinking OFF, UNCONDITIONALLY —
+          // it must fire even when the backend flag was never confirmed true
+          ...(_thinkRetry ? { chat_template_kwargs: { enable_thinking: false } }
+            : (isLlamaCpp ? { chat_template_kwargs: { reasoning_effort: 'low' } } : {})),
+          temperature: TEMPERATURE,
+          top_p: TOP_P,
+          stream_options: { include_usage: true }
+        }),
+        signal: abortController.signal
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -4043,7 +5409,7 @@ async function streamResponse() {
       if (thinking) {
         html = thinkingPillHTML(thinking, false);
       }
-      if (fullText) html += escapeAndFormat(fullText);
+      if (fullText) html += renderAssistantContent(fullText);
       else if (thinking) html += '<div class="loop-warn">⚠ No answer text generated — the model stayed in reasoning (thinking loop). Retry the message.</div>';
       else html += '<div class="loop-warn">⚠ No response received from the server.</div>';
       finalEl.innerHTML = html;
@@ -4070,8 +5436,8 @@ async function streamResponse() {
     const exactTps = (serverTimings && serverTimings.predicted_per_second > 0)
       ? serverTimings.predicted_per_second
       : (genMs > 0 ? (exactTokens / (genMs / 1000)) : 0);
-    const finalStats = { tokens: exactTokens, timeMs: totalMs, tps: exactTps, truncated: finishReason === 'length' || undefined, model: currentModel };
-    if (msgStatsEl) msgStatsEl.innerHTML = statsBarHTML(exactTokens, totalMs, exactTps, false, currentModel);
+    const finalStats = { tokens: exactTokens, timeMs: totalMs, tps: exactTps, truncated: finishReason === 'length' || undefined, model: displayModelBadge() };
+    if (msgStatsEl) msgStatsEl.innerHTML = statsBarHTML(exactTokens, totalMs, exactTps, false, displayModelBadge());
 
     // Truncation notice: finish_reason "length" = hit the token cap mid-generation
     if (finishReason === 'length' && finalEl) {
@@ -4106,6 +5472,12 @@ async function streamResponse() {
     }
     updateTokenBar();
     resetJumpIndex();   // stream finished -> walk restarts from the newest message
+
+    // Voice read-aloud: speak newly arrived replies (skips thinking-only /
+    // aborted / error streams — this code only runs on successful completion)
+    if (fullText && fullText.trim() && voiceEnabled && voiceAvailable && voiceName) {
+      speakText(fullText);
+    }
   } catch (e) {
     if (msgStatsTimer) { clearInterval(msgStatsTimer); msgStatsTimer = null; }
     const errEl = liveBubble();
@@ -4113,7 +5485,7 @@ async function streamResponse() {
       // only paint [stopped] into an ASSISTANT bubble — after a recycle-triggered
       // abort the last bubble may be the user's (chat rebuilt); never clobber it
       if (errEl && errEl.closest('.msg') && errEl.closest('.msg').classList.contains('assistant')) {
-        errEl.innerHTML = fullText ? escapeAndFormat(fullText) + '<span style="color:var(--dim);font-size:12px"> — [stopped]</span>' : '<span style="color:var(--dim)">[stopped]</span>';
+        errEl.innerHTML = fullText ? renderAssistantContent(fullText) + '<span style="color:var(--dim);font-size:12px"> — [stopped]</span>' : '<span style="color:var(--dim)">[stopped]</span>';
       }
       // persist whatever streamed so far into the stream's thread (2026-08-27)
       if (streamChatId === currentChatId) {
@@ -4135,7 +5507,7 @@ async function streamResponse() {
     // Partial stats on stop/error
     if (msgStatsEl && streamTokens > 0) {
       const totalMs = Date.now() - streamStartTime;
-      msgStatsEl.innerHTML = statsBarHTML(streamTokens, totalMs, totalMs > 0 ? (streamTokens / (totalMs / 1000)) : 0, false, currentModel);
+      msgStatsEl.innerHTML = statsBarHTML(streamTokens, totalMs, totalMs > 0 ? (streamTokens / (totalMs / 1000)) : 0, false, displayModelBadge());
     }
     resetJumpIndex();   // stream ended (stop/error) -> walk restarts from the newest message
   }
@@ -4287,6 +5659,90 @@ function highlightCodeBlocks(html) {
     const grammar = Prism.languages[inferred] || Prism.languages.typescript;
     return `<pre><code${lang ? ` class="language-${lang}"` : ''}>${Prism.highlight(raw, grammar, inferred)}</code></pre>`;
   });
+}
+
+// ── Media responses (2026-09-05): agent-generated images land in the streamed
+//    text as local file tokens (MEDIA:/abs/path, ~/…/x.png, ComfyUI/output/x.png)
+//    — R1 Connect's proven convention against the same Hermes gateway. A browser
+//    can't read the local disk, so each token renders as an <img> served by
+//    chat-server.py's /api/media (same resolution roots as R1). Path-qualified
+//    tokens (MEDIA:/, /, ~/, ./) are stripped from the bubble TEXT (protocol
+//    syntax, not prose); bare filenames stay visible above their image.
+const MEDIA_TOKEN_RE = /(\S*?\.(?:png|jpe?g|webp|gif|bmp))\b/gi;
+const MEDIA_BAD_PREFIX = /^(?:https?|data|file|blob|ftp):/i;
+
+function mediaCodeSpans(text) {
+  // ```fenced``` + `inline` code regions — image-looking strings inside code are
+  // example text, never live media (same rule hermes' image_routing uses).
+  const spans = [];
+  const re = /```[\s\S]*?(?:```|$)|`[^`\n]*`/g;
+  let m;
+  while ((m = re.exec(text))) spans.push([m.index, m.index + m[0].length]);
+  return spans;
+}
+
+function inAnySpan(spans, pos) {
+  for (const [s, e] of spans) { if (pos >= s && pos < e) return true; }
+  return false;
+}
+
+function mediaTokensIn(text) {
+  // Order-preserving, deduped media tokens in free text (code spans + URLs +
+  // markdown link/image targets skipped).
+  const toks = [];
+  if (!text) return toks;
+  const spans = mediaCodeSpans(text);
+  const re = new RegExp(MEDIA_TOKEN_RE.source, 'gi');
+  let m;
+  while ((m = re.exec(text))) {
+    const tok = m[1];
+    if (!tok) continue;
+    if (inAnySpan(spans, m.index)) continue;
+    if (MEDIA_BAD_PREFIX.test(tok)) continue;
+    if (m.index > 0 && /[(\[]/.test(text[m.index - 1])) continue;  // ![](path) / [x](path)
+    if (!toks.includes(tok)) toks.push(tok);
+  }
+  return toks;
+}
+
+function stripMediaPathTokens(text) {
+  // Remove path-qualified media tokens from DISPLAY text only. Persisted content
+  // keeps the raw text; this is applied at render time so reloads show the same.
+  if (!text || !/(?:MEDIA:|[\/~])/i.test(text)) return text;
+  const spans = mediaCodeSpans(text);
+  const re = new RegExp(MEDIA_TOKEN_RE.source, 'gi');
+  const out = [];
+  let last = 0;
+  let m;
+  while ((m = re.exec(text))) {
+    const tok = m[1];
+    const pathQualified = /^MEDIA:/i.test(tok) || tok.startsWith('/') || tok.startsWith('~/') || tok.startsWith('./');
+    if (!pathQualified) continue;
+    if (inAnySpan(spans, m.index)) continue;
+    if (m.index > 0 && /[(\[]/.test(text[m.index - 1])) continue;
+    let end = m.index + m[0].length;
+    // eat sentence punctuation glued to the token ("…x.png." / "x.png, next")
+    while (end < text.length && /[.,;:!?)\]>]/.test(text[end]) && /[\s]|^$/.test(text[end + 1] || '')) end++;
+    out.push(text.slice(last, m.index));
+    last = end;
+  }
+  if (last === 0) return text;
+  out.push(text.slice(last));
+  return out.join('');
+}
+
+function mediaItemsHTML(text) {
+  const toks = mediaTokensIn(text);
+  if (!toks.length) return '';
+  return '<div class="bubble-media">' + toks.map(tok =>
+    `<a class="bubble-media-item" href="/api/media?path=${encodeURIComponent(tok)}" target="_blank" rel="noopener" title="${escAttr(tok)}"><img loading="lazy" src="/api/media?path=${encodeURIComponent(tok)}" alt="" onerror="this.closest('.bubble-media-item').remove()"></a>`
+  ).join('') + '</div>';
+}
+
+function renderAssistantContent(text) {
+  // One choke point for every assistant content render (live finalize, [stopped]
+  // partial, history) — stripped markdown text + inline media below it.
+  return (text ? escapeAndFormat(stripMediaPathTokens(text)) : '') + mediaItemsHTML(text);
 }
 
 function escapeAndFormat(text) {
@@ -4463,7 +5919,7 @@ function downloadJson(filename, obj) {
   URL.revokeObjectURL(url);
 }
 function chatExportEnvelope(chats) {
-  return { app: 'vLLM Chat', version: APP_VERSION, type: 'vllm-chat-export', exportedAt: new Date().toISOString(), chats };
+  return { app: 'xLLM Chat', version: APP_VERSION, type: 'xllm-chat-export', exportedAt: new Date().toISOString(), chats };
 }
 function exportChat() {   // header button — current chat only
   if (!conversationHistory.length) return showToast('No messages');
@@ -4513,7 +5969,7 @@ function doExportSelected() {
   const ids = new Set([...document.querySelectorAll('#exportChatList input[type=checkbox]:checked')].map(cb => cb.value));
   if (!ids.size) return showToast('Select at least one chat');
   const chats = JSON.parse(localStorage.getItem('chat_history') || '[]').filter(c => ids.has(c.id));
-  downloadJson(`vllm-chats_${new Date().toISOString().slice(0,10)}.json`, chatExportEnvelope(chats));
+  downloadJson(`xllm-chats_${new Date().toISOString().slice(0,10)}.json`, chatExportEnvelope(chats));
   showToast(`Exported ${chats.length} chat${chats.length > 1 ? 's' : ''}`);
   closeExportModal();
 }
@@ -4540,7 +5996,7 @@ function importChatsFromFile(input) {
       imported = Array.isArray(data) ? data : (data && Array.isArray(data.chats) ? data.chats : null);
       if (!imported) throw new Error('shape');
     } catch (e) {
-      status.textContent = 'Invalid file — not a vLLM Chat JSON export.';
+      status.textContent = 'Invalid file — not an xLLM Chat JSON export.';
       status.className = 'import-status err';
       input.value = '';
       return;
@@ -4631,6 +6087,22 @@ updateSysPromptBar(); updateTokenBar();
   sb.style.transition = '';
 })();
 initChatBg();   // chat background (image / URL / YouTube / color + overlay) — restores last state
+// ── Agent connect boot (2026-09-04) ──
+updatePill();                 // pill label reflects chat_source (agent vs local)
+refreshStatusPill();
+pingAllAgents();              // fills connected-agent rows in the source dropdown + header status
+document.addEventListener('click', (e) => {
+  const src = document.getElementById('sourceMenu');
+  const pill = document.getElementById('modelPill');
+  if (src && src.hidden === false && pill && !pill.contains(e.target)) closeSourceMenu();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSourceMenu(); });
+// Source-menu model rows are data-driven (ids may contain any character — see
+// renderSourceMenu). Agent rows carry inline onclick (fixed ids like hermes/pi).
+document.addEventListener('click', (e) => {
+  const row = e.target.closest && e.target.closest('#sourceMenu .src-item[data-src="model"]');
+  if (row) { selectModel(row.dataset.val); e.stopPropagation(); }
+});
 </script>
 </body>
 </html>

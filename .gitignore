@@ -5,3 +5,4 @@ Checkpoints/
 server.log
 .chat-client.pid
 .chat-client.log
+.agent-keys.json
