@@ -392,6 +392,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if path == "/api/agent/ping":
             self._handle_agent_ping()
             return
+        if path == "/api/agent/models":
+            self._handle_agent_models()
+            return
         if path == "/api/agent/chat":
             self._handle_agent_chat()
             return
@@ -496,6 +499,53 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self._json({"ok": False, "error": str(e)[:200]})
 
+    def _handle_agent_models(self):
+        """List an OpenAI-compatible endpoint's models (DeepSeek / OpenRouter /
+        custom) so the client's cloud group in the header pill can render model
+        rows. Returns {ok, models:[{id, ctx}]} — ctx from the provider's own
+        context fields when present (token-bar limit)."""
+        req, err = self._read_json_body()
+        if err:
+            self._json(err[0], err[1])
+            return
+        assert req is not None
+        agent_id = (req.get("id") or "").strip()
+        base = (req.get("url") or "").strip()
+        if not base:
+            self._json({"ok": False, "error": "no server URL configured"})
+            return
+        _, models_url = agent_urls(base)
+        key = agent_secret(agent_id, (req.get("key") or "").strip())
+        try:
+            with agent_open(models_url, key, timeout=AGENT_PING_TIMEOUT) as r:
+                if r.status != 200:
+                    detail = r.read(300).decode("utf-8", "replace")
+                    self._json({"ok": False, "status": r.status,
+                                "error": (detail or f"HTTP {r.status}")[:300]})
+                    return
+                data = json.loads(r.read(400_000).decode("utf-8", "replace"))
+            out = []
+            for m in (data.get("data") or [])[:500]:
+                mid = (m or {}).get("id")
+                if not mid:
+                    continue
+                meta = (m.get("meta") or {}) if isinstance(m.get("meta"), dict) else {}
+                ctx = (m.get("max_model_len") or m.get("context_length")
+                       or m.get("max_context_length") or meta.get("n_ctx")
+                       or meta.get("n_ctx_train") or 0)
+                out.append({"id": mid, "ctx": int(ctx) if ctx else 0})
+            self._json({"ok": True, "models": out})
+        except urllib.error.HTTPError as e:
+            detail = ""
+            try:
+                detail = e.read(300).decode("utf-8", "replace")
+            except Exception:
+                pass
+            self._json({"ok": False, "status": e.code,
+                        "error": (detail or f"HTTP {e.code}")[:300]})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)[:200]})
+
     def _handle_agent_chat(self):
         """Stream an OpenAI-compatible agent chat (SSE) back to the browser.
         The body carries the agent target + session id; keys resolve server-side.
@@ -531,6 +581,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             payload["temperature"] = float(req["temperature"])
         if req.get("top_p") is not None:
             payload["top_p"] = float(req["top_p"])
+        if req.get("include_usage"):
+            # cloud chats (DeepSeek / OpenRouter): exact usage in the final chunk
+            payload["stream_options"] = {"include_usage": True}
         headers = {}
         if key:
             headers["Authorization"] = "Bearer " + key

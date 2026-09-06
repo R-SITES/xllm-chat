@@ -38,6 +38,18 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .model-pill.open .pill-chev{transform:rotate(180deg)}
 .model-pill .pill-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;display:inline-block;margin-right:2px}
 .model-pill.agent-mode{border-color:var(--accentLine);color:var(--accent)}
+/* Cloud threads (2026-09-05): the pill shows provider + model with a soft accent tint */
+.model-pill .pill-dot.cloud{background:var(--purple);box-shadow:0 0 0 2px var(--bg3)}
+.model-pill.cloud-mode{border-color:color-mix(in srgb,var(--purple) 45%,var(--border));color:var(--purple)}
+.model-pill .pill-sub{font-weight:400;color:var(--dim);opacity:.9;max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+/* LLM Connections tabs inside Settings General (2026-09-05) */
+.conn-tabs{display:flex;gap:6px;margin-bottom:2px}
+.conn-tab{flex:1;padding:6px 0;border:1px solid var(--border);background:var(--bg3);color:var(--dim);border-radius:8px;font-size:12px;cursor:pointer;font-family:var(--font);transition:all .15s}
+.conn-tab:hover{border-color:var(--accent);color:var(--accent)}
+.conn-tab.active{background:var(--accentBg);color:var(--accent);border-color:var(--accentLine)}
+.conn-pane{animation:connFade .12s ease}
+@keyframes connFade{from{opacity:.4}to{opacity:1}}
+.conn-sub{font-size:11px;color:var(--dim);font-weight:400}
 .source-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:900;min-width:260px;max-width:min(430px,calc(100vw - 32px));background:var(--bg2);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.35);padding:6px;max-height:min(60vh,420px);overflow-y:auto}
 .source-menu[hidden]{display:none}
 .src-group-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);opacity:.85;padding:7px 10px 3px}
@@ -47,6 +59,12 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .src-item .src-check{width:14px;flex-shrink:0;text-align:center;color:var(--accent);font-size:11px}
 .src-item .src-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .src-item .src-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
+.src-item .src-dot.cloud{background:var(--purple)}
+.src-group-label.cloud{display:flex;align-items:center;gap:6px}
+.src-group-label .src-dot{width:6px;height:6px;border-radius:50%;background:var(--purple);flex-shrink:0}
+.src-group-label .src-sub{font-size:9px;text-transform:none;letter-spacing:0;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.src-item.dim{opacity:.6;cursor:default}
+.src-item.dim:hover{background:transparent;color:var(--text)}
 .src-item .src-sub{font-size:10px;color:var(--dim);opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;flex-shrink:1}
 .src-item.off{cursor:default;opacity:.6}
 .src-item.off:hover{background:transparent;color:var(--text)}
@@ -597,9 +615,11 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
       <div class="source-menu" id="sourceMenu" hidden>
         <div class="src-group-label">Local models</div>
         <div id="srcModelList"></div>
+        <div class="src-group-label" id="srcCloudLabel" hidden>Cloud</div>
+        <div id="srcCloudList"></div>
         <div class="src-group-label" id="srcAgentLabel" hidden>Connected agents</div>
         <div id="srcAgentList"></div>
-        <div class="src-empty" id="srcEmpty" hidden>No local models or connected agents — start a local server, or connect an agent in Settings → Connect Agent.</div>
+        <div class="src-empty" id="srcEmpty" hidden>No local models, cloud connections or connected agents — start a local server, add a cloud key in Settings → LLM Connections, or connect an agent in Settings → Connect Agent.</div>
       </div>
     </div>
     <button class="icon-btn" onclick="openSettings()" title="Settings">
@@ -783,8 +803,39 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
       <span class="val" id="fontSizeVal">14px</span>
       <span class="fs-scale">26px</span>
     </div>
-    <label>API URL</label>
-    <input type="text" id="setApiUrl" value="http://127.0.0.1:8080">
+    <label>LLM Connections <span class="conn-sub">— endpoints for Local / DeepSeek / OpenRouter threads; the header pill picks which one each chat uses</span></label>
+    <div class="conn-tabs">
+      <button type="button" class="conn-tab active" data-ctab="local" onclick="connTab('local')">Local</button>
+      <button type="button" class="conn-tab" data-ctab="deepseek" onclick="connTab('deepseek')">DeepSeek</button>
+      <button type="button" class="conn-tab" data-ctab="openrouter" onclick="connTab('openrouter')">OpenRouter</button>
+    </div>
+    <div class="conn-pane" id="ctLocal">
+      <label>API URL</label>
+      <input type="text" id="setApiUrl" value="http://127.0.0.1:8080" spellcheck="false">
+      <div class="bg-note">Local model server (llama.cpp / vLLM / any OpenAI-compatible API). Its models are detected automatically — they appear in the header pill's Local group.</div>
+    </div>
+    <div class="conn-pane" id="ctDeepseek" hidden>
+      <label>Base URL</label>
+      <input type="text" id="dsUrl" placeholder="https://api.deepseek.com/v1" spellcheck="false">
+      <label>API Key</label>
+      <input type="password" id="dsKey" autocomplete="off" placeholder="sk-…">
+      <div class="voice-row">
+        <span class="agent-status" id="dsStatus"><span class="status-dot"></span><span>Not tested</span></span>
+        <button class="bg-btn" id="dsTestBtn" onclick="testCloudConn('deepseek')">Test</button>
+      </div>
+      <div class="bg-note">DeepSeek's model API. Keys are stored only in this browser (never in the app files). After Save, the header pill's DeepSeek group lists its models.</div>
+    </div>
+    <div class="conn-pane" id="ctOpenrouter" hidden>
+      <label>Base URL</label>
+      <input type="text" id="orUrl" placeholder="https://openrouter.ai/api/v1" spellcheck="false">
+      <label>API Key</label>
+      <input type="password" id="orKey" autocomplete="off" placeholder="sk-or-…">
+      <div class="voice-row">
+        <span class="agent-status" id="orStatus"><span class="status-dot"></span><span>Not tested</span></span>
+        <button class="bg-btn" id="orTestBtn" onclick="testCloudConn('openrouter')">Test</button>
+      </div>
+      <div class="bg-note">OpenRouter's model API — thousands of models incl. Claude / GPT / Gemini. Top models are listed in the pill's OpenRouter group; ✎ custom model accepts any id. Keys stay in this browser only.</div>
+    </div>
     <label>System Prompt</label>
     <textarea id="setSysPrompt"></textarea>
     <label>Max Tokens (0 = unlimited)</label>
@@ -2890,7 +2941,84 @@ const AGENT_PRESETS = {
 };
 let AGENTS = loadAgents();
 let agentState = {};                       // id -> {connected, error} — in-memory, re-pinged
-let chatSource = localStorage.getItem('chat_source') || 'local';  // 'local' | 'agent:<id>'
+// ── Thread connection (2026-09-05): EVERY chat thread remembers the connection it
+//    last chatted on — 'local' (the API URL model server), 'cloud' (DeepSeek /
+//    OpenRouter model API), or 'agent' (Hermes / Pi / DS Harness / custom).
+//    activeConn is the ACTIVE thread's conn; chatSource stays as the serialized
+//    mirror ('local' | 'agent:<id>' | 'cloud:<provider>') so existing helpers
+//    (activeAgent, pickAgent, loadModels…) keep working unchanged. New threads
+//    inherit the last-known conn from localStorage 'chat_conn_last' (same pattern
+//    as per-thread system prompts).
+const CLOUD_PROVIDERS = {
+  deepseek:   { name: 'DeepSeek',   url: 'https://api.deepseek.com/v1',  key: '', model: '', ctx: 128000, defaultModel: 'deepseek-chat' },
+  openrouter: { name: 'OpenRouter', url: 'https://openrouter.ai/api/v1', key: '', model: '', ctx: 128000, defaultModel: '' }
+};
+const CLOUD_CTX_DEFAULT = 128000;
+function loadCloudConns() {
+  let stored = {};
+  try { stored = JSON.parse(localStorage.getItem('chat_llm_conns') || '{}') || {}; } catch (e) {}
+  const out = {};
+  for (const id of Object.keys(CLOUD_PROVIDERS)) {
+    out[id] = Object.assign({}, CLOUD_PROVIDERS[id], stored[id] || {});
+    out[id].name = CLOUD_PROVIDERS[id].name;   // preset names are fixed
+  }
+  return out;
+}
+let CLOUD_CONNS = loadCloudConns();
+function saveCloudConns() { localStorage.setItem('chat_llm_conns', JSON.stringify(CLOUD_CONNS)); }
+function cloudConfigured(id) { const c = CLOUD_CONNS[id]; return !!(c && c.url && c.url.trim()); }
+function activeCloudId() { return chatSource.startsWith('cloud:') ? chatSource.slice(6) : null; }
+function activeCloud() {
+  const id = activeCloudId();
+  if (!id) return null;
+  const c = CLOUD_CONNS[id];
+  return c ? Object.assign({ id }, c) : null;
+}
+// normalize: any stored/partial conn shape -> {kind, agent?, provider?, model?}
+function normalizeConn(c) {
+  if (!c || typeof c !== 'object') return { kind: 'local', model: '' };
+  if (c.kind === 'agent') return { kind: 'agent', agent: c.agent || c.id || 'hermes' };
+  if (c.kind === 'cloud') {
+    const p = (c.provider && CLOUD_CONNS[c.provider]) ? c.provider : 'deepseek';
+    return { kind: 'cloud', provider: p, model: (c.model && String(c.model)) || '' };
+  }
+  return { kind: 'local', model: (c.model && String(c.model)) || '' };
+}
+function connOfChatSource(src) {   // legacy 'chat_source' -> conn (migration)
+  if (src && src.startsWith('agent:')) return { kind: 'agent', agent: src.slice(6) };
+  if (src && src.startsWith('cloud:')) return { kind: 'cloud', provider: CLOUD_CONNS[src.slice(6)] ? src.slice(6) : 'deepseek' };
+  return { kind: 'local' };
+}
+let activeConn = (() => {
+  try {
+    const last = JSON.parse(localStorage.getItem('chat_conn_last') || 'null');
+    if (last) return normalizeConn(last);
+  } catch (e) {}
+  return connOfChatSource(localStorage.getItem('chat_source'));
+})();
+let chatSource = (activeConn.kind === 'agent') ? 'agent:' + activeConn.agent
+  : (activeConn.kind === 'cloud') ? 'cloud:' + activeConn.provider : 'local';
+localStorage.setItem('chat_source', chatSource);   // migrate the legacy global once
+function persistLastConn() { localStorage.setItem('chat_conn_last', JSON.stringify(activeConn)); }
+function applyConn(c, opts) {
+  const o = opts || {};
+  activeConn = normalizeConn(c);
+  chatSource = (activeConn.kind === 'agent') ? 'agent:' + activeConn.agent
+    : (activeConn.kind === 'cloud') ? 'cloud:' + activeConn.provider : 'local';
+  if (activeConn.kind === 'agent') {
+    if (!o.noModel) currentModel = currentModel;    // agent model is server-side — leave local pick alone
+  } else if (activeConn.kind === 'cloud') {
+    currentModel = activeConn.model || CLOUD_CONNS[activeConn.provider].defaultModel || '';
+  } else {
+    const lm = activeConn.model;
+    if (lm && !o.keepLocalDefault) currentModel = lm;
+  }
+  if (!o.noSave) {
+    localStorage.setItem('chat_source', chatSource);
+    persistLastConn();
+  }
+  if (!o.silent) { updatePill(); refreshStatusPill(); syncSourceContext(); }
+}
 let cfgAgentId = localStorage.getItem('chat_agent_cfg') || 'hermes';  // agent being configured
 let chatAgentSessions = {};                // per-THREAD agent session ids (keep-alive continuity)
 
@@ -2914,7 +3042,13 @@ function activeAgent() {
 function agentConfigured(id) { const a = AGENTS[id]; return !!(a && a.url && a.url.trim()); }
 function isAgentConnected(id) { return !!(agentState[id] && agentState[id].connected); }
 // Badge model shown on agent messages ("◆ Hermes") instead of the local model id
-function displayModelBadge() { const ag = activeAgent(); return ag ? (ag.name || ag.id) : currentModel; }
+function displayModelBadge() {
+  const ag = activeAgent();
+  if (ag) return (ag.name || ag.id);
+  const cl = activeCloud();
+  if (cl) return currentModel || (cl.name + ' model');
+  return currentModel;
+}
 
 function agentSessionId(id, rotate) {
   // ALWAYS-ON sessions (2026-09-05): one stable session per agent per THREAD —
@@ -2937,14 +3071,20 @@ function newAgentSessionId() {
 // ── Pill source dropdown ──
 function updatePill() {
   const ag = activeAgent();
+  const cl = activeCloud();
   const lab = document.getElementById('modelLabel');
   const pill = document.getElementById('modelPill');
   if (!lab || !pill) return;
-  syncSourceContext();   // token bar limit follows the ACTIVE source (agent vs local)
+  syncSourceContext();   // token bar limit follows the ACTIVE source (agent vs cloud vs local)
   pill.classList.toggle('agent-mode', !!ag);
+  pill.classList.toggle('cloud-mode', !!cl);
   if (ag) {
     lab.innerHTML = `<span class="pill-dot"></span>${escHtml(ag.name || ag.id)}`;
     lab.title = `Chatting with the ${escHtml(ag.name || ag.id)} agent${ag.url ? ' — ' + escHtml(ag.url) : ''}. Click to switch source.`;
+  } else if (cl) {
+    const m = currentModel || cl.defaultModel || 'pick a model';
+    lab.innerHTML = `<span class="pill-dot cloud"></span>${escHtml(cl.name)}<span class="pill-sub">${escHtml(shortModel(m))}</span>`;
+    lab.title = `Chatting via ${escHtml(cl.name)} — ${escHtml(m)}. Click to switch source.`;
   } else {
     lab.textContent = currentModel || 'Local model';
     lab.title = 'Chatting with the local model. Click to switch source.';
@@ -2952,32 +3092,75 @@ function updatePill() {
 }
 function refreshStatusPill() {
   // Local mode: loadModels owns the pill. Agent mode: show the agent's state.
+  // Cloud mode: show the cloud provider's state (same agentState map).
   const ag = activeAgent();
+  const cl = activeCloud();
   const dot = document.getElementById('statusDot');
   const txt = document.getElementById('statusText');
   if (!dot || !txt) return;
-  if (!ag) return;
-  if (!agentConfigured(ag.id)) {
+  const who = ag || (cl ? Object.assign({ id: cl.id, name: cl.name, url: cl.url }, cl) : null);
+  if (!who) return;
+  const id = who.id;
+  if (cl && !cloudConfigured(id)) {
+    dot.className = 'status-dot err';
+    txt.textContent = cl.name + ' — no server set';
+    return;
+  }
+  if (ag && !agentConfigured(ag.id)) {
     dot.className = 'status-dot err';
     txt.textContent = (ag.name || ag.id) + ' — no server set';
     return;
   }
-  const st = agentState[ag.id];
-  if (!st) { dot.className = 'status-dot'; txt.textContent = 'Checking ' + (ag.name || ag.id) + '…'; return; }
-  if (st.connected) { dot.className = 'status-dot ok'; txt.textContent = (ag.name || ag.id) + ' connected'; }
+  const st = agentState[id];
+  if (!st) { dot.className = 'status-dot'; txt.textContent = 'Checking ' + (who.name || id) + '…'; return; }
+  if (st.connected) { dot.className = 'status-dot ok'; txt.textContent = (who.name || id) + ' connected'; }
   else {
     dot.className = 'status-dot err';
-    txt.textContent = (ag.name || ag.id) + ' offline' + (st.error ? ' — ' + st.error : '');
+    txt.textContent = (who.name || id) + ' offline' + (st.error ? ' — ' + st.error : '');
   }
+}
+let cloudModels = { deepseek: null, openrouter: null };   // null = not fetched yet; [] = fetched but empty
+let cloudFetching = {};
+function ensureCloudModels(p) {
+  if (!cloudConfigured(p) || cloudModels[p] || cloudFetching[p]) return cloudModels[p];
+  const c = CLOUD_CONNS[p];
+  cloudFetching[p] = true;
+  return fetch('/api/agent/models', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: p, url: (c.url || '').trim(), key: (c.key || '').trim() })
+  }).then(r => r.json()).then(d => {
+    cloudFetching[p] = false;
+    if (d && d.ok && Array.isArray(d.models)) {
+      cloudModels[p] = d.models.slice(0, 300).map(m => ({ id: m.id, ctx: m.ctx || 0 }));
+    } else {
+      // DeepSeek's public model set is stable — fall back so the thread is usable
+      // even when /models is unreachable or the key rejects it; OpenRouter has no
+      // fixed set, so its group relies on ✎ custom model.
+      cloudModels[p] = (p === 'deepseek')
+        ? [{ id: 'deepseek-chat', ctx: 128000 }, { id: 'deepseek-reasoner', ctx: 128000 }]
+        : [];
+    }
+    if (!document.getElementById('sourceMenu').hidden) renderSourceMenu();
+    return cloudModels[p];
+  }).catch(() => {
+    cloudFetching[p] = false;
+    cloudModels[p] = (p === 'deepseek')
+      ? [{ id: 'deepseek-chat', ctx: 128000 }, { id: 'deepseek-reasoner', ctx: 128000 }]
+      : [];
+    if (!document.getElementById('sourceMenu').hidden) renderSourceMenu();
+    return cloudModels[p];
+  });
 }
 function renderSourceMenu() {
   const mlist = document.getElementById('srcModelList');
   const alist = document.getElementById('srcAgentList');
   const agLabel = document.getElementById('srcAgentLabel');
+  const clist = document.getElementById('srcCloudList');
+  const clab = document.getElementById('srcCloudLabel');
   const empty = document.getElementById('srcEmpty');
   const sel = document.getElementById('modelSelect');
   const opts = sel ? Array.from(sel.options).map(o => o.value) : [];
-  const localActive = !activeAgent();
+  const localActive = !activeAgent() && !activeCloud();
   let html = '';
   for (const id of opts) {
     const active = localActive && id === currentModel;
@@ -3004,7 +3187,37 @@ function renderSourceMenu() {
   }
   alist.innerHTML = ahtml;
   agLabel.hidden = shown === 0;
-  const none = opts.length === 0 && shown === 0 && !(ag && !isAgentConnected(ag.id));
+  // ── Cloud group (2026-09-05): configured providers, each with its model rows ──
+  const cloudNow = activeCloud();
+  let chtml = '';
+  let cloudShown = 0;
+  for (const p of Object.keys(CLOUD_PROVIDERS)) {
+    if (!cloudConfigured(p)) continue;
+    cloudShown++;
+    const c = CLOUD_CONNS[p];
+    chtml += `<div class="src-group-label cloud"><span class="src-dot cloud"></span>${escHtml(c.name)}<span class="src-sub">${escHtml(String(c.url || '').replace(/^https?:\/\//i, ''))}</span></div>`;
+    const ms = cloudModels[p];
+    if (!ms) {
+      chtml += `<div class="src-item dim"><span class="src-check"></span><span class="src-name">… loading ${escHtml(c.name)} models</span></div>`;
+      ensureCloudModels(p);
+    } else {
+      let n = 0;
+      const cap = p === 'openrouter' ? 60 : ms.length;
+      for (const m of ms) {
+        if (n >= cap) break;
+        const active = !!cloudNow && cloudNow.id === p && currentModel === m.id;
+        chtml += `<div class="src-item${active ? ' active' : ''}" data-src="cloud" data-prov="${escAttr(p)}" data-val="${escAttr(m.id)}" title="${escAttr(m.id)}"><span class="src-check">${active ? '✓' : ''}</span><span class="src-dot cloud"></span><span class="src-name">${escHtml(shortModel(m.id))}</span></div>`;
+        n++;
+      }
+      if (ms.length > cap) {
+        chtml += `<div class="src-item dim"><span class="src-check"></span><span class="src-name">… ${ms.length - cap} more in the catalog — use ✎ custom model</span></div>`;
+      }
+    }
+    chtml += `<div class="src-item" data-src="cloudcustom" data-prov="${escAttr(p)}" title="Type any ${escHtml(c.name)} model id"><span class="src-check"></span><span class="src-dot cloud"></span><span class="src-name">✎ custom model…</span></div>`;
+  }
+  clist.innerHTML = chtml;
+  if (clab) clab.hidden = cloudShown === 0;
+  const none = opts.length === 0 && shown === 0 && cloudShown === 0 && !(ag && !isAgentConnected(ag.id));
   empty.hidden = !none;
   if (none) mlist.innerHTML = '';
 }
@@ -3024,12 +3237,38 @@ function closeSourceMenu() {
 }
 function pickAgent(id) {
   if (!AGENTS[id] || !agentConfigured(id)) return;
-  chatSource = 'agent:' + id;
-  localStorage.setItem('chat_source', chatSource);
+  applyConn({ kind: 'agent', agent: id });
   closeSourceMenu();
   updatePill(); refreshStatusPill();
   if (!isAgentConnected(id)) pingAgent(id);   // async status fill
+  if (currentChatId) saveCurrentChat();       // remember this thread chats with this agent
   showToast('Chatting with ' + (AGENTS[id].name || id));
+}
+// ── Cloud pick (2026-09-05): choose a DeepSeek / OpenRouter model for THIS thread ──
+function pickCloud(provider, model) {
+  if (!CLOUD_CONNS[provider] || !cloudConfigured(provider)) return;
+  if (!model) { showToast('Pick a model for ' + CLOUD_CONNS[provider].name); return; }
+  applyConn({ kind: 'cloud', provider: provider, model: String(model) });
+  closeSourceMenu();
+  updatePill(); refreshStatusPill();
+  if (!agentState[provider]) pingAgent(provider);   // async status fill (agentState map)
+  if (currentChatId) saveCurrentChat();             // per-thread last-known cloud conn
+  showToast('Chatting via ' + CLOUD_CONNS[provider].name + ' — ' + shortModel(String(model)));
+}
+function customCloudModel(provider) {
+  const c = CLOUD_CONNS[provider];
+  if (!c) return;
+  const cur = (activeCloud() && activeCloud().id === provider) ? (currentModel || '') : '';
+  const val = prompt('Model id for ' + c.name + ':', cur);
+  if (val === null) return;
+  const m = String(val).trim();
+  if (!m) return;
+  if (!cloudConfigured(provider)) {
+    // allow typing a model even before a key is stored — the settings pane can fill it in
+    showToast('Set the ' + c.name + ' URL + key in Settings → LLM Connections first', null, true);
+    return;
+  }
+  pickCloud(provider, m);
 }
 // Agent-mode context for the token bar: an agent's context is the MODEL Hermes is
 // using (deepseek default 200k per hermes agent models_dev), NOT the local API
@@ -3037,9 +3276,17 @@ function pickAgent(id) {
 const AGENT_CTX_DEFAULT = 200000;
 function syncSourceContext() {
   const ag = activeAgent();
+  const cl = activeCloud();
   let want;
   if (ag) {
     want = parseInt(String((AGENTS[ag.id] && AGENTS[ag.id].context) || ''), 10) || AGENT_CTX_DEFAULT;
+  } else if (cl) {
+    // cloud: the model's own context window when the registry knows it, else the
+    // provider default (DeepSeek/OpenRouter models run 128k+; local is separate)
+    let mctx = 0;
+    const ms = cloudModels[cl.id];
+    if (ms) { const mm = ms.find(m => m.id === currentModel); if (mm && mm.ctx > 0) mctx = mm.ctx; }
+    want = mctx || CLOUD_CTX_DEFAULT;
   } else {
     want = parseInt(localStorage.getItem('chat_context_limit') || '', 10);
     if (!(want > 0)) want = 180000;
@@ -3049,11 +3296,12 @@ function syncSourceContext() {
 syncSourceContext();   // page load: honor the restored chat_source (agent or local)
 // ── Agent connectivity ──
 function pingAgent(id) {
-  const a = AGENTS[id];
-  if (!a) return Promise.resolve(false);
+  const a = AGENTS[id] || CLOUD_CONNS[id];   // cloud providers ping through the same proxy
+  if (!a || !(a.url || '').trim()) return Promise.resolve(false);
   const body = { id: id, url: (a.url || '').trim(), key: (a.key || '') };
   agentState[id] = null;                       // "checking…" — clears stale state
   if (activeAgent() && activeAgent().id === id) refreshStatusPill();
+  if (activeCloud() && activeCloud().id === id) refreshStatusPill();
   if (cfgAgentId === id) updateAgentStatusLine();
   return fetch('/api/agent/ping', {
     method: 'POST',
@@ -3061,13 +3309,13 @@ function pingAgent(id) {
     body: JSON.stringify(body)
   }).then(r => r.json()).then(d => {
     agentState[id] = { connected: !!d.ok, error: d.ok ? '' : (d.error || ('HTTP ' + (d.status || '?'))) };
-    if (activeAgent() && activeAgent().id === id) refreshStatusPill();
+    if ((activeAgent() && activeAgent().id === id) || (activeCloud() && activeCloud().id === id)) refreshStatusPill();
     if (cfgAgentId === id) updateAgentStatusLine();
     if (!document.getElementById('sourceMenu').hidden) renderSourceMenu();
     return !!d.ok;
   }).catch(err => {
     agentState[id] = { connected: false, error: 'proxy unreachable' };
-    if (activeAgent() && activeAgent().id === id) refreshStatusPill();
+    if ((activeAgent() && activeAgent().id === id) || (activeCloud() && activeCloud().id === id)) refreshStatusPill();
     if (cfgAgentId === id) updateAgentStatusLine();
     return false;
   });
@@ -3195,6 +3443,35 @@ let msgStatsEl = null;          // stats bar element of the CURRENT streaming me
 let msgStatsTimer = null;       // live-update timer for the per-message stats bar
 let msgFirstTokenTime = 0;      // when the first content token arrived (for t/s baseline)
 let msgRateSamples = [];        // rolling (t, estTokens) samples for windowed live t/s
+
+// ── Per-thread runs (2026-09-05) — INDEPENDENT chat sessions ──
+// Each thread's LIVE generation is one entry in `runs`, keyed by the thread's
+// chat id, so a thread mid-generation never blocks another thread from sending.
+// Local/cloud runs keep their mutable stream state in FUNCTION-LOCAL bindings
+// (see the prologue of streamResponse) — concurrent invocations can't see or
+// clobber each other. Agent (/v1/runs) turns stay serialized app-wide (one run
+// protocol + approvals + steer at a time) and keep the module globals below.
+// runs[id] = { threadId, kind:'local'|'cloud'|'agent', badge, model, ac }
+let runs = {};
+function runActive(id) { return !!(id && runs[id]); }
+function curRun() { return (currentChatId && runs[currentChatId]) ? runs[currentChatId] : null; }
+let agentRunActive = false;     // an agent turn is live somewhere (serialized)
+function updateStreamUI() {
+  // Send/stop buttons + input state follow the CURRENT thread's run only — a job
+  // running in another thread leaves this thread fully able to send.
+  const RS = curRun();
+  const sendBtn = document.getElementById('sendBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  if (!sendBtn || !stopBtn) return;
+  const agentLive = !!(RS && RS.kind === 'agent');
+  sendBtn.style.display = RS ? 'none' : 'flex';
+  stopBtn.style.display = RS ? 'flex' : 'none';
+  const input = document.getElementById('chatInput');
+  if (input) {
+    input.disabled = !!RS && !agentLive;   // steerable agent runs keep the input open
+    input.placeholder = agentLive ? 'Type to steer the agent… (Enter)' : 'Type a message...';
+  }
+}
 
 // llama.cpp-style stats bar — lucide icons (whole-word / clock / gauge)
 const STAT_ICON_TOKENS = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="12" r="3"/><path d="M10 9v6"/><circle cx="17" cy="12" r="3"/><path d="M14 7v8"/><path d="M22 17v1c0 .5-.5 1-1 1H3c-.5 0-1-.5-1-1v-1"/></svg>';
@@ -3627,6 +3904,11 @@ function setChatFontSize(v) {
 }
 function openSettings() {
   document.getElementById('setApiUrl').value = API_URL;
+  // LLM Connections: cloud fields (2026-09-05) — keys stay browser-local
+  document.getElementById('dsUrl').value = CLOUD_CONNS.deepseek.url || '';
+  document.getElementById('dsKey').value = CLOUD_CONNS.deepseek.key || '';
+  document.getElementById('orUrl').value = CLOUD_CONNS.openrouter.url || '';
+  document.getElementById('orKey').value = CLOUD_CONNS.openrouter.key || '';
   document.getElementById('setSysPrompt').value = SYSTEM_PROMPT;
   document.getElementById('setMaxTokens').value = MAX_TOKENS;
   document.getElementById('setTemp').value = TEMPERATURE;
@@ -3640,12 +3922,87 @@ function openSettings() {
   updateBgSettingsUI();
   loadVoices();   // refresh qwen3 availability + voice list each open
   populateAgentPane();   // Connect Agent: fill fields from stored config (agent tab default-hidden; fields kept live)
+  // LLM Connections tab follows the ACTIVE thread's conn (Local / DeepSeek / OpenRouter)
+  connTab(activeConn.kind === 'cloud' ? activeConn.provider : 'local');
+  cloudStatusLine('deepseek'); cloudStatusLine('openrouter');   // status rows reflect last ping
   document.getElementById('settingsModal').classList.add('show');
 }
 function closeSettings() { document.getElementById('settingsModal').classList.remove('show'); }
+// LLM Connections inner tabs (2026-09-05)
+function connTab(kind) {
+  const tabs = document.querySelectorAll('.conn-tab');
+  for (const t of tabs) t.classList.toggle('active', t.dataset.ctab === kind);
+  const panes = { local: 'ctLocal', deepseek: 'ctDeepseek', openrouter: 'ctOpenrouter' };
+  for (const k of Object.keys(panes)) {
+    const el = document.getElementById(panes[k]);
+    if (el) el.hidden = (k !== kind);
+  }
+}
+function cloudStatusLine(provider) {
+  const map = { deepseek: 'dsStatus', openrouter: 'orStatus' };
+  const st = document.getElementById(map[provider]);
+  const btn = document.getElementById(provider === 'deepseek' ? 'dsTestBtn' : 'orTestBtn');
+  if (!st) return;
+  const dot = st.querySelector('.status-dot');
+  const label = st.querySelector('span:last-child');
+  if (!btn.disabled) btn.disabled = false;
+  const s = agentState[provider];
+  if (!s) { dot.className = 'status-dot'; label.textContent = 'Not tested'; return; }
+  if (s.connected) { st.className = 'agent-status ok'; dot.className = 'status-dot ok'; label.textContent = 'Connected'; }
+  else { st.className = 'agent-status err'; dot.className = 'status-dot err'; label.textContent = 'Offline' + (s.error ? ' — ' + shortTxt(s.error, 90) : ''); }
+}
+async function testCloudConn(provider) {
+  const c = CLOUD_CONNS[provider];
+  const url = document.getElementById(provider === 'deepseek' ? 'dsUrl' : 'orUrl').value.trim();
+  const key = document.getElementById(provider === 'deepseek' ? 'dsKey' : 'orKey').value;
+  const st = document.getElementById(provider === 'deepseek' ? 'dsStatus' : 'orStatus');
+  const btn = document.getElementById(provider === 'deepseek' ? 'dsTestBtn' : 'orTestBtn');
+  if (!url) { st.className = 'agent-status err'; st.querySelector('.status-dot').className = 'status-dot err'; st.querySelector('span:last-child').textContent = 'Enter a base URL first'; return; }
+  btn.disabled = true; btn.textContent = 'Testing…';
+  st.className = 'agent-status'; st.querySelector('.status-dot').className = 'status-dot';
+  st.querySelector('span:last-child').textContent = 'Checking…';
+  try {
+    const d = await fetch('/api/agent/ping', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: provider, url: url, key: key })
+    }).then(r => r.json());
+    if (d.ok) {
+      // apply the typed config so Test alone makes the provider available (Save optional)
+      CLOUD_CONNS[provider].url = url; CLOUD_CONNS[provider].key = key;
+      saveCloudConns();
+      cloudModels[provider] = null;   // re-list models against the new endpoint
+      agentState[provider] = { connected: true, error: '' };
+      st.className = 'agent-status ok';
+      st.querySelector('.status-dot').className = 'status-dot ok';
+      st.querySelector('span:last-child').textContent = 'Connected';
+      showToast(c.name + ' connected');
+    } else {
+      agentState[provider] = { connected: false, error: d.error || ('HTTP ' + (d.status || '?')) };
+      cloudStatusLine(provider);
+    }
+  } catch (e) {
+    agentState[provider] = { connected: false, error: 'proxy unreachable' };
+    cloudStatusLine(provider);
+  }
+  btn.disabled = false; btn.textContent = 'Test';
+}
 function saveSettings() {
   API_URL = document.getElementById('setApiUrl').value.replace(/\/+$/, '');
   isLlamaCpp = null; _backendKnown = false; detectBackend(); // API URL changed -> re-probe backend
+  // LLM Connections: persist cloud provider endpoints + keys (2026-09-05)
+  const dsUrl = document.getElementById('dsUrl').value.trim();
+  const dsKey = document.getElementById('dsKey').value;
+  const orUrl = document.getElementById('orUrl').value.trim();
+  const orKey = document.getElementById('orKey').value;
+  const dsChanged = CLOUD_CONNS.deepseek.url !== dsUrl || CLOUD_CONNS.deepseek.key !== dsKey;
+  const orChanged = CLOUD_CONNS.openrouter.url !== orUrl || CLOUD_CONNS.openrouter.key !== orKey;
+  CLOUD_CONNS.deepseek.url = dsUrl; CLOUD_CONNS.deepseek.key = dsKey;
+  CLOUD_CONNS.openrouter.url = orUrl; CLOUD_CONNS.openrouter.key = orKey;
+  saveCloudConns();
+  if (dsChanged || orChanged) {
+    if (dsChanged) { cloudModels.deepseek = null; if (dsUrl && dsKey) pingAgent('deepseek'); else delete agentState.deepseek; }
+    if (orChanged) { cloudModels.openrouter = null; if (orUrl && orKey) pingAgent('openrouter'); else delete agentState.openrouter; }
+  }
   SYSTEM_PROMPT = document.getElementById('setSysPrompt').value;
   const mt = parseInt(document.getElementById('setMaxTokens').value);
   MAX_TOKENS = (!isNaN(mt) && mt > 0) ? mt : 0;
@@ -4267,6 +4624,7 @@ function newChat() {
   updateSysPromptBar(); updateTokenBar();
   document.getElementById('messages').innerHTML = '<div class="empty-state" id="emptyState"><div class="icon">💬</div><p>Send a message to start chatting</p></div>';
   loadHistory();
+  updateStreamUI();   // a fresh thread has no run — input live even if other threads stream
 }
 function saveCurrentChat() {
   if (!currentChatId) {
@@ -4282,6 +4640,7 @@ function saveCurrentChat() {
   // Custom titles (Rename menu) are kept; only auto-title from the first user message when not renamed
   if (!existing.renamed) existing.title = threadTitle(conversationHistory.find(m => m.role === 'user')?.content);
   existing.systemPrompt = SYSTEM_PROMPT;   // per-thread system prompt (2026-08-18)
+  existing.conn = JSON.parse(JSON.stringify(activeConn));   // per-thread connection: local | cloud:<provider> | agent:<id> (2026-09-05)
   existing.agentSessions = chatAgentSessions;   // per-thread agent keep-alive sessions (2026-09-04)
   let serialized = JSON.stringify(chats);
   if (serialized.length > 4500000) {
@@ -4312,9 +4671,15 @@ function loadConversation(chatId) {
     ? chat.systemPrompt
     : (localStorage.getItem('chat_system_prompt') || '');
   localStorage.setItem('chat_system_prompt', SYSTEM_PROMPT);
+  // Per-thread connection (2026-09-05): this thread remembers what it last chatted
+  // on (local / cloud provider / agent). Legacy threads without a conn keep the
+  // current default. The global last-known always tracks the ACTIVE thread.
+  if (chat.conn) applyConn(chat.conn);
+  localStorage.setItem('chat_conn_last', JSON.stringify(activeConn));
   updateSysPromptBar(); updateTokenBar();
   renderAllMessages();
   loadHistory();
+  updateStreamUI();   // entering a thread: its own run (if any) drives the send/stop UI
 }
 function deleteChat(chatId) {
   let chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
@@ -4414,8 +4779,17 @@ function loadModels() {
       const sel = document.getElementById('modelSelect');
       if (models.length) {
         sel.innerHTML = models.map(m => `<option value="${escAttr(m.id)}">${escHtml(m.id)}</option>`).join('');
-        currentModel = models[0].id;
-        localStorage.setItem('chat_current_model', currentModel);
+        // The ACTIVE conn owns the model choice (2026-09-05): a local thread keeps
+        // its remembered model, cloud/agent threads keep THEIR model — loadModels
+        // only defaults when the active local conn has no model yet.
+        if (activeConn && activeConn.kind === 'local') {
+          if (activeConn.model && models.some(m => m.id === activeConn.model)) {
+            currentModel = activeConn.model;
+          } else {
+            currentModel = models[0].id;
+            localStorage.setItem('chat_current_model', currentModel);
+          }
+        }
         // PRIMARY backend signal: llama.cpp reports owned_by:"llamacpp" in /v1/models.
         // This rides the same fetch that populates the model list (retried every 10s on
         // failure), so the flag is set whenever the server is actually reachable — the
@@ -4427,23 +4801,22 @@ function loadModels() {
         // vLLM reports context top-level (max_model_len); llama.cpp hides it in
         // meta.n_ctx / n_ctx_train — read both so the token bar shows the real limit
         const mml = models[0].max_model_len || models[0].context_length || meta.n_ctx || meta.n_ctx_train || 0;
-        if (mml > 0 && mml !== contextLimit && !activeAgent()) {
+        if (mml > 0 && mml !== contextLimit && !activeAgent() && !activeCloud()) {
           contextLimit = mml;
           localStorage.setItem('chat_context_limit', contextLimit);
         }
         document.getElementById('statusDot').className = 'status-dot ok';
         document.getElementById('statusText').textContent = 'Connected';
-      } else {
-        currentModel = '';
+      } else if (activeConn.kind !== 'cloud' && !activeAgent()) {
         document.getElementById('modelLabel').textContent = 'No models';
         document.getElementById('statusDot').className = 'status-dot ok';
         document.getElementById('statusText').textContent = 'Connected (no models)';
       }
       updateTokenBar();
       updatePill();   // local mode: label = freshly loaded model; agent mode: pill shows the agent
-      if (activeAgent()) refreshStatusPill();   // agent status owns the header pill in agent mode
+      if (activeAgent() || activeCloud()) refreshStatusPill();   // agent/cloud status owns the header pill in those modes
     }).catch(() => {
-      if (!activeAgent()) {
+      if (!activeAgent() && !activeCloud()) {
         document.getElementById('statusDot').className = 'status-dot err';
         document.getElementById('statusText').textContent = 'API unavailable';
         document.getElementById('modelLabel').textContent = 'Connection error';
@@ -4483,22 +4856,28 @@ async function detectBackend() {
 function selectModel(val) {
   // Picking a model from the source dropdown = chat with the LOCAL model.
   if (!val) return;
-  chatSource = 'local';
-  localStorage.setItem('chat_source', chatSource);
-  currentModel = val;
+  applyConn({ kind: 'local', model: String(val) });
   localStorage.setItem('chat_current_model', val);
   closeSourceMenu();
   updatePill(); refreshStatusPill();
+  if (currentChatId) saveCurrentChat();   // per-thread last-known conn (2026-09-05)
 }
 
 async function sendMessage() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
   if (!text && attachments.length === 0) return;
-  if (isStreaming) {
-    // R1-Connect-style interrupt: while an AGENT run streams, typing + Enter
-    // steers the live run instead of being swallowed (local model: unchanged)
-    if (activeAgent() && _agentRun && _agentRun.runId) { doAgentSteer(text); }
+  const RS = curRun();
+  if (RS) {
+    // R1-Connect-style interrupt: while THIS thread's AGENT run streams, typing +
+    // Enter steers the live run. Local/cloud runs disable their own input, and a
+    // run in ANOTHER thread never swallows this thread's message (2026-09-05).
+    if (RS.kind === 'agent' && _agentRun && _agentRun.runId) { doAgentSteer(text); }
+    return;
+  }
+  // Agent turns are serialized app-wide — one runs-protocol session at a time.
+  if (activeAgent() && agentRunActive) {
+    showToast('Another agent run is active — open that thread and stop it, or wait for it to finish.');
     return;
   }
   input.value = '';
@@ -4599,39 +4978,84 @@ function attachmentChipsHTML(list) {
 // Stream an assistant response from the CURRENT history tail (used by send
 // and by recycle — the user prompt is already in history, don't re-add it)
 async function streamFromHistory() {
-  const input = document.getElementById('chatInput');
+  // A thread can only run ONE generation at a time; other threads are unaffected.
+  if (curRun()) return;
   const agentNow = activeAgent();
-  const agentStream = !!agentNow;   // agent runs keep the input OPEN so the user can steer mid-run
-  isStreaming = true;
-  abortController = new AbortController();
-  document.getElementById('sendBtn').style.display = 'none';
-  document.getElementById('stopBtn').style.display = 'flex';
-  if (!agentStream) input.disabled = true;
-  input.placeholder = agentStream ? 'Type to steer the agent… (Enter)' : input.placeholder;
-  startStatsTracking();
+  const cloudNow = activeCloud();
+  const kind = agentNow ? 'agent' : (cloudNow ? 'cloud' : 'local');
+  // Agent turns are serialized app-wide: one runs-protocol session at a time.
+  if (kind === 'agent' && agentRunActive) {
+    showToast('Another agent run is already active — finish or stop it in that thread first.');
+    return;
+  }
+  const model = (kind !== 'agent') ? (currentModel || '') : '';
+  const badge = agentNow ? (agentNow.name || agentNow.id)
+    : (cloudNow ? (model || 'Cloud model') : model);
+  const conn = normalizeConn(activeConn);
   const placeholder = { role: 'assistant', content: '' };
   if (agentNow) placeholder.agentName = agentNow.name || agentNow.id;   // agent responses keep their head row across reloads
   conversationHistory.push(placeholder);
   saveCurrentChat();   // persist prompt+placeholder NOW — a mid-stream chat switch can't lose the prompt (2026-08-27)
-  streamChatId = currentChatId;   // bind this stream to its thread — AFTER save so brand-new chats get the materialized id (2026-08-27)
-  try { await streamResponse(); }
-  catch (e) {
-    if (e.name !== 'AbortError') appendMessage('system', 'Error: ' + e.message);
+  const threadId = currentChatId;   // bind this stream to its thread — AFTER save so brand-new chats get the materialized id (2026-08-27)
+  const S = { threadId: threadId, kind: kind, badge: badge, model: model, conn: conn, ac: new AbortController() };
+  runs[threadId] = S;
+  if (kind === 'agent') {
+    // agent runs keep using the module stream globals — they're serialized, so no
+    // other run can clobber them; local/cloud runs shadow their own (streamResponse)
+    agentRunActive = true;
+    abortController = S.ac;
+    isStreaming = true;
+    streamChatId = threadId;
+    streamTokens = 0; streamChars = 0; streamThinkingChars = 0; streamContentChars = 0;
+    streamStartTime = Date.now();
+    msgStatsEl = null; msgStatsTimer = null;
+  }
+  updateStreamUI();
+  try {
+    if (kind === 'agent') await agentRunTurn();
+    else await streamResponse(S);
+  } catch (e) {
+    // Errors that happened BEFORE a bubble existed (missing model, server down).
+    // Visible run: system line as before. Hidden run: never touch the thread the
+    // user is reading — write the error onto THIS run's stored placeholder instead.
+    if (e.name !== 'AbortError') {
+      if (threadId === currentChatId) {
+        appendMessage('system', 'Error: ' + e.message);
+      } else {
+        try {
+          const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+          const chat = chats.find(c => c.id === threadId);
+          const la = chat && chat.messages ? chat.messages[chat.messages.length - 1] : null;
+          if (la && la.role === 'assistant' && !la.content) {
+            la.content = '⚠ Error: ' + e.message;
+            localStorage.setItem('chat_history', JSON.stringify(chats));
+            loadHistory();
+          }
+        } catch (_) {}
+      }
+    }
   }
   // (2026-09-05: the thinking-loop self-heal retry was REMOVED — it forced
   // enable_thinking:false client-side. Reasoning is launch/server-determined now;
   // a thinking-only response finalizes with the loop-warn instead of auto-retrying.)
-  ensureBranchBar();
-  saveCurrentChat();
-  isStreaming = false;
-  streamChatId = null;
-  abortController = null;
-  document.getElementById('sendBtn').style.display = 'flex';
-  document.getElementById('stopBtn').style.display = 'none';
-  input.disabled = false;
-  input.placeholder = 'Type a message...';
-  input.focus();
-  stopStatsTracking();
+  if (threadId === currentChatId) {
+    ensureBranchBar();
+    saveCurrentChat();   // visible: persist the finalized turn (hidden runs already wrote it)
+  }
+  delete runs[threadId];
+  if (kind === 'agent') {
+    agentRunActive = false;
+    isStreaming = false;
+    streamChatId = null;
+    abortController = null;
+  }
+  updateStreamUI();
+  const input = document.getElementById('chatInput');
+  if (input) {
+    input.disabled = false;
+    input.placeholder = 'Type a message...';
+    if (threadId === currentChatId) input.focus();
+  }
 }
 function copyMessage(btn) {
   const msgEl = btn.closest('.msg');
@@ -4647,12 +5071,12 @@ async function recycleMessage(btn) {
   const msgEl = btn.closest('.msg');
   if (!msgEl) return;
   // abort streaming if this is the live message, and WAIT for the abort to fully
-  // unwind (isStreaming only flips false in streamFromHistory's cleanup) — otherwise
+  // unwind (the run only leaves `runs` in streamFromHistory's cleanup) — otherwise
   // the old stream's catch can clobber the rebuilt DOM and the resend gets skipped
-  if (isStreaming) {
+  if (curRun()) {
     stopGeneration();
     let waited = 0;
-    while (isStreaming && waited < 50) { await new Promise(r => setTimeout(r, 100)); waited++; }
+    while (curRun() && waited < 50) { await new Promise(r => setTimeout(r, 100)); waited++; }
   }
   const idx = parseInt(msgEl.dataset.hidx, 10);
   if (isNaN(idx) || idx < 0) return;
@@ -4675,9 +5099,11 @@ function deleteMessage(btn) {
   // Find the message container (.msg) from the delete button in its stats row
   const msgEl = btn.closest('.msg');
   if (!msgEl) return;
-  // Streaming in progress on this message? abort first
-  if (isStreaming && msgEl === document.querySelector('.msg.assistant:last-of-type') && msgStatsEl && msgStatsEl.contains(btn)) {
-    stopGeneration();
+  // Streaming in progress on this message? abort first (the run's plate holds the
+  // delete button for the live message — local/cloud run plates are per-run now)
+  if (curRun() && msgEl === document.querySelector('.msg.assistant:last-of-type')) {
+    const liveStats = msgEl.querySelector('.msg-stats');
+    if (liveStats && liveStats.contains(btn)) stopGeneration();
   }
   // Remove this message and ALL messages below it
   const idx = parseInt(msgEl.dataset.hidx, 10);
@@ -4697,21 +5123,26 @@ function deleteMessage(btn) {
 }
 
 function stopGeneration() {
-  // Agent runs are server-side: closing the events stream does NOT cancel the
-  // run, so tell the gateway to stop it first (best-effort), then abort.
-  if (_agentRun && _agentRun.runId && !_agentStopFired) {
-    _agentStopFired = true;
-    agentPostRunAction('stop').catch(() => {});
+  // Stops the CURRENT (visible) thread's run — runs in other threads keep going.
+  const RS = curRun();
+  if (!RS) return;
+  if (RS.kind === 'agent') {
+    // Agent runs are server-side: closing the events stream does NOT cancel the
+    // run, so tell the gateway to stop it first (best-effort), then abort.
+    if (_agentRun && _agentRun.runId && !_agentStopFired) {
+      _agentStopFired = true;
+      agentPostRunAction('stop').catch(() => {});
+    }
+    // If an approval modal is open, unblock it (deny, no POST — the stop above
+    // cancels the run) so the turn loop can unwind to the abort.
+    _agentAborted = true;
+    if (_agentApprovalResolve) {
+      const r = _agentApprovalResolve; _agentApprovalResolve = null; _agentApprovalPending = false;
+      r('deny');
+      document.getElementById('approvalModal')?.classList.remove('show');
+    }
   }
-  // If an approval modal is open, unblock it (deny, no POST — the stop above
-  // cancels the run) so the turn loop can unwind to the abort.
-  _agentAborted = true;
-  if (_agentApprovalResolve) {
-    const r = _agentApprovalResolve; _agentApprovalResolve = null; _agentApprovalPending = false;
-    r('deny');
-    document.getElementById('approvalModal')?.classList.remove('show');
-  }
-  if (abortController) abortController.abort();
+  if (RS.ac) RS.ac.abort();
 }
 
 // ── Edit user message + branch versions (llama.cpp/Qwen port) ──
@@ -4766,7 +5197,7 @@ function editMessage(btn) {
   if (isNaN(idx) || idx < 0 || idx >= conversationHistory.length) return;
   const msg = conversationHistory[idx];
   if (!msg || msg.role !== 'user') return;
-  if (isStreaming) stopGeneration();
+  if (curRun()) stopGeneration();
   msgEl.classList.add('editing');
   const bubble = msgEl.querySelector('.bubble');
   if (!bubble) return;
@@ -4789,7 +5220,7 @@ function saveMessageEdit(idx) {
   const ta = document.getElementById('editTa');
   const text = ta ? ta.value.trim() : '';
   if (!text) { showToast('Message cannot be empty'); return; }
-  if (isStreaming) stopGeneration();
+  if (curRun()) stopGeneration();
   const next = conversationHistory[idx + 1];
   const hadResponse = !!(next && next.role === 'assistant');
   if (hadResponse) {
@@ -4806,7 +5237,7 @@ function saveMessageEdit(idx) {
   saveCurrentChat();
   renderAllMessages();
   updateTokenBar();
-  if (hadResponse && !isStreaming) streamFromHistory();
+  if (hadResponse && !curRun()) streamFromHistory();
 }
 function ensureBranchBar() {
   // after a stream finalizes, stamp the ‹ n/N › pill onto the live response
@@ -5624,9 +6055,97 @@ async function agentChatSimpleTurn(ag, sessId, reuseExisting) {
   }
 }
 
-async function streamResponse() {
-  if (activeAgent()) { await agentRunTurn(); return; }   // agent mode: /v1/runs protocol (activity/approval/steer)
-  const messages = buildMessages();   // local-model path below (unchanged)
+async function streamResponse(S) {
+  const messages = buildMessages();   // local/cloud model path — never agent (streamFromHistory dispatches)
+  // ── Per-thread run isolation (2026-09-05) ─────────────────────────────
+  // Mutable stream state is LOCAL to this invocation: a concurrent run in another
+  // thread has its own copies and can't clobber these, and this run can't be
+  // affected by source/model flips elsewhere. The local shadow helpers below are
+  // the same logic as the module versions the (serialized) agent path uses.
+  const threadId = S.threadId;
+  let streamChatId = threadId;
+  let currentStreamingEl = null;
+  let msgStatsEl = null;
+  let msgStatsTimer = null;
+  let streamTokens = 0;
+  let streamChars = 0;
+  let streamThinkingChars = 0;
+  let streamContentChars = 0;
+  let streamStartTime = Date.now();
+  let msgFirstTokenTime = 0;
+  let msgRateSamples = [];
+  let currentModel = S.model;        // this thread's model — pinned at send
+  const abortController = S.ac;      // this run's own abort (stop hits only this run)
+  const badge = S.badge;             // this thread's conn badge — pinned at send
+  function displayModelBadge() { return badge; }
+  function estLiveTokens() {
+    return Math.max(streamTokens, Math.round(streamThinkingChars / 4 + streamContentChars / 2.6));
+  }
+  function liveBubble() {
+    // Resolve the streaming bubble per call: while this run's thread is on screen
+    // hit the visible placeholder (fresh after any re-render); otherwise the
+    // (detached) creation-time element — harmless writes, never touches the chat
+    // being read (2026-08-27 pattern, per-run).
+    if (currentChatId === threadId) {
+      const live = document.querySelector('.msg:last-of-type .bubble');
+      if (live) return live;
+    }
+    return currentStreamingEl;
+  }
+  function updateContentUI(fullText, thinking, inThinking) {
+    const el = liveBubble();
+    if (el) {
+      let html = '';
+      if (thinking) html += thinkingPillHTML(thinking, true);
+      html += escapeAndFormat(fullText);
+      el.innerHTML = html;
+      if (currentChatId === threadId) document.getElementById('chatArea').scrollTop = document.getElementById('chatArea').scrollHeight;
+    }
+  }
+  function updateThinkingUI(thinking, inThinking) {
+    if (inThinking) {
+      const el = agentContentEl(liveBubble());
+      if (!el) return;
+      let tb = el.querySelector('.thinking-block');
+      if (!tb) {
+        tb = document.createElement('div');
+        tb.className = 'thinking-block';
+        tb.innerHTML = `<span class="thinking-pill"><span class="tp-spinner"></span> reasoning <span class="tp-chev">▾</span></span><div class="thinking-content">${escHtml(thinking)}</div>`;
+        tb.addEventListener('click', () => tb.classList.toggle('open'));
+        el.appendChild(tb);
+      } else {
+        const content = tb.querySelector('.thinking-content');
+        if (content) content.textContent = thinking;
+      }
+      if (currentChatId === threadId) document.getElementById('chatArea').scrollTop = document.getElementById('chatArea').scrollHeight;
+    }
+  }
+  function updateStatsUI() {
+    // header live-stat pills track the VISIBLE thread's run only
+    if (currentChatId !== threadId) return;
+    const elapsed = (Date.now() - streamStartTime) / 1000;
+    if (elapsed > 0) {
+      const tokSec = (streamTokens / elapsed).toFixed(1);
+      const tokEl = document.getElementById('valTokSec');
+      const secEl = document.getElementById('statTokSec');
+      tokEl.textContent = tokSec;
+      if (tokSec > 0) secEl.classList.add('live');
+    }
+    document.getElementById('valTokens').textContent = streamTokens;
+    document.getElementById('statTokens').style.display = '';
+  }
+  function updateMsgStatsLive() {
+    if (!msgStatsEl) return;
+    const now = Date.now();
+    const elapsed = now - streamStartTime;
+    const tokens = estLiveTokens();
+    let tps = null;
+    if (msgFirstTokenTime > 0) {
+      const genMs = now - msgFirstTokenTime;
+      if (genMs > 0) tps = (tokens / genMs) * 1000;
+    }
+    msgStatsEl.innerHTML = statsBarHTML(tokens, elapsed, tps, true, badge);
+  }
   let responseDiv = appendStreamingMessage('assistant');
   const bubble = responseDiv.querySelector('.bubble');
   currentStreamingEl = bubble;
@@ -5652,32 +6171,61 @@ async function streamResponse() {
 
   try {
     let res;
-    // probe whenever the backend is NOT confirmed llama.cpp AND not definitively known
-    // otherwise — a probe that failed earlier (server restarting) must never leave the
-    // cap off; models owned_by already sets the flag in the common case (no throttle:
-    // throttling re-introduced exactly the blank-loop it was meant to prevent)
-    if (isLlamaCpp !== true && !_backendKnown) {
-      try { await detectBackend(); } catch (e) { isLlamaCpp = false; }
+    // Cloud threads (2026-09-05) go through the chat-server relay (/api/agent/chat —
+    // same OpenAI SSE shape, so the parser below is shared); local threads hit the
+    // API URL directly. The relay keeps cloud keys out of the browser → public repo.
+    // The provider is PINNED at send: flipping another thread's source mid-run must
+    // not reroute this stream (per-thread independence, 2026-09-05).
+    const cl = (S.kind === 'cloud' && CLOUD_CONNS[S.conn.provider]) ? CLOUD_CONNS[S.conn.provider] : null;
+    if (!cl) {
+      // probe whenever the backend is NOT confirmed llama.cpp AND not definitively known
+      // otherwise — a probe that failed earlier (server restarting) must never leave the
+      // cap off; models owned_by already sets the flag in the common case (no throttle:
+      // throttling re-introduced exactly the blank-loop it was meant to prevent)
+      if (isLlamaCpp !== true && !_backendKnown) {
+        try { await detectBackend(); } catch (e) { isLlamaCpp = false; }
+      }
+      res = await fetch(API_URL + '/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: currentModel || '',
+            messages: messages,
+            stream: true,
+            // 0 = unlimited: omit max_tokens so vLLM uses the model's full context
+            ...(MAX_TOKENS > 0 ? { max_tokens: MAX_TOKENS } : {}),
+            // Reasoning is launch/server-determined: the client sends NO
+            // chat_template_kwargs (2026-09-05 — removed the reasoning_effort:'low'
+            // cap and the thinking-off auto-retry; David's call)
+            temperature: TEMPERATURE,
+            top_p: TOP_P,
+            stream_options: { include_usage: true }
+          }),
+          signal: abortController.signal
+        });
+    } else {
+      if (!currentModel) throw new Error('Pick a ' + cl.name + ' model in the header pill first');
+      res = await fetch('/api/agent/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: S.conn.provider, url: (cl.url || '').trim(), key: (cl.key || '').trim(),
+            model: currentModel,
+            messages: messages,
+            stream: true,
+            include_usage: true,
+            ...(MAX_TOKENS > 0 ? { max_tokens: MAX_TOKENS } : {}),
+            temperature: TEMPERATURE,
+            top_p: TOP_P
+          }),
+          signal: abortController.signal
+        });
     }
-    res = await fetch(API_URL + '/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: currentModel || '',
-          messages: messages,
-          stream: true,
-          // 0 = unlimited: omit max_tokens so vLLM uses the model's full context
-          ...(MAX_TOKENS > 0 ? { max_tokens: MAX_TOKENS } : {}),
-          // Reasoning is launch/server-determined: the client sends NO
-          // chat_template_kwargs (2026-09-05 — removed the reasoning_effort:'low'
-          // cap and the thinking-off auto-retry; David's call)
-          temperature: TEMPERATURE,
-          top_p: TOP_P,
-          stream_options: { include_usage: true }
-        }),
-        signal: abortController.signal
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    if (!res.ok) {
+      let emsg = `HTTP ${res.status}: ${res.statusText}`;
+      try { const je = await res.json(); if (je && je.error) emsg = String(je.error).slice(0, 300); } catch (_) {}
+      throw new Error(emsg);
+    }
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -6395,6 +6943,7 @@ function exportChat() {   // header button — current chat only
     created: stored ? stored.created : Date.now(),
     messages: JSON.parse(JSON.stringify(conversationHistory)),
     ...(SYSTEM_PROMPT ? { systemPrompt: SYSTEM_PROMPT } : {}),
+    ...(activeConn ? { conn: JSON.parse(JSON.stringify(activeConn)) } : {}),
     ...(stored && stored.renamed ? { renamed: true } : {}),
     ...(stored && stored.pinned ? { pinned: true } : {})
   };
@@ -6478,6 +7027,7 @@ function importChatsFromFile(input) {
       created: c.created || Date.now(),
       messages: c.messages,
       ...(c.systemPrompt !== undefined ? { systemPrompt: c.systemPrompt } : {}),
+      ...(c.conn !== undefined ? { conn: c.conn } : {}),
       ...(c.renamed ? { renamed: true } : {}),
       ...(c.pinned ? { pinned: true } : {})
     }));
@@ -6552,9 +7102,10 @@ updateSysPromptBar(); updateTokenBar();
 })();
 initChatBg();   // chat background (image / URL / YouTube / color + overlay) — restores last state
 // ── Agent connect boot (2026-09-04) ──
-updatePill();                 // pill label reflects chat_source (agent vs local)
+updatePill();                 // pill label reflects chat_source (agent vs local vs cloud)
 refreshStatusPill();
 pingAllAgents();              // fills connected-agent rows in the source dropdown + header status
+if (activeCloud() && cloudConfigured(activeCloud().id)) pingAgent(activeCloud().id);   // cloud status + rows (2026-09-05)
 document.addEventListener('click', (e) => {
   const src = document.getElementById('sourceMenu');
   const pill = document.getElementById('modelPill');
@@ -6565,7 +7116,12 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSourc
 // renderSourceMenu). Agent rows carry inline onclick (fixed ids like hermes/pi).
 document.addEventListener('click', (e) => {
   const row = e.target.closest && e.target.closest('#sourceMenu .src-item[data-src="model"]');
-  if (row) { selectModel(row.dataset.val); e.stopPropagation(); }
+  if (row) { selectModel(row.dataset.val); e.stopPropagation(); return; }
+  // Cloud rows (2026-09-05): data-prov = deepseek|openrouter, data-val = model id
+  const crow = e.target.closest && e.target.closest('#sourceMenu .src-item[data-src="cloud"]');
+  if (crow) { pickCloud(crow.dataset.prov, crow.dataset.val); e.stopPropagation(); return; }
+  const ccrow = e.target.closest && e.target.closest('#sourceMenu .src-item[data-src="cloudcustom"]');
+  if (ccrow) { customCloudModel(ccrow.dataset.prov); e.stopPropagation(); return; }
 });
 </script>
 </body>
