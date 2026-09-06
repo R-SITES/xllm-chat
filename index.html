@@ -703,7 +703,7 @@ function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.1.9</span>
+    <span class="footer-version">xLLM Chat v3.2.0</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -3084,7 +3084,7 @@ let TOP_P = parseFloat(localStorage.getItem('chat_top_p') || '0.9');
 let currentModel = localStorage.getItem('chat_current_model') || '';
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.1.9';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.2.0';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -6484,10 +6484,16 @@ async function streamResponse(S) {
   // - llama.cpp w/o per-chunk timings (older builds): also 1 token/event.
   // - local vLLM: MTP batches ~4-5 tokens per SSE event (measured on B70), so
   //   event count undercounts ~5x -> char estimate; residual drift is absorbed
-  //   by benchCalibrateTail at finalize.
+  //   by benchCalibrateSeries at finalize.
   function liveTokensNow() {
     if (srvLiveT && srvLiveT.predicted_n > 0) return srvLiveT.predicted_n;
-    if (S.kind === 'cloud') return streamTokens;
+    // Cloud (2026-09-06 fix): real providers BATCH deltas — a live DeepSeek run
+    // measured ~36 tokens per SSE event (19,007 usage tokens in ~500 events), so
+    // event count under-reads ~30-40x and the bench y-axis showed 0-9 while the
+    // model pushed ~199 t/s. The char estimate tracks true throughput within
+    // ~10-25%; residual drift lands exactly on the usage rate via the
+    // benchCalibrateSeries finalize step, so no far-right spike either.
+    if (S.kind === 'cloud') return estLiveTokens();
     if (isLlamaCpp === true) return streamTokens;
     return estLiveTokens();
   }
@@ -6862,7 +6868,8 @@ async function streamResponse(S) {
     if (msgStatsTimer) { clearInterval(msgStatsTimer); msgStatsTimer = null; }
     const totalMs = Date.now() - streamStartTime;
     const genMs = msgFirstTokenTime > 0 ? Date.now() - msgFirstTokenTime : totalMs;
-    const exactTokens = (finalUsage && finalUsage.completion_tokens > 0) ? finalUsage.completion_tokens : streamTokens;
+    const exactTokens = (finalUsage && finalUsage.completion_tokens > 0) ? finalUsage.completion_tokens
+      : (S.kind === 'cloud' ? Math.max(streamTokens, estLiveTokens()) : streamTokens);
     // Final decode t/s — llama.cpp's OWN chat formula: predicted_n / predicted_ms
     // * 1000 (cumulative since decode start, exact server counters). NOT the
     // server's predicted_per_second convenience field, which divides (n-1)/ms.
@@ -6879,15 +6886,15 @@ async function streamResponse(S) {
     let promptTps = null;
     if (serverTimings && serverTimings.prompt_n > 0 && serverTimings.prompt_ms > 0) promptTps = serverTimings.prompt_n / serverTimings.prompt_ms * 1000;
     else if (promptN > 0 && ttfMs > 0) promptTps = promptN / (ttfMs / 1000);
-    // Terminal calibration (2026-09-06): if the live series was an ESTIMATE
-    // (local vLLM MTP batches tokens per SSE event — no per-token truth), its
-    // last point can sit ~10-25% off the exact final decode rate. Ramp the tail
-    // so the curve ENDS at the measured rate with no hard snap / "sharp
-    // increase at the far right". llama.cpp + cloud streams are exact per-token,
-    // so |diff| ~0 and benchCalibrateTail is a no-op for them.
+    // Terminal calibration (2026-09-06): the live series is an ESTIMATE on every
+    // non-llama.cpp path (char-based), so its end can sit 10-65% off the exact
+    // final decode rate. Calibrate the WHOLE series proportionally (shape
+    // preserved) so the curve's body AND end land on the measured rate with no
+    // hard snap / "sharp increase at the far right". llama.cpp + cloud streams
+    // are exact, so |diff| ~0 and benchCalibrateSeries is a no-op for them.
     if (benchSamples.length >= 3 && exactTps > 0) {
       const lastY = benchSamples[benchSamples.length - 1][1];
-      if (lastY > 0 && Math.abs(exactTps - lastY) / lastY > 0.02) benchCalibrateTail(benchSamples, exactTps);
+      if (lastY > 0 && Math.abs(exactTps - lastY) / lastY > 0.02) benchCalibrateSeries(benchSamples, exactTps);
     }
     // snap the series' last point to the EXACT final decode speed
     if (benchSamples.length) {
@@ -7617,21 +7624,24 @@ function benchFmtCtxPct(used, win) {
   if (used === null || used === undefined || !(win > 0)) return '';
   return ' · ' + ((100 * used / win).toFixed(1)) + '%';
 }
-function benchCalibrateTail(samples, exactTps) {
-  // Smooth the last half of the series (4-16 samples) from its current end
-  // value up/down to the exact final decode t/s using a smoothstep ramp, so the
-  // bench graph terminates ON the measured rate instead of hard-snapping a
-  // disconnected point (the "sharp increase at the far right"). Only called
-  // when the live series was an estimate and drifted >2% from the exact final.
+function benchCalibrateSeries(samples, exactTps) {
+  // Whole-series calibration to the exact final decode rate (2026-09-06, second
+  // pass): the live estimate's error is PROPORTIONAL to its source (a chars/token
+  // divisor offset, an event-batch undercount...) and roughly CONSTANT across the
+  // run, so the fix is a single proportional rescale of EVERY sample — the curve
+  // keeps its true shape, but its body AND its end now sit on the measured rate.
+  // (The old tail-only smoothstep ramp left a body at the wrong level when the
+  // estimate was systematically off — a cloud prose run read ~330 mid-graph with
+  // an exact 186 t/s end: "the numbers on the left don't match the gen speeds".)
+  // Only called when the live end drifted >2% from the exact final rate;
+  // llama.cpp + cloud 1:1 streams are exact and never reach here.
   const n = samples.length;
-  const win = Math.max(4, Math.min(16, Math.ceil(n * 0.5)));
-  const start = n - win;
-  const kEnd = exactTps / samples[n - 1][1];
-  for (let i = start; i < n; i++) {
-    const f = (i - start) / (win - 1);      // 0..1 across the window
-    const s = f * f * (3 - 2 * f);           // smoothstep
-    samples[i][1] *= (1 + (kEnd - 1) * s);
-  }
+  if (n < 3) return;
+  const lastY = samples[n - 1][1];
+  if (!(lastY > 0) || !(exactTps > 0)) return;
+  const k = exactTps / lastY;
+  if (k < 0.1 || k > 10) return;          // pathological — leave the series as-is
+  for (let i = 0; i < n; i++) samples[i][1] *= k;
 }
 function benchDownsample(arr, maxN) {
   if (!arr || !arr.length) return [];
@@ -7715,39 +7725,68 @@ function benchPromptSnippet() {
   }
   return '';
 }
-function benchSVGHTML(series) {
+function benchSVGHTML(series, finTps) {
   const W = 236, H = 88, L = 8, R = 6, T = 10, B = 15;
   if (!series || !series.length) return null;
   const tMax = Math.max(100, series[series.length - 1][0]);
-  let vMax = 0.01;
-  for (const p of series) if (p[1] > vMax) vMax = p[1];
-  const scale = vMax * 1.15;
+  let rawMax = 0.01;
+  for (const p of series) if (p[1] > rawMax) rawMax = p[1];
+  // Stale-series repair (2026-09-06): series recorded before the calibration
+  // fix can be a FLAT UNDER-MEASURE — cloud runs counted SSE events as tokens
+  // (~500 events) while usage said 19,007, so the y-axis read 0-9 while the
+  // model pushed ~199 t/s. When the series' own max sits far below the
+  // message's FINAL decode rate (impossible for current data — finalize
+  // calibrates to the exact rate), top-anchor the series onto that rate so the
+  // axis + line reflect the throughput the model really pushed. Live runs skip
+  // the repair (finTps = 0).
+  if (finTps > 0 && series.length >= 2 && rawMax < finTps * 0.6) {
+    const k = finTps / rawMax;
+    series = series.map(p => [p[0], p[1] * k]);
+    rawMax = finTps;
+  }
+  // Axis scale (2026-09-06, 2nd pass): the left-hand numbers must read against
+  // the speed the model is REALLY pushing, not against a transient burst — a
+  // single early arrival-burst sample (DeepSeek flushes big first deltas) used
+  // to stretch a ~186 t/s run onto a 0-770 axis. Scale from the max of:
+  //   • the 90th percentile of samples (sustained peaks count; isolated
+  //     sub-second burst spikes don't — a real faster phase still raises it),
+  //   • the exact final decode rate (or the live/current rate on live runs).
+  // Values above the axis top pin to the top gridline instead of blowing the
+  // scale out (clamped below), so the curve stays readable end to end.
+  const n = series.length;
+  let robust = rawMax;
+  if (n >= 8) {
+    const ys = series.map(p => p[1]).sort((a, b) => a - b);
+    robust = ys[Math.min(n - 1, Math.floor(n * 0.9))];
+  }
+  const anchor = (finTps > 0) ? finTps : (n >= 5 ? series[n - 1][1] : rawMax);
+  const scale = Math.max(robust, anchor, 0.01) * 1.15;
   const X = (t) => L + (t / tMax) * (W - L - R);
-  const Y = (v) => T + (1 - v / scale) * (H - T - B);
-  const fmtAx = (v) => (v >= 100 ? String(Math.round(v)) : (+v.toFixed(1)) + '');
+  const YY = (v) => Math.max(T, T + (1 - v / scale) * (H - T - B));  // pin above-scale at the top gridline
+  const fmtAx = (v) => (v >= 20 ? String(Math.round(v)) : (+v.toFixed(1)) + '');
   let s = '<svg class="bench-svg" viewBox="0 0 ' + W + ' ' + H + '">';
   s += '<defs><linearGradient id="benchFill" x1="0" y1="0" x2="0" y2="1"><stop class="b0" offset="0"/><stop class="b1" offset="1"/></linearGradient></defs>';
   // y gridlines (0..scale in 4 steps) + x time labels
   for (let i = 0; i <= 4; i++) {
-    const v = scale * i / 4, y = Y(v);
+    const v = scale * i / 4, y = YY(v);
     s += '<line class="grid" x1="' + L + '" y1="' + y + '" x2="' + (W - R) + '" y2="' + y + '"/>';
     s += '<text x="' + (L - 3) + '" y="' + (y + 2.6) + '" text-anchor="end">' + fmtAx(v) + '</text>';
   }
   s += '<text x="' + L + '" y="' + (H - 3) + '">0s</text>';
   s += '<text x="' + (W - R) + '" y="' + (H - 3) + '" text-anchor="end">' + (+(tMax / 1000).toFixed(1)) + 's</text>';
-  s += '<line class="axisline" x1="' + L + '" y1="' + Y(0) + '" x2="' + (W - R) + '" y2="' + Y(0) + '"/>';
+  s += '<line class="axisline" x1="' + L + '" y1="' + YY(0) + '" x2="' + (W - R) + '" y2="' + YY(0) + '"/>';
   if (series.length >= 2) {
-    let d = '', da = 'M' + X(series[0][0]) + ',' + Y(0);
+    let d = '', da = 'M' + X(series[0][0]) + ',' + YY(0);
     for (let i = 0; i < series.length; i++) {
-      d += (i === 0 ? 'M' : 'L') + (+X(series[i][0]).toFixed(1)) + ',' + (+Y(series[i][1]).toFixed(1));
-      da += 'L' + (+X(series[i][0]).toFixed(1)) + ',' + (+Y(series[i][1]).toFixed(1));
+      d += (i === 0 ? 'M' : 'L') + (+X(series[i][0]).toFixed(1)) + ',' + (+YY(series[i][1]).toFixed(1));
+      da += 'L' + (+X(series[i][0]).toFixed(1)) + ',' + (+YY(series[i][1]).toFixed(1));
     }
-    da += 'L' + (+X(series[series.length - 1][0]).toFixed(1)) + ',' + Y(0) + 'Z';
+    da += 'L' + (+X(series[series.length - 1][0]).toFixed(1)) + ',' + YY(0) + 'Z';
     s += '<path class="area" d="' + da + '"/>';
     s += '<path class="pline" d="' + d + '"/>';
   }
   const lp = series[series.length - 1];
-  s += '<circle class="pdot" cx="' + (+X(lp[0]).toFixed(1)) + '" cy="' + (+Y(lp[1]).toFixed(1)) + '" r="3"/>';
+  s += '<circle class="pdot" cx="' + (+X(lp[0]).toFixed(1)) + '" cy="' + (+YY(lp[1]).toFixed(1)) + '" r="3"/>';
   s += '</svg>';
   return s;
 }
@@ -7771,7 +7810,7 @@ function benchHTML(v) {
   const headV = (v.tps !== null && v.tps !== undefined) ? v.tps
     : (v.series && v.series.length ? v.series[v.series.length - 1][1] : null);
   let graphHtml = '';
-  const svg = benchSVGHTML(v.series);
+  const svg = benchSVGHTML(v.series, (v.live ? 0 : v.tps));
   if (svg) graphHtml = svg;
   else if (v.live) graphHtml = '<div class="bench-empty">waiting for first token…</div>';
   else if (v.hasAny) graphHtml = '<div class="bench-empty">no speed samples<br>recorded for this run</div>';
