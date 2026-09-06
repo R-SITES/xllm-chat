@@ -320,7 +320,8 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .sidebar{position:fixed;top:0;left:0;bottom:0;width:280px;background:var(--bg);border-right:1px solid var(--border);z-index:999;transform:translateX(-100%);transition:transform .2s;display:flex;flex-direction:column}
 .sidebar.open{transform:translateX(0)}
 .sidebar-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)}
-.sidebar-header h3{font-size:14px;font-weight:600}
+.sidebar-header h3{font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px;min-width:0;line-height:1}
+.sidebar-header h3 img,.header-left h1 img{width:35px;height:35px;flex-shrink:0;display:block}
 .sidebar-header button{background:none;border:none;color:var(--dim);cursor:pointer;font-size:18px;padding:4px}
 .sidebar-header button:hover{color:var(--text)}
 .sidebar-header-left{display:flex;align-items:center;gap:2px;min-width:0}
@@ -360,6 +361,21 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 #bgOv1{background:var(--bgOv1,#000)}
 #bgOv2{background:var(--bgOv2,#000);animation:bgCrossfade 10s ease-in-out infinite alternate}
 @keyframes bgCrossfade{0%{opacity:0}45%{opacity:0}55%{opacity:1}100%{opacity:1}}
+/* Video-only scrim (2026-09-06): a child INSIDE #chatBg appended after the video/slide layers —
+   guaranteed over the background and under every chat surface (bubbles, plates, input, header),
+   because it can never escape #chatBg's z-index:0 stacking context. Same dual-color crossfade
+   as the top overlay, confined to the background. */
+#chatBg .bg-vid-ov{position:absolute;inset:0;pointer-events:none}
+#chatBg .bg-vid-ov .vov1,#chatBg .bg-vid-ov .vov2{position:absolute;inset:0}
+#chatBg .bg-vid-ov .vov1{background:var(--vidOv1,#000)}
+#chatBg .bg-vid-ov .vov2{background:var(--vidOv2,#000);animation:bgCrossfade 10s ease-in-out infinite alternate}
+/* Blue glass layer (2026-09-06): a frosted blue pane OVER the background, UNDER the chat —
+   appended LAST inside #chatBg so it stacks above the video-overlay tint. Translucent accent
+   blue + backdrop blur (real frosted blur over same-document image/URL bgs; over a YouTube
+   iframe the browser can't sample the cross-origin video, so it reads as a blue glass veil —
+   same visual family as the frosted chrome). Opacity AND blur radius both scale with the Glass
+   slider (0 = clear/crisp, 100 = heavy frost) — applyBgGlass sets backdrop-filter inline. */
+#chatBg .bg-glass{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(186,216,255,.30),rgba(88,166,255,.66));backdrop-filter:blur(12px) saturate(1.35);-webkit-backdrop-filter:blur(12px) saturate(1.35)}
 /* Image slideshow layers (2026-09-05): two stacked full-screen layers crossfade via the
    base opacity transition; the incoming layer additionally slides/zooms via a per-frame
    animation class when the chosen transition isn't a plain crossfade. */
@@ -477,6 +493,22 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
 .bg-note{font-size:11px;color:var(--dim);opacity:.8;line-height:1.45}
 .bg-ov-toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);cursor:pointer;margin-top:10px}
 .bg-ov-toggle input{accent-color:var(--accent)}
+/* LLM Connections — DeepSeek key row + in-pane model list (2026-09-06) */
+.ds-key-row{display:flex;gap:8px;align-items:flex-end}
+.ds-key-row input{flex:1;min-width:0}
+.ds-refresh{width:38px;height:36px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;background:var(--bg3);border:1px solid var(--border);color:var(--dim);border-radius:8px;cursor:pointer;transition:all .15s}
+.ds-refresh:hover{background:var(--accentBg);color:var(--accent);border-color:var(--accentLine)}
+.ds-refresh:disabled{opacity:.5;cursor:default}
+.ds-refresh svg{width:16px;height:16px}
+.ds-refresh.spinning svg{animation:tp-spin .8s linear infinite}
+.ds-model-list{margin-top:6px;display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px;background:var(--bg);scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.ds-model-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;border:1px solid transparent;transition:background .12s}
+.ds-model-item:hover{background:var(--accentBg);border-color:var(--accentLine)}
+.ds-model-item.active{background:var(--accentBg);border-color:var(--accentLine);color:var(--accent)}
+.ds-model-item.dim{color:var(--dim);cursor:default}
+.ds-model-item.dim:hover{background:none;border-color:transparent}
+.dm-check{width:16px;flex-shrink:0;color:var(--accent);font-size:11px}
+.dm-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:11px;line-height:1.4}
 .new-chat-btn{width:100%;padding:10px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:13px;cursor:pointer;font-family:var(--font);margin-bottom:12px;transition:opacity .15s}
 .new-chat-btn:hover{opacity:.85}
 .sidebar-footer{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 10px;border-top:1px solid var(--border);color:var(--dim);font-size:11px;text-align:center;flex-shrink:0}
@@ -568,7 +600,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
 <div class="sidebar" id="sidebar">
   <div class="sidebar-header">
     <div class="sidebar-header-left">
-      <h3>xLLM Chat History</h3>
+      <h3><img src="favicon-48.png" alt="xLLM" width="35" height="35">Chat History</h3>
       <button class="pin-sidebar-btn" id="pinSidebarBtn" onclick="toggleSidebarPin()" title="Keep panel open"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg></button>
     </div>
     <button onclick="toggleSidebar()">×</button>
@@ -586,7 +618,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.1.3</span>
+    <span class="footer-version">xLLM Chat v3.1.4</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -596,7 +628,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
 <div class="header">
   <div class="header-left">
     <button class="sidebar-toggle" onclick="toggleSidebar()" title="Chat History">☰</button>
-    <h1><span>💬</span> Chat</h1>
+    <h1><img src="favicon-48.png" alt="xLLM" width="35" height="35"></h1>
   </div>
   <div class="header-center">
     <span class="stat-item" id="statTokSec" style="display:none">
@@ -796,11 +828,35 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
         <input type="color" id="bgOv2Pick" oninput="setBgOvColor(2,this.value)">
       </div>
       <div class="bg-slider-row">
-        <label>Transparency</label>
+        <label>Intensity</label>
         <input type="range" id="bgOvAlpha" min="0" max="100" value="35" oninput="setBgOvAlpha(this.value)">
         <span class="val" id="bgOvAlphaVal">35%</span>
       </div>
-      <div class="bg-note">The two colors crossfade over the background. Transparency 0 = no tint, 100 = fully opaque.</div>
+      <div class="bg-note">The two colors crossfade over the WHOLE window — video and chat included. Intensity 0 = no tint, 100 = strongest wash.</div>
+    </div>
+    <label class="bg-ov-toggle"><input type="checkbox" id="bgVidOvToggle" onchange="setBgVidOv(this.checked)"> Video Overlay (behind the chat, over the video)</label>
+    <div class="bg-opt" id="bgOptVidOv" hidden>
+      <div class="bg-color-row">
+        <label>Color 1</label>
+        <input type="color" id="bgVidOv1Pick" oninput="setBgVidOvColor(1,this.value)">
+        <label style="width:auto;margin-left:12px">Color 2</label>
+        <input type="color" id="bgVidOv2Pick" oninput="setBgVidOvColor(2,this.value)">
+      </div>
+      <div class="bg-slider-row">
+        <label>Transparency</label>
+        <input type="range" id="bgVidOvAlpha" min="0" max="100" value="35" oninput="setBgVidOvAlpha(this.value)">
+        <span class="val" id="bgVidOvAlphaVal">35%</span>
+      </div>
+      <div class="bg-note">The two colors crossfade over the video only — the chat flow and input stay crisp above it. Transparency 0 = no tint, 100 = fully opaque.</div>
+    </div>
+    <label class="bg-ov-toggle"><input type="checkbox" id="bgGlassToggle" onchange="setBgGlass(this.checked)"> Glass Overlay (blue frosted glass — over the video, behind the chat)</label>
+    <div class="bg-opt" id="bgOptGlass" hidden>
+      <div class="bg-slider-row">
+        <label>Glass</label>
+        <input type="range" id="bgGlassVal" min="0" max="100" value="40" oninput="setBgGlassVal(this.value)">
+        <span class="val" id="bgGlassValVal">40%</span>
+      </div>
+      <div class="bg-note">A frosted blue pane over the video — down toward 0 clears it (crisp video), up intensifies the blue glass and frost. Stacks with the Video Overlay tint.</div>
     </div>
     <label>Chat Bubble Font</label>
     <div class="bg-slider-row">
@@ -824,12 +880,17 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
       <label>Base URL</label>
       <input type="text" id="dsUrl" placeholder="https://api.deepseek.com/v1" spellcheck="false">
       <label>API Key</label>
-      <input type="password" id="dsKey" autocomplete="off" placeholder="sk-…">
+      <div class="ds-key-row">
+        <input type="password" id="dsKey" autocomplete="off" placeholder="sk-…" oninput="cloudKeyTyped('deepseek')">
+        <button class="ds-refresh" id="dsRefreshBtn" onclick="refreshCloudModels('deepseek')" title="Fetch the model list from this API" style="display:none" aria-label="Refresh DeepSeek model list"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
+      </div>
       <div class="voice-row">
         <span class="agent-status" id="dsStatus"><span class="status-dot"></span><span>Not tested</span></span>
         <button class="bg-btn" id="dsTestBtn" onclick="testCloudConn('deepseek')">Test</button>
       </div>
-      <div class="bg-note">DeepSeek's model API. Keys are stored only in this browser (never in the app files). After Save, the header pill's DeepSeek group lists its models.</div>
+      <label style="margin-top:12px">Models <span class="conn-sub">— click one to chat with it</span></label>
+      <div class="ds-model-list" id="dsModelList"></div>
+      <div class="bg-note">DeepSeek's model API. Keys are stored only in this browser (never in the app files). Enter your key, then hit the ↻ button to pull DeepSeek's current model list from the API — no Save needed. The header pill's DeepSeek group lists the same models.</div>
     </div>
     <div class="conn-pane" id="ctOpenrouter" hidden>
       <label>Base URL</label>
@@ -2933,7 +2994,7 @@ let TOP_P = parseFloat(localStorage.getItem('chat_top_p') || '0.9');
 let currentModel = localStorage.getItem('chat_current_model') || '';
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.1.3';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.1.4';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -3127,10 +3188,12 @@ function refreshStatusPill() {
 }
 let cloudModels = { deepseek: null, openrouter: null };   // null = not fetched yet; [] = fetched but empty
 let cloudFetching = {};
+let cloudFallback = { deepseek: false, openrouter: false };   // true = /models unreachable, showing the known set
 function ensureCloudModels(p) {
   if (!cloudConfigured(p) || cloudModels[p] || cloudFetching[p]) return cloudModels[p];
   const c = CLOUD_CONNS[p];
   cloudFetching[p] = true;
+  renderDsModels(p);
   return fetch('/api/agent/models', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: p, url: (c.url || '').trim(), key: (c.key || '').trim() })
@@ -3138,6 +3201,7 @@ function ensureCloudModels(p) {
     cloudFetching[p] = false;
     if (d && d.ok && Array.isArray(d.models)) {
       cloudModels[p] = d.models.slice(0, 300).map(m => ({ id: m.id, ctx: m.ctx || 0 }));
+      cloudFallback[p] = false;
     } else {
       // DeepSeek's public model set is stable — fall back so the thread is usable
       // even when /models is unreachable or the key rejects it; OpenRouter has no
@@ -3145,17 +3209,76 @@ function ensureCloudModels(p) {
       cloudModels[p] = (p === 'deepseek')
         ? [{ id: 'deepseek-chat', ctx: 128000 }, { id: 'deepseek-reasoner', ctx: 128000 }]
         : [];
+      cloudFallback[p] = true;
     }
     if (!document.getElementById('sourceMenu').hidden) renderSourceMenu();
+    renderDsModels(p);
     return cloudModels[p];
   }).catch(() => {
     cloudFetching[p] = false;
     cloudModels[p] = (p === 'deepseek')
       ? [{ id: 'deepseek-chat', ctx: 128000 }, { id: 'deepseek-reasoner', ctx: 128000 }]
       : [];
+    cloudFallback[p] = true;
     if (!document.getElementById('sourceMenu').hidden) renderSourceMenu();
+    renderDsModels(p);
     return cloudModels[p];
   });
+}
+// ── LLM Connections: DeepSeek in-pane model list + refresh (2026-09-06, David's ask) ──
+// ↻ appears once the API key has text; clicking forces a fresh /models fetch through the
+// proxy (typed URL/key are applied first — Save stays optional) and lists what the API
+// returned. Clicking a row picks it for THIS thread (same path as the header pill).
+function cloudKeyTyped(p) {
+  const keyEl = document.getElementById(p === 'deepseek' ? 'dsKey' : 'orKey');
+  const btn = document.getElementById(p === 'deepseek' ? 'dsRefreshBtn' : null);
+  if (!keyEl) return;
+  const has = String(keyEl.value || '').length > 0;
+  if (btn) btn.style.display = has ? 'inline-flex' : 'none';
+  if (p === 'deepseek') renderDsModels('deepseek');
+}
+function refreshCloudModels(p) {
+  const c = CLOUD_CONNS[p];
+  const url = document.getElementById(p === 'deepseek' ? 'dsUrl' : 'orUrl').value.trim();
+  const key = document.getElementById(p === 'deepseek' ? 'dsKey' : 'orKey').value;
+  const btn = document.getElementById(p === 'deepseek' ? 'dsRefreshBtn' : null);
+  if (!url) { showToast('Enter the ' + c.name + ' base URL first', null, true); return; }
+  if (!key) { showToast('Enter the ' + c.name + ' API key first', null, true); return; }
+  // apply the typed config (Save optional) so the proxy + pickers use it
+  CLOUD_CONNS[p].url = url; CLOUD_CONNS[p].key = key; saveCloudConns();
+  cloudModels[p] = null; cloudFetching[p] = false; cloudFallback[p] = false;
+  if (btn) { btn.disabled = true; btn.classList.add('spinning'); }
+  ensureCloudModels(p).then(() => { if (btn) { btn.disabled = false; btn.classList.remove('spinning'); } });
+}
+function pickDsModel(id) { pickCloud('deepseek', id); renderDsModels('deepseek'); }
+function renderDsModels(p) {
+  const listEl = document.getElementById(p === 'deepseek' ? 'dsModelList' : null);
+  if (!listEl) return;
+  const c = CLOUD_CONNS[p];
+  const keyEl = document.getElementById(p === 'deepseek' ? 'dsKey' : 'orKey');
+  const hasKey = !!keyEl && String(keyEl.value || '').length > 0;
+  let html = '';
+  if (!hasKey) {
+    html = '<div class="ds-model-item dim"><span class="dm-check"></span><span class="dm-name">Enter your API key above, then hit ↻ to fetch the model list.</span></div>';
+  } else if (cloudFetching[p]) {
+    html = '<div class="ds-model-item dim"><span class="tp-spinner"></span><span class="dm-name">Fetching ' + escHtml(c.name) + ' models…</span></div>';
+  } else if (!cloudModels[p]) {
+    html = '<div class="ds-model-item dim"><span class="dm-check"></span><span class="dm-name">Press ↻ to pull the model list from the API.</span></div>';
+  } else {
+    const cloudNow = activeCloud();
+    const cap = p === 'openrouter' ? 60 : cloudModels[p].length;
+    let n = 0;
+    for (const m of cloudModels[p]) {
+      if (n >= cap) break;
+      const active = !!cloudNow && cloudNow.id === p && currentModel === m.id;
+      html += '<div class="ds-model-item' + (active ? ' active' : '') + '" data-model="' + escAttr(m.id) + '" onclick="pickDsModel(this.dataset.model)" title="' + escAttr(m.id) + '"><span class="dm-check">' + (active ? '✓' : '') + '</span><span class="dm-name">' + escHtml(m.id) + '</span></div>';
+      n++;
+    }
+    if (cloudFallback[p] && p === 'deepseek') {
+      html += '<div class="ds-model-item dim"><span class="dm-check"></span><span class="dm-name">/models unreachable — showing the known set</span></div>';
+    }
+  }
+  listEl.innerHTML = html;
 }
 function renderSourceMenu() {
   const mlist = document.getElementById('srcModelList');
@@ -3915,6 +4038,8 @@ function openSettings() {
   document.getElementById('dsKey').value = CLOUD_CONNS.deepseek.key || '';
   document.getElementById('orUrl').value = CLOUD_CONNS.openrouter.url || '';
   document.getElementById('orKey').value = CLOUD_CONNS.openrouter.key || '';
+  cloudKeyTyped('deepseek'); cloudKeyTyped('openrouter');   // ↻ visibility follows a present key
+  renderDsModels('deepseek'); renderDsModels('openrouter');
   document.getElementById('setSysPrompt').value = SYSTEM_PROMPT;
   document.getElementById('setMaxTokens').value = MAX_TOKENS;
   document.getElementById('setTemp').value = TEMPERATURE;
@@ -3943,6 +4068,7 @@ function connTab(kind) {
     const el = document.getElementById(panes[k]);
     if (el) el.hidden = (k !== kind);
   }
+  if (kind === 'deepseek') renderDsModels('deepseek');   // fresh states on tab switch
 }
 function cloudStatusLine(provider) {
   const map = { deepseek: 'dsStatus', openrouter: 'orStatus' };
@@ -3977,10 +4103,12 @@ async function testCloudConn(provider) {
       CLOUD_CONNS[provider].url = url; CLOUD_CONNS[provider].key = key;
       saveCloudConns();
       cloudModels[provider] = null;   // re-list models against the new endpoint
+      cloudFallback[provider] = false;
       agentState[provider] = { connected: true, error: '' };
       st.className = 'agent-status ok';
       st.querySelector('.status-dot').className = 'status-dot ok';
       st.querySelector('span:last-child').textContent = 'Connected';
+      renderDsModels(provider);   // models were cleared — list now prompts ↻
       showToast(c.name + ' connected');
     } else {
       agentState[provider] = { connected: false, error: d.error || ('HTTP ' + (d.status || '?')) };
@@ -4006,9 +4134,10 @@ function saveSettings() {
   CLOUD_CONNS.openrouter.url = orUrl; CLOUD_CONNS.openrouter.key = orKey;
   saveCloudConns();
   if (dsChanged || orChanged) {
-    if (dsChanged) { cloudModels.deepseek = null; if (dsUrl && dsKey) pingAgent('deepseek'); else delete agentState.deepseek; }
-    if (orChanged) { cloudModels.openrouter = null; if (orUrl && orKey) pingAgent('openrouter'); else delete agentState.openrouter; }
+    if (dsChanged) { cloudModels.deepseek = null; cloudFallback.deepseek = false; if (dsUrl && dsKey) pingAgent('deepseek'); else delete agentState.deepseek; }
+    if (orChanged) { cloudModels.openrouter = null; cloudFallback.openrouter = false; if (orUrl && orKey) pingAgent('openrouter'); else delete agentState.openrouter; }
   }
+  renderDsModels('deepseek');   // list reflects the saved config (cleared -> ↻ prompt)
   SYSTEM_PROMPT = document.getElementById('setSysPrompt').value;
   const mt = parseInt(document.getElementById('setMaxTokens').value);
   MAX_TOKENS = (!isNaN(mt) && mt > 0) ? mt : 0;
@@ -4039,11 +4168,14 @@ function saveSettings() {
 }
 
 // ---- Chat Background (2026-08-27): image / image-URL / YouTube (muted autoplay, playlists) /
-// color, plus a crossfading dual-color overlay. Persisted under chat_bg_*; applies LIVE, no Save.
+// color, plus overlay layers INSIDE/ABOVE #chatBg: "Overlay" (whole-window wash ABOVE the chat,
+// slider = Intensity), "Video Overlay" (dual-color scrim over bg, UNDER chat), and "Glass Overlay"
+// (frosted blue pane, topmost inside #chatBg — over the video + tint, under the chat).
+// Persisted under chat_bg_*; applies LIVE, no Save.
 // 2026-09-05: the Image type is now a multi-image SLIDESHOW — frames stored in IndexedDB
 // (hi-res dataURLs blow localStorage), transitions picked per frame (Random/Crossfade/Slide/Zoom),
 // per-slide dwell set by the timer input (slideSec seconds).
-const BG_DEFAULTS = { type: 'none', image: null, url: '', yt: '', color: '#0d1117', colorAlpha: 0, overlayOn: false, ov1: '#000000', ov2: '#000000', ovAlpha: 35, transition: 'fade', slideSec: 5 };
+const BG_DEFAULTS = { type: 'none', image: null, url: '', yt: '', color: '#0d1117', colorAlpha: 0, overlayOn: false, ov1: '#000000', ov2: '#000000', ovAlpha: 35, vidOvOn: false, vOv1: '#000000', vOv2: '#000000', vOvAlpha: 35, glassOn: false, glassVal: 40, transition: 'fade', slideSec: 5 };
 let BG = Object.assign({}, BG_DEFAULTS);
 BG.slides = [];                    // slideshow frames [{name,data}] — IndexedDB-backed, NOT in BG_DEFAULTS/localStorage
 let bgSlidesLoaded = false;        // true once IndexedDB frames are hydrated (legacy chat_bg_image is the fallback until then)
@@ -4149,6 +4281,33 @@ function applyChatBg() {
     }
   }
   applyBgOverlay();
+  applyBgVidOv();   // video-only scrim — appended INSIDE #chatBg after the video/slide layers (over bg, under chat)
+  applyBgGlass();   // blue glass pane — appended LAST inside #chatBg (over video + tint, still under chat)
+}
+function applyBgGlass() {
+  const bg = document.getElementById('chatBg');
+  if (!bg) return;
+  let g = bg.querySelector('.bg-glass');
+  if (BG.glassOn && BG.type !== 'none') {
+    if (!g) { g = document.createElement('div'); g.className = 'bg-glass'; bg.appendChild(g); }
+    g.style.opacity = BG.glassVal / 100;
+    // blur radius scales with the slider: 0% = crisp, 100% = heavy frost (18px)
+    const px = (BG.glassVal / 100 * 18).toFixed(1);
+    const flt = 'blur(' + px + 'px) saturate(1.35)';
+    g.style.backdropFilter = flt;
+    g.style.webkitBackdropFilter = flt;
+  } else if (g) { g.remove(); }
+}
+function applyBgVidOv() {
+  const bg = document.getElementById('chatBg');
+  if (!bg) return;
+  let s = bg.querySelector('.bg-vid-ov');
+  if (BG.vidOvOn && BG.type !== 'none') {
+    if (!s) { s = document.createElement('div'); s.className = 'bg-vid-ov'; s.innerHTML = '<div class="vov1"></div><div class="vov2"></div>'; bg.appendChild(s); }
+    s.style.opacity = BG.vOvAlpha / 100;
+    s.style.setProperty('--vidOv1', BG.vOv1);
+    s.style.setProperty('--vidOv2', BG.vOv2);
+  } else if (s) { s.remove(); }
 }
 function applyBgOverlay() {
   const ov = document.getElementById('chatBgOverlay');
@@ -4439,6 +4598,19 @@ function setBgOverlay(on) {
 }
 function setBgOvColor(n, c) { if (n === 1) BG.ov1 = c; else BG.ov2 = c; saveBgState(); applyBgOverlay(); }
 function setBgOvAlpha(v) { BG.ovAlpha = parseInt(v, 10); document.getElementById('bgOvAlphaVal').textContent = v + '%'; saveBgState(); applyBgOverlay(); }
+function setBgVidOv(on) {
+  BG.vidOvOn = on;
+  document.getElementById('bgOptVidOv').hidden = !on;
+  saveBgState(); applyBgVidOv();   // scrim-only — don't rebuild the bg (would restart the video/slideshow)
+}
+function setBgVidOvColor(n, c) { if (n === 1) BG.vOv1 = c; else BG.vOv2 = c; saveBgState(); applyBgVidOv(); }
+function setBgVidOvAlpha(v) { BG.vOvAlpha = parseInt(v, 10); document.getElementById('bgVidOvAlphaVal').textContent = v + '%'; saveBgState(); applyBgVidOv(); }
+function setBgGlass(on) {
+  BG.glassOn = on;
+  document.getElementById('bgOptGlass').hidden = !on;
+  saveBgState(); applyBgGlass();   // glass-only — don't rebuild the bg (would restart the video/slideshow)
+}
+function setBgGlassVal(v) { BG.glassVal = parseInt(v, 10); document.getElementById('bgGlassValVal').textContent = v + '%'; saveBgState(); applyBgGlass(); }
 function updateBgSettingsUI() {
   const chips = document.getElementById('bgSlideChips');
   if (chips) {
@@ -4464,6 +4636,16 @@ function updateBgSettingsUI() {
   document.getElementById('bgOv2Pick').value = BG.ov2;
   document.getElementById('bgOvAlpha').value = BG.ovAlpha;
   document.getElementById('bgOvAlphaVal').textContent = BG.ovAlpha + '%';
+  document.getElementById('bgVidOvToggle').checked = BG.vidOvOn;
+  document.getElementById('bgOptVidOv').hidden = !BG.vidOvOn;
+  document.getElementById('bgVidOv1Pick').value = BG.vOv1;
+  document.getElementById('bgVidOv2Pick').value = BG.vOv2;
+  document.getElementById('bgVidOvAlpha').value = BG.vOvAlpha;
+  document.getElementById('bgVidOvAlphaVal').textContent = BG.vOvAlpha + '%';
+  document.getElementById('bgGlassToggle').checked = BG.glassOn;
+  document.getElementById('bgOptGlass').hidden = !BG.glassOn;
+  document.getElementById('bgGlassVal').value = BG.glassVal;
+  document.getElementById('bgGlassValVal').textContent = BG.glassVal + '%';
   renderYtPresets();
 }
 function initChatBg() {
@@ -4684,6 +4866,7 @@ function loadConversation(chatId) {
   localStorage.setItem('chat_conn_last', JSON.stringify(activeConn));
   updateSysPromptBar(); updateTokenBar();
   renderAllMessages();
+  rebindAgentRunUI();   // re-attach a live agent run's feed/plate if this thread still streams (2026-09-05)
   loadHistory();
   updateStreamUI();   // entering a thread: its own run (if any) drives the send/stop UI
 }
@@ -5306,6 +5489,47 @@ function agentHeadHTML(name) {
 // avatar, agent class (off-color tint), and INSIDE the bubble — head at top +
 // a dedicated .bubble-content region (streaming writers fill the region so the
 // head and the per-response process stream below it are never clobbered).
+function rebindAgentRunUI() {
+  // Returning to a thread whose AGENT run is still live (2026-09-05): the run's
+  // chrome — content region, process feed, live stats plate — was built on
+  // elements that got DETACHED when the user switched chats, and the fresh
+  // history render of the placeholder bubble carries none of it. Rebuild the
+  // chrome on the freshly rendered bubble and repoint the run's module globals
+  // at it, so the process stream box + live plate stay visible while the run
+  // keeps going. Local/cloud runs need none of this (their per-run writers
+  // already re-target the live DOM every tick via their own liveBubble).
+  const S = curRun();
+  if (!S || S.kind !== 'agent') return;
+  const div = document.querySelector('.msg.assistant:last-of-type');
+  if (!div) return;
+  const msgMain = div.querySelector('.msg-main');
+  const bubble = div.querySelector('.bubble');
+  if (!bubble || !msgMain) return;
+  const name = S.badge || (activeAgent() ? (activeAgent().name || activeAgent().id) : 'Agent') || 'Agent';
+  // 1. content region inside the bubble (appendMessage already rendered the head row)
+  if (!bubble.querySelector('.bubble-content')) {
+    const head = bubble.querySelector('.agent-head');
+    bubble.innerHTML = (head ? head.outerHTML : agentHeadHTML(name)) + '<div class="bubble-content"></div>';
+  }
+  // 2. live stats plate (replace the history render's actions-only plate)
+  const oldPlate = msgMain.querySelector('.msg-stats');
+  if (oldPlate) oldPlate.remove();
+  msgStatsEl = document.createElement('div');
+  msgStatsEl.className = 'msg-stats';
+  msgStatsEl.innerHTML = statsBarHTML(0, 0, null, true, name);
+  msgMain.appendChild(msgStatsEl);
+  // 3. process feed inside the bubble, under the content region
+  if (!bubble.querySelector('.agent-activity')) {
+    const act = document.createElement('div');
+    act.className = 'agent-activity';
+    _agentActEl = act;
+    _agentActPinned = true;
+    act.addEventListener('scroll', onAgentActScroll);
+    bubble.appendChild(act);
+  }
+  // 4. repoint the live-writer refs at the fresh nodes
+  currentStreamingEl = bubble;
+}
 function agentDecorateMsg(div, name) {
   if (!div) return;
   div.classList.add('agent');

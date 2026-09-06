@@ -28,6 +28,7 @@ A single-file browser chat window for **local LLMs and connected agents** — ll
 - **Voice read-aloud** — Settings → Voice: reads replies aloud through a local TTS server (Kokoro / Qwen3-TTS cloned voices proxied by the companion server, so no CORS and no cloud)
 - **Independent chat threads** — every thread is fully independent: start a long response, flip to any other chat, pick a different source (local / DeepSeek / OpenRouter / agent), and send — other threads' running jobs keep streaming untouched into their own chats; Stop only stops the thread you're looking at. A reload restores each thread's own connection and model
 - **Chat search** — live-filters the chat list by title; Enter searches inside the actual messages and lists every matching chat
+- **Branded headers** — the xLLM favicon mark (35px) leads the sidebar's Chat History header and replaces the 💬 in the main header
 
 ## Run
 
