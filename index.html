@@ -79,6 +79,9 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .status-dot{width:7px;height:7px;border-radius:50%;display:inline-block}
 .status-dot.ok{background:var(--green)}
 .status-dot.err{background:var(--red)}
+/* 2026-09-06: bare .status-dot has NO background — while a cloud/agent ping is in
+   flight the header pill showed an invisible dot next to "Checking …". Neutral grey. */
+.status-pill .status-dot:not(.ok):not(.err){background:var(--dim);opacity:.55}
 .stat-item{display:flex;align-items:center;gap:4px;padding:2px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;font-size:10px;letter-spacing:0.3px;white-space:nowrap}
 .stat-item .label{color:var(--dim);opacity:.7}
 .stat-item .val{color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
@@ -163,6 +166,48 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .msg-stats .stat-badge.live .val{color:var(--green)}
 .msg-stats .stat-badge .val{font-variant-numeric:tabular-nums}
 .msg-stats .stat-badge .model-val{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--accent)}
+/* ── Bench popup (2026-09-06): hover/click the ◆ model badge → per-run stats box
+      above that response's stats bar. Theme-aware, two columns (left = stat rows,
+      right = live decode-t/s line graph), ⤓ bench download bottom-right. ── */
+.msg-stats .stat-badge .model-val{cursor:pointer;border-bottom:1px dotted transparent;transition:border-color .15s}
+.msg-stats .stat-badge:hover .model-val{border-bottom-color:var(--accent)}
+#benchPopup{display:none;position:fixed;z-index:120;width:440px;max-width:calc(100vw - 16px);background:var(--bg2);border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.45);color:var(--text);font-size:11px;line-height:1.45;user-select:none;padding:12px 14px 11px}
+#benchPopup.open{display:block}
+#benchPopup *{box-sizing:border-box}
+.bench-head{display:flex;align-items:center;gap:8px;padding:0 0 8px;border-bottom:1px solid var(--border);margin-bottom:9px;min-width:0}
+.bench-head .bm-diamond{color:var(--accent);font-size:10px;flex:none}
+.bench-head .bm-name{font-weight:600;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:225px}
+.bench-head .bm-kind{flex:none;font-size:9px;letter-spacing:.8px;padding:1px 7px;border:1px solid var(--accentLine);background:var(--accentSoft);color:var(--accent);border-radius:999px;text-transform:uppercase}
+.bench-head .bm-live{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--green);font-weight:600;letter-spacing:.6px;flex:none}
+.bench-head .bm-live i{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;animation:benchPulse 1.1s ease-in-out infinite}
+@keyframes benchPulse{0%,100%{opacity:1}50%{opacity:.25}}
+.bench-body{display:grid;grid-template-columns:152px minmax(0,1fr);gap:18px;align-items:stretch}
+.bench-stats{display:flex;flex-direction:column;gap:8px;min-width:0;justify-content:center;padding-right:6px}
+.bench-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;line-height:1.5}
+.bench-row .bl{color:var(--dim);white-space:nowrap}
+.bench-row .bv{font-variant-numeric:tabular-nums;font-weight:600;text-align:right;white-space:nowrap}
+.bench-row .bv.live{color:var(--green)}
+.bench-row .bv.warn{color:var(--red)}
+.bench-row .sub{color:var(--dim);font-weight:400;font-size:10px}
+.bench-gcol{display:flex;flex-direction:column;min-width:0;border-left:1px solid var(--border);padding-left:13px;padding-right:4px}
+.bench-ghead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:3px}
+.bench-ghead .gl{color:var(--dim);text-transform:uppercase;letter-spacing:.8px;font-size:9px}
+.bench-ghead .gv{font-variant-numeric:tabular-nums;font-weight:700;color:var(--accent);font-size:14px;line-height:1;padding-right:6px}
+.bench-svg{width:100%;height:auto;display:block}
+.bench-svg text{fill:var(--dim);font-size:8px;font-family:var(--font)}
+.bench-svg .grid{stroke:var(--border);stroke-width:.5}
+.bench-svg .axisline{stroke:var(--border);stroke-width:.75}
+.bench-svg .area{fill:url(#benchFill)}
+.bench-svg .pline{fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
+.bench-svg .pdot{fill:var(--accent);stroke:var(--bg2);stroke-width:1.2}
+.bench-svg stop.b0{stop-color:var(--accent);stop-opacity:.22}
+.bench-svg stop.b1{stop-color:var(--accent);stop-opacity:0}
+.bench-empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:10px;min-height:72px;text-align:center;padding:0 4px}
+.bench-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px;padding-top:7px;border-top:1px solid var(--border)}
+.bench-foot .note{color:var(--dim);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bench-dl{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:7px;border:1px solid var(--border);background:var(--bg3);color:var(--dim);cursor:pointer;transition:all .15s;margin-left:auto;padding:0;flex:none}
+.bench-dl:hover{background:var(--accentBg);color:var(--accent);border-color:var(--accent)}
+.bench-dl svg{width:13px;height:13px}
 .msg-stats .msg-actions{margin-left:auto;display:inline-flex;align-items:center;gap:2px}
 .msg-stats .msg-act{background:none;border:none;color:var(--dim);cursor:pointer;padding:3px 5px;border-radius:4px;opacity:.6;display:inline-flex;align-items:center;transition:all .15s}
 .msg-stats .msg-act:hover{opacity:1;color:var(--text);background:var(--accentBg)}
@@ -649,7 +694,7 @@ function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.1.6</span>
+    <span class="footer-version">xLLM Chat v3.1.7</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -3030,7 +3075,7 @@ let TOP_P = parseFloat(localStorage.getItem('chat_top_p') || '0.9');
 let currentModel = localStorage.getItem('chat_current_model') || '';
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.1.6';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.1.7';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -3044,6 +3089,7 @@ const AGENT_PRESETS = {
 };
 let AGENTS = loadAgents();
 let agentState = {};                       // id -> {connected, error} — in-memory, re-pinged
+let agentPingBusy = {};                    // id -> in-flight ping promise (dedupe concurrent probes)
 // ── Thread connection (2026-09-05): EVERY chat thread remembers the connection it
 //    last chatted on — 'local' (the API URL model server), 'cloud' (DeepSeek /
 //    OpenRouter model API), or 'agent' (Hermes / Pi / DS Harness / custom).
@@ -3120,7 +3166,7 @@ function applyConn(c, opts) {
     localStorage.setItem('chat_source', chatSource);
     persistLastConn();
   }
-  if (!o.silent) { updatePill(); refreshStatusPill(); syncSourceContext(); }
+  if (!o.silent) { updatePill(); refreshStatusPill(); syncSourceContext(); ensureConnStatus(false); }
 }
 let cfgAgentId = localStorage.getItem('chat_agent_cfg') || 'hermes';  // agent being configured
 let chatAgentSessions = {};                // per-THREAD agent session ids (keep-alive continuity)
@@ -3221,6 +3267,19 @@ function refreshStatusPill() {
     dot.className = 'status-dot err';
     txt.textContent = (who.name || id) + ' offline' + (st.error ? ' — ' + st.error : '');
   }
+}
+// Activate/restore path (2026-09-06): give the ACTIVE cloud provider or agent a live
+// verdict in agentState so the header status pill resolves instead of sitting on
+// "Checking …" forever. applyConn calls this on every non-silent conn change (page
+// boot, thread switch, pick); explicit picks pass recheck=true so a cached stale
+// offline verdict gets re-verified. Local mode: loadModels owns the pill — no-op.
+function ensureConnStatus(recheck) {
+  const ag = activeAgent();
+  const cl = activeCloud();
+  const who = ag || cl;
+  if (!who) return;
+  const st = agentState[who.id];
+  if (!st || (recheck && !st.connected)) pingAgent(who.id);
 }
 let cloudModels = { deepseek: null, openrouter: null };   // null = not fetched yet; [] = fetched but empty
 let cloudFetching = {};
@@ -3405,7 +3464,7 @@ function pickAgent(id) {
   applyConn({ kind: 'agent', agent: id });
   closeSourceMenu();
   updatePill(); refreshStatusPill();
-  if (!isAgentConnected(id)) pingAgent(id);   // async status fill
+  ensureConnStatus(true);   // fresh verdict on an explicit pick (re-checks a stale offline)
   if (currentChatId) saveCurrentChat();       // remember this thread chats with this agent
   showToast('Chatting with ' + (AGENTS[id].name || id));
 }
@@ -3416,7 +3475,7 @@ function pickCloud(provider, model) {
   applyConn({ kind: 'cloud', provider: provider, model: String(model) });
   closeSourceMenu();
   updatePill(); refreshStatusPill();
-  if (!agentState[provider]) pingAgent(provider);   // async status fill (agentState map)
+  ensureConnStatus(true);   // fresh verdict on an explicit pick (re-checks a stale offline)
   if (currentChatId) saveCurrentChat();             // per-thread last-known cloud conn
   showToast('Chatting via ' + CLOUD_CONNS[provider].name + ' — ' + shortModel(String(model)));
 }
@@ -3463,12 +3522,13 @@ syncSourceContext();   // page load: honor the restored chat_source (agent or lo
 function pingAgent(id) {
   const a = AGENTS[id] || CLOUD_CONNS[id];   // cloud providers ping through the same proxy
   if (!a || !(a.url || '').trim()) return Promise.resolve(false);
+  if (agentPingBusy[id]) return agentPingBusy[id];   // one probe per id — restore + explicit pick can both fire
   const body = { id: id, url: (a.url || '').trim(), key: (a.key || '') };
   agentState[id] = null;                       // "checking…" — clears stale state
   if (activeAgent() && activeAgent().id === id) refreshStatusPill();
   if (activeCloud() && activeCloud().id === id) refreshStatusPill();
   if (cfgAgentId === id) updateAgentStatusLine();
-  return fetch('/api/agent/ping', {
+  const p = fetch('/api/agent/ping', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
@@ -3483,7 +3543,9 @@ function pingAgent(id) {
     if ((activeAgent() && activeAgent().id === id) || (activeCloud() && activeCloud().id === id)) refreshStatusPill();
     if (cfgAgentId === id) updateAgentStatusLine();
     return false;
-  });
+  }).finally(() => { if (agentPingBusy[id] === p) agentPingBusy[id] = false; });
+  agentPingBusy[id] = p;
+  return p;
 }
 function pingAllAgents() {
   for (const id of Object.keys(AGENTS)) {
@@ -3608,6 +3670,7 @@ let msgStatsEl = null;          // stats bar element of the CURRENT streaming me
 let msgStatsTimer = null;       // live-update timer for the per-message stats bar
 let msgFirstTokenTime = 0;      // when the first content token arrived (for t/s baseline)
 let msgRateSamples = [];        // rolling (t, estTokens) samples for windowed live t/s
+let benchLive = null;           // live bench registry for the VISIBLE thread's local/cloud run (2026-09-06)
 
 // ── Per-thread runs (2026-09-05) — INDEPENDENT chat sessions ──
 // Each thread's LIVE generation is one entry in `runs`, keyed by the thread's
@@ -3690,7 +3753,7 @@ function msgActionsHTML(isUser, minimal) {
 
 function statsBarHTML(tokens, timeMs, tokSec, live, model, minimalActions = false) {
   const tps = tokSec !== null && tokSec !== undefined ? (live ? tokSec.toFixed(2) : tokSec.toFixed(2)) + ' t/s' : (live ? '— t/s' : '');
-  const modelBadge = model ? `<span class="stat-badge" title="Model: ${escAttr(model)}"><span class="ic">◆</span><span class="val model-val">${escHtml(shortModel(model))}</span></span>` : '';
+  const modelBadge = model ? `<span class="stat-badge" title="Model: ${escAttr(model)} — hover/click for bench stats"><span class="ic">◆</span><span class="val model-val">${escHtml(shortModel(model))}</span></span>` : '';
   return `<div class="msg-stats">
     ${modelBadge}
     <span class="stat-badge ${live ? 'live' : ''}" title="Generated tokens"><span class="ic">${STAT_ICON_TOKENS}</span><span class="val">${tokens.toLocaleString()} tokens</span></span>
@@ -3928,7 +3991,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadModels().then(() => { if (!_backendKnown) detectBackend(); });
   loadHistory();
   if (currentChatId) {
-    loadConversation(currentChatId);
+    loadConversation(currentChatId);   // restores the thread's conn → applyConn pings cloud/agent if never checked
   }
   wireTokenTip();
   updateTokenBar();
@@ -6394,6 +6457,8 @@ async function streamResponse(S) {
   let streamStartTime = Date.now();
   let msgFirstTokenTime = 0;
   let msgRateSamples = [];
+  let benchSamples = [];             // [tMs since first token, cumulative decode t/s] — bench popup (2026-09-06)
+  const benchCtxLimit = contextLimit;   // window ctx at run start, captured for the bench
   let currentModel = S.model;        // this thread's model — pinned at send
   const abortController = S.ac;      // this run's own abort (stop hits only this run)
   const badge = S.badge;             // this thread's conn badge — pinned at send
@@ -6525,6 +6590,17 @@ async function streamResponse(S) {
     if (msgFirstTokenTime > 0) {
       const genMs = now - msgFirstTokenTime;
       if (genMs > 0) tps = (tokens / genMs) * 1000;
+      // bench: sample the SAME cumulative decode t/s the bar shows, ≥180ms apart
+      if (genMs > 0 && tps !== null) {
+        if (!benchSamples.length || genMs - benchSamples[benchSamples.length - 1][0] >= 180) {
+          benchSamples.push([genMs, tps]);
+          if (benchSamples.length > 1500) benchSamples.splice(0, benchSamples.length - 1500);
+        }
+      }
+      if (benchLive && benchLive.chatId === threadId && currentChatId === threadId) {
+        if (!benchLive.tFirst) benchLive.tFirst = msgFirstTokenTime;
+        benchLive.tokens = tokens; benchLive.tps = tps; benchLive.elapsed = elapsed;
+      }
     }
     msgStatsEl.innerHTML = statsBarHTML(tokens, elapsed, tps, true, badge);
   }
@@ -6542,6 +6618,14 @@ async function streamResponse(S) {
   msgRateSamples = [];
   if (msgStatsTimer) clearInterval(msgStatsTimer);
   msgStatsTimer = setInterval(updateMsgStatsLive, 250);
+
+  // Live bench registry (2026-09-06): ONLY the visible thread's run registers —
+  // the open bench popup reads this object every tick for its live graph.
+  if (currentChatId === threadId) {
+    benchLive = { chatId: threadId, hidx: conversationHistory.length - 1, model: badge, kind: (S.kind === 'cloud' ? 'cloud' : (S.kind === 'agent' ? 'agent' : 'local')),
+      t0: streamStartTime, tFirst: 0, tokens: 0, tps: null, elapsed: 0,
+      samples: benchSamples, live: true, final: null, partial: false };
+  }
 
   let fullText = '';
   let thinking = '';
@@ -6702,7 +6786,32 @@ async function streamResponse(S) {
     const exactTps = (serverTimings && serverTimings.predicted_per_second > 0)
       ? serverTimings.predicted_per_second
       : (genMs > 0 ? (exactTokens / (genMs / 1000)) : 0);
-    const finalStats = { tokens: exactTokens, timeMs: totalMs, tps: exactTps, truncated: finishReason === 'length' || undefined, model: displayModelBadge() };
+    // ── Bench capture (2026-09-06): prefill (prompt tokens / time-to-first-token),
+    //    exact decode t/s, window ctx + used, and the live speed series → stored on
+    //    the message (stats.*) AND mirrored into the benchLive registry for the popup.
+    const promptN = (finalUsage && finalUsage.prompt_tokens > 0) ? finalUsage.prompt_tokens
+      : ((serverTimings && serverTimings.prompt_n > 0) ? serverTimings.prompt_n : 0);
+    const ttfMs = msgFirstTokenTime > 0 ? (msgFirstTokenTime - streamStartTime) : totalMs;
+    let promptTps = null;
+    if (serverTimings && serverTimings.prompt_n > 0 && serverTimings.prompt_ms > 0) promptTps = serverTimings.prompt_n / serverTimings.prompt_ms * 1000;
+    else if (promptN > 0 && ttfMs > 0) promptTps = promptN / (ttfMs / 1000);
+    // snap the series' last point to the EXACT final decode speed
+    if (benchSamples.length) {
+      const lastP = benchSamples[benchSamples.length - 1];
+      if (Math.abs(lastP[1] - exactTps) > 0.05 || genMs - lastP[0] > 150) benchSamples.push([Math.max(genMs, lastP[0] + 1), exactTps]);
+    } else if (genMs > 0 && exactTps > 0) benchSamples.push([genMs, exactTps]);
+    const finalStats = { tokens: exactTokens, timeMs: totalMs, tps: exactTps, truncated: finishReason === 'length' || undefined, model: displayModelBadge(),
+      kind: (S.kind === 'cloud' ? 'cloud' : (S.kind === 'agent' ? 'agent' : 'local')),
+      promptTokens: promptN || undefined, ttfMs: ttfMs, promptTps: promptTps || undefined,
+      ctx: benchCtxLimit || undefined,
+      ctxUsed: (promptN > 0 && exactTokens > 0) ? (promptN + exactTokens) : undefined,
+      speed: benchSamples.length ? benchDownsample(benchSamples, 240) : undefined };
+    if (benchLive && benchLive.chatId === threadId) {
+      benchLive.final = { tokens: exactTokens, timeMs: totalMs, tps: exactTps, promptTps: promptTps, promptTokens: promptN || undefined,
+        ttfMs: ttfMs, ctx: benchCtxLimit || undefined, ctxUsed: finalStats.ctxUsed, truncated: finalStats.truncated || false };
+      benchLive.live = false; benchLive.partial = false; benchLive.samples = benchSamples;
+      benchLive.elapsed = totalMs; benchLive.tokens = exactTokens; benchLive.tps = exactTps;
+    }
     if (msgStatsEl) msgStatsEl.innerHTML = statsBarHTML(exactTokens, totalMs, exactTps, false, displayModelBadge());
 
     // Truncation notice: finish_reason "length" = hit the token cap mid-generation
@@ -6775,6 +6884,11 @@ async function streamResponse(S) {
     if (msgStatsEl && streamTokens > 0) {
       const totalMs = Date.now() - streamStartTime;
       msgStatsEl.innerHTML = statsBarHTML(streamTokens, totalMs, totalMs > 0 ? (streamTokens / (totalMs / 1000)) : 0, false, displayModelBadge());
+    }
+    // bench: a stopped run keeps its partial series available to the popup
+    if (benchLive && benchLive.chatId === threadId) {
+      benchLive.live = false; benchLive.partial = true; benchLive.samples = benchSamples;
+      benchLive.elapsed = Date.now() - streamStartTime; benchLive.tokens = streamTokens;
     }
     resetJumpIndex();   // stream ended (stop/error) -> walk restarts from the newest message
   }
@@ -7253,44 +7367,99 @@ function escAttr(s) { return escHtml(s); }
 
 function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
 
-// ── Message walk (up/down chevrons, 2026-08-18) ──
-// First click targets the LAST message (top of it); subsequent clicks walk up
-// (older) or down (newer) one message per click. Index resets on new content.
+// ── Message walk (up/down chevrons, 2026-08-18; viewport-anchored 2026-09-06) ──
+// First click targets the message currently in context at the viewport top;
+// subsequent clicks walk up (older) or down (newer) one message per click.
+// _jumpIndex = -1 means unset (re-anchor on next click). The DISABLED/greyed
+// state tracks the ACTUAL scroll position — up greys only at the top of the
+// thread, down greys only at the bottom — so mid-thread both chevrons live even
+// after the walk previously reached an end (David: "down chevron greyed out
+// while I'm mid-way scroll of the whole thread").
 let _jumpIndex = -1;
 
 function _jumpMsgs() { return document.querySelectorAll('#messages .msg'); }
 
+function _jumpArea() { return document.getElementById('chatArea'); }
+
 function _scrollToMsg(el) { if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
 
+// The message "in context" at the viewport: the last one whose top is at/above
+// the chat area's top edge (messages stack top-down, so the loop breaks early).
+function _viewportMsgIndex() {
+  const area = _jumpArea(); const msgs = _jumpMsgs();
+  if (!area || !msgs.length) return -1;
+  const line = area.getBoundingClientRect().top + 2;
+  let idx = -1;
+  for (let i = 0; i < msgs.length; i++) {
+    if (msgs[i].getBoundingClientRect().top <= line + 1) idx = i; else break;
+  }
+  return idx;
+}
+
 function _updateJumpButtons() {
-  const msgs = _jumpMsgs();
+  const msgs = _jumpMsgs(); const area = _jumpArea();
   const up = document.getElementById('jumpBtn');
   const down = document.getElementById('jumpDownBtn');
-  if (up) up.disabled = msgs.length === 0 || _jumpIndex === 0;
-  if (down) down.disabled = msgs.length === 0 || _jumpIndex === msgs.length - 1;
+  if (!msgs.length || !area) { if (up) up.disabled = true; if (down) down.disabled = true; return; }
+  const atTop = area.scrollTop <= 4;
+  const atBottom = (area.scrollHeight - area.scrollTop - area.clientHeight) <= 4;
+  // UP greys at the real top OR when the walk is already on the first message (the
+  // .messages top padding can keep scrollTop above 4 after a jump to message 0).
+  // DOWN greys ONLY at the real bottom — never by index, so mid-thread it stays live.
+  if (up) up.disabled = atTop || _jumpIndex === 0;
+  if (down) down.disabled = atBottom;
 }
 
 function jumpUp() {
-  const msgs = _jumpMsgs();
-  if (!msgs.length) return;
+  const msgs = _jumpMsgs(); const area = _jumpArea();
+  if (!msgs.length || !area) return;
   if (_jumpIndex >= msgs.length) _jumpIndex = msgs.length - 1;   // clamp stale index (dead-button guard)
-  if (_jumpIndex === -1) _jumpIndex = msgs.length - 1;   // first click: last response
-  else if (_jumpIndex > 0) _jumpIndex--;                 // then walk up
+  if (_jumpIndex === -1) { _jumpIndex = _viewportMsgIndex(); if (_jumpIndex < 0) _jumpIndex = msgs.length - 1; }
+  if (_jumpIndex > 0) {
+    // Scrolled INTO the message (its top is above the fold)? First raise ITS top
+    // ('top of this message'); only when its top is at the fold, step one above.
+    const top = msgs[_jumpIndex].getBoundingClientRect().top;
+    const arTop = area.getBoundingClientRect().top;
+    if (top >= arTop - 2) _jumpIndex--;
+  }
   _scrollToMsg(msgs[_jumpIndex]);
   _updateJumpButtons();
 }
 
+function _scrollAreaBottom() {
+  const area = _jumpArea();
+  if (area) area.scrollTo({ top: area.scrollHeight, behavior: 'smooth' });
+}
+
 function jumpDown() {
-  const msgs = _jumpMsgs();
-  if (!msgs.length) return;
+  const msgs = _jumpMsgs(); const area = _jumpArea();
+  if (!msgs.length || !area) return;
   if (_jumpIndex >= msgs.length) _jumpIndex = msgs.length - 1;   // clamp stale index (dead-button guard)
-  if (_jumpIndex === -1) _jumpIndex = msgs.length - 1;   // first click: newest response
-  else if (_jumpIndex < msgs.length - 1) _jumpIndex++;   // then walk down
-  _scrollToMsg(msgs[_jumpIndex]);
+  if (_jumpIndex === -1) { _jumpIndex = _viewportMsgIndex(); if (_jumpIndex < 0) _jumpIndex = msgs.length - 1; }
+  if (_jumpIndex < msgs.length - 1) { _jumpIndex++; _scrollToMsg(msgs[_jumpIndex]); }
+  else _scrollAreaBottom();   // already on the NEWEST message → take it all the way to the thread bottom
   _updateJumpButtons();
 }
 
 function resetJumpIndex() { _jumpIndex = -1; _updateJumpButtons(); }
+
+// Manual scrolling re-anchors the walk to whatever message is at the viewport top
+// and live-updates the greyed states (the old index-only logic wedged the down
+// chevron grey after the walk reached the newest message + a manual scroll up).
+// At the true bottom the anchor is the LAST message so UP behaves from the newest.
+(function () {
+  const area = document.getElementById('chatArea');
+  if (!area) return;
+  const sync = () => {
+    const msgs = _jumpMsgs();
+    const atBottom = (area.scrollHeight - area.scrollTop - area.clientHeight) <= 4;
+    if (atBottom) _jumpIndex = msgs.length - 1;
+    else { const n = _viewportMsgIndex(); _jumpIndex = (n >= 0) ? n : -1; }
+    _updateJumpButtons();
+  };
+  area.addEventListener('scroll', sync, { passive: true });
+  sync();   // initial state (before any scroll event)
+})();
 
 // Delegated, POSITION-based click handling for the jump buttons (2026-08-26):
 // a GPU compositor hit-test glitch can route the click to a different element
@@ -7314,6 +7483,301 @@ function downloadJson(filename, obj) {
   const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
 }
+// ═══ Bench popup (2026-09-06) — David's ask: hover/click the ◆ model badge on a
+// response's stats bar → a theme-aware box DIRECTLY ABOVE that stats bar. Left
+// column: prefill speed, tokens to completion, time, decode t/s, TTFT, window ctx,
+// ctx used. Right column: the LIVE decode-t/s line graph. Bottom-right: ⤓ download
+// of the run's bench JSON. Purpose: instant bench memes per prompt run.
+let benchState = { open: false, pin: false, chatId: null, hidx: null, el: null,
+  timer: null, model: '', cursorX: -1, cursorY: -1, leaveAt: 0 };
+let benchHoverCap = (window.matchMedia && window.matchMedia('(hover:hover) and (pointer:fine)').matches);
+function benchFmtInt(n) { return (n === null || n === undefined || isNaN(n)) ? '—' : Math.round(n).toLocaleString(); }
+function benchFmtTps(n) { if (n === null || n === undefined || isNaN(n)) return '—'; return (+n.toFixed(2)).toLocaleString() + ' t/s'; }
+function benchFmtCtxPct(used, win) {
+  if (used === null || used === undefined || !(win > 0)) return '';
+  return ' · ' + ((100 * used / win).toFixed(1)) + '%';
+}
+function benchDownsample(arr, maxN) {
+  if (!arr || !arr.length) return [];
+  const out = [];
+  if (arr.length <= maxN) { for (const p of arr) out.push([Math.round(p[0]), +p[1].toFixed(2)]); return out; }
+  const stride = Math.ceil(arr.length / maxN);
+  for (let i = 0; i < arr.length; i += stride) out.push([Math.round(arr[i][0]), +arr[i][1].toFixed(2)]);
+  const last = arr[arr.length - 1];
+  if (out.length && out[out.length - 1][0] !== Math.round(last[0])) out.push([Math.round(last[0]), +last[1].toFixed(2)]);
+  return out;
+}
+function benchIsModelBadge(t) {
+  const b = t && t.closest ? t.closest('.stat-badge') : null;
+  if (!b) return null;
+  if ((b.title || '').indexOf('Model:') === 0) return b;
+  return b.querySelector('.model-val') ? b : null;
+}
+// Collect what the popup should show for the targeted message. Priority: the
+// message's OWN stored stats (final, replayed after reload) → the live run
+// registry (streaming / just-finished / stopped) → empty state.
+function benchCollect() {
+  if (benchState.chatId !== currentChatId || benchState.hidx === null) return null;
+  const msgEl = document.querySelector('.msg[data-hidx="' + benchState.hidx + '"]');
+  if (!msgEl) return null;
+  const sb = msgEl.querySelector('.msg-stats');
+  if (!sb) return null;
+  const histMsg = conversationHistory[benchState.hidx] || null;
+  const st = (histMsg && histMsg.stats) || null;
+  const lv = (benchLive && benchLive.chatId === currentChatId && benchLive.hidx === benchState.hidx) ? benchLive : null;
+  const liveNow = !!(lv && lv.live);
+  let model = benchState.model || '', kind = '', stateLabel = '';
+  let tokens = null, timeMs = null, tps = null, promptTps = null, promptTokens = null, ttfMs = null;
+  let ctx = null, ctxUsed = null, truncated = false, series = null;
+  if (st && (st.tokens > 0 || st.timeMs > 0 || Array.isArray(st.speed))) {
+    model = st.model || model; kind = st.kind || '';
+    tokens = st.tokens || 0; timeMs = st.timeMs || 0;
+    tps = (st.tps !== null && st.tps !== undefined) ? st.tps : null;
+    promptTps = (st.promptTps !== null && st.promptTps !== undefined) ? st.promptTps : null;
+    promptTokens = (st.promptTokens !== null && st.promptTokens !== undefined) ? st.promptTokens : null;
+    ttfMs = (st.ttfMs !== null && st.ttfMs !== undefined) ? st.ttfMs : null;
+    ctx = (st.ctx !== null && st.ctx !== undefined) ? st.ctx : null;
+    ctxUsed = (st.ctxUsed !== null && st.ctxUsed !== undefined) ? st.ctxUsed : null;
+    truncated = !!st.truncated;
+    series = (Array.isArray(st.speed) && st.speed.length) ? st.speed : null;
+  } else if (lv) {
+    model = lv.model || model; kind = lv.kind || '';
+    if (liveNow) {
+      stateLabel = 'live';
+      tokens = lv.tokens || 0;
+      timeMs = lv.elapsed || (Date.now() - lv.t0);
+      tps = (lv.tps !== null && lv.tps !== undefined) ? lv.tps : null;
+      ctx = contextLimit || null;                 // live window = current setting
+      series = (lv.samples && lv.samples.length) ? lv.samples : null;
+    } else if (lv.final) {
+      const f = lv.final;
+      tokens = f.tokens; timeMs = f.timeMs; tps = f.tps;
+      promptTps = f.promptTps; promptTokens = f.promptTokens; ttfMs = f.ttfMs;
+      ctx = (f.ctx !== null && f.ctx !== undefined) ? f.ctx : null;
+      ctxUsed = (f.ctxUsed !== null && f.ctxUsed !== undefined) ? f.ctxUsed : null;
+      truncated = !!f.truncated;
+      series = (lv.samples && lv.samples.length) ? lv.samples : null;
+    } else if (lv.partial) {
+      stateLabel = 'partial';
+      tokens = lv.tokens || 0;
+      timeMs = lv.elapsed || 0;
+      tps = (lv.samples && lv.samples.length) ? lv.samples[lv.samples.length - 1][1] : null;
+      ctx = contextLimit || null;
+      series = (lv.samples && lv.samples.length) ? lv.samples : null;
+    }
+  }
+  const hasAny = (tokens !== null) || (series !== null);
+  return { msgEl, sb, model, kind, live: liveNow, stateLabel, tokens, timeMs, tps, promptTps,
+    promptTokens, ttfMs, ctx, ctxUsed, truncated, series, hasAny };
+}
+function benchPromptSnippet() {
+  for (let i = benchState.hidx - 1; i >= 0; i--) {
+    const m = conversationHistory[i];
+    if (m && m.role === 'user') {
+      const c = (typeof m.content === 'string') ? m.content : '';
+      return c.length > 300 ? c.slice(0, 300) + '…' : c;
+    }
+  }
+  return '';
+}
+function benchSVGHTML(series) {
+  const W = 236, H = 88, L = 8, R = 6, T = 10, B = 15;
+  if (!series || !series.length) return null;
+  const tMax = Math.max(100, series[series.length - 1][0]);
+  let vMax = 0.01;
+  for (const p of series) if (p[1] > vMax) vMax = p[1];
+  const scale = vMax * 1.15;
+  const X = (t) => L + (t / tMax) * (W - L - R);
+  const Y = (v) => T + (1 - v / scale) * (H - T - B);
+  const fmtAx = (v) => (v >= 100 ? String(Math.round(v)) : (+v.toFixed(1)) + '');
+  let s = '<svg class="bench-svg" viewBox="0 0 ' + W + ' ' + H + '">';
+  s += '<defs><linearGradient id="benchFill" x1="0" y1="0" x2="0" y2="1"><stop class="b0" offset="0"/><stop class="b1" offset="1"/></linearGradient></defs>';
+  // y gridlines (0..scale in 4 steps) + x time labels
+  for (let i = 0; i <= 4; i++) {
+    const v = scale * i / 4, y = Y(v);
+    s += '<line class="grid" x1="' + L + '" y1="' + y + '" x2="' + (W - R) + '" y2="' + y + '"/>';
+    s += '<text x="' + (L - 3) + '" y="' + (y + 2.6) + '" text-anchor="end">' + fmtAx(v) + '</text>';
+  }
+  s += '<text x="' + L + '" y="' + (H - 3) + '">0s</text>';
+  s += '<text x="' + (W - R) + '" y="' + (H - 3) + '" text-anchor="end">' + (+(tMax / 1000).toFixed(1)) + 's</text>';
+  s += '<line class="axisline" x1="' + L + '" y1="' + Y(0) + '" x2="' + (W - R) + '" y2="' + Y(0) + '"/>';
+  if (series.length >= 2) {
+    let d = '', da = 'M' + X(series[0][0]) + ',' + Y(0);
+    for (let i = 0; i < series.length; i++) {
+      d += (i === 0 ? 'M' : 'L') + (+X(series[i][0]).toFixed(1)) + ',' + (+Y(series[i][1]).toFixed(1));
+      da += 'L' + (+X(series[i][0]).toFixed(1)) + ',' + (+Y(series[i][1]).toFixed(1));
+    }
+    da += 'L' + (+X(series[series.length - 1][0]).toFixed(1)) + ',' + Y(0) + 'Z';
+    s += '<path class="area" d="' + da + '"/>';
+    s += '<path class="pline" d="' + d + '"/>';
+  }
+  const lp = series[series.length - 1];
+  s += '<circle class="pdot" cx="' + (+X(lp[0]).toFixed(1)) + '" cy="' + (+Y(lp[1]).toFixed(1)) + '" r="3"/>';
+  s += '</svg>';
+  return s;
+}
+function benchHTML(v) {
+  const kindChip = v.kind ? '<span class="bm-kind">' + escHtml(v.kind) + '</span>' : '';
+  const liveChip = v.live ? '<span class="bm-live"><i></i>LIVE</span>'
+    : (v.stateLabel === 'partial' ? '<span class="bm-live" style="color:var(--red)"><i style="background:var(--red)"></i>STOPPED</span>' : '');
+  const rows = [
+    ['Prefill speed', benchFmtTps(v.promptTps), ''],
+    ['Tokens', benchFmtInt(v.tokens) + (v.truncated ? ' <span class="sub">⚠ cap</span>' : ''), v.truncated ? 'warn' : ''],
+    ['Time', formatPerfTime(v.timeMs || 0), ''],
+    ['Decode t/s', benchFmtTps(v.tps), v.live ? 'live' : ''],
+    ['TTFT', (v.ttfMs !== null && v.ttfMs !== undefined) ? formatPerfTime(v.ttfMs) : '—', ''],
+    ['Window ctx', benchFmtInt(v.ctx), ''],
+    ['Context used', benchFmtInt(v.ctxUsed) + '<span class="sub">' + benchFmtCtxPct(v.ctxUsed, v.ctx) + '</span>', '']
+  ];
+  let statsHtml = '';
+  for (const r of rows) {
+    statsHtml += '<div class="bench-row"><span class="bl">' + r[0] + '</span><span class="bv' + (r[2] ? ' ' + r[2] : '') + '">' + r[1] + '</span></div>';
+  }
+  const headV = (v.tps !== null && v.tps !== undefined) ? v.tps
+    : (v.series && v.series.length ? v.series[v.series.length - 1][1] : null);
+  let graphHtml = '';
+  const svg = benchSVGHTML(v.series);
+  if (svg) graphHtml = svg;
+  else if (v.live) graphHtml = '<div class="bench-empty">waiting for first token…</div>';
+  else if (v.hasAny) graphHtml = '<div class="bench-empty">no speed samples<br>recorded for this run</div>';
+  else graphHtml = '<div class="bench-empty">no bench data<br>for this run</div>';
+  const footNote = v.truncated ? '⚠ stopped at the token cap'
+    : (v.live ? 'recording live decode speed…' : (v.stateLabel === 'partial' ? 'run stopped early — partial bench' : 'xLLM Chat v' + APP_VERSION));
+  return '<div class="bench-head"><span class="bm-diamond">◆</span><span class="bm-name" title="' + escAttr(v.model) + '">' + escHtml(v.model || '—') + '</span>' + kindChip + liveChip + '</div>' +
+    '<div class="bench-body"><div class="bench-stats">' + statsHtml + '</div>' +
+    '<div class="bench-gcol"><div class="bench-ghead"><span class="gl">decode tok/s</span><span class="gv' + (v.live ? '" style="color:var(--green)' : '') + '">' + benchFmtTps(headV) + '</span></div>' + graphHtml + '</div></div>' +
+    '<div class="bench-foot"><span class="note">' + footNote + '</span>' +
+    '<button class="bench-dl" title="Download bench JSON for this run" onclick="benchDownload()">' + ICON_DL + '</button></div>';
+}
+function benchReposition(pop, v) {
+  const r = v.sb.getBoundingClientRect();
+  if (r.width < 4) return;
+  pop.style.visibility = 'hidden';
+  pop.style.left = '0px'; pop.style.top = '0px';
+  const w = pop.offsetWidth, h = pop.offsetHeight;
+  let top = r.top - h - 6;
+  if (top < 8) top = Math.min(r.bottom + 6, window.innerHeight - h - 8);
+  if (top < 8) top = 8;
+  let left = r.left;
+  if (left + w > window.innerWidth - 8) left = window.innerWidth - w - 8;
+  if (left < 8) left = 8;
+  pop.style.visibility = '';
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+}
+function benchOverRect(el, x, y) {
+  if (!el) return false;
+  const r = el.getBoundingClientRect();
+  return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+}
+function benchCursorOverModelBadge() {
+  const cx = benchState.cursorX, cy = benchState.cursorY;
+  if (cx < 0 || cy < 0) return false;
+  const badges = document.querySelectorAll('.msg .msg-stats .stat-badge');
+  for (const b of badges) {
+    if (b.querySelector('.model-val') && benchOverRect(b, cx, cy)) return true;
+  }
+  return false;
+}
+function benchTick() {
+  if (!benchState.open) return;
+  const pop = benchState.el;
+  const v = benchCollect();
+  if (!v) { benchClose(); return; }
+  pop.innerHTML = benchHTML(v);
+  benchReposition(pop, v);
+  // hover-close with grace: cursor off the popup AND off every model badge
+  if (!benchState.pin && benchHoverCap) {
+    const cx = benchState.cursorX, cy = benchState.cursorY;
+    const inside = benchOverRect(pop, cx, cy) || benchCursorOverModelBadge();
+    if (!inside) {
+      if (!benchState.leaveAt) benchState.leaveAt = Date.now();
+      else if (Date.now() - benchState.leaveAt > 280) benchClose();
+    } else benchState.leaveAt = 0;
+  }
+}
+function benchOpenBadge(badge, viaClick) {
+  const msg = badge.closest('.msg');
+  if (!msg) return;
+  const hidx = parseInt(msg.getAttribute('data-hidx'), 10);
+  const model = String((badge.getAttribute('title') || '').replace(/^Model:\s*/, '').replace(/\s*—.*$/, ''))
+    || (badge.querySelector('.model-val') ? badge.querySelector('.model-val').textContent : '');
+  const same = benchState.open && benchState.hidx === hidx;
+  if (viaClick && same && benchState.pin) { benchClose(); return; }   // pinned → click unpins/closes
+  if (!benchState.open) {
+    benchState.el.classList.add('open');
+    benchState.open = true;
+  }
+  if (!same) { benchState.hidx = hidx; benchState.model = model; benchState.chatId = currentChatId; }
+  if (viaClick) benchState.pin = true;
+  if (!benchState.timer) benchState.timer = setInterval(benchTick, 250);
+  benchTick();
+}
+function benchClose() {
+  if (!benchState.open) return;
+  benchState.open = false;
+  benchState.pin = false;
+  if (benchState.timer) { clearInterval(benchState.timer); benchState.timer = null; }
+  benchState.el.classList.remove('open');
+}
+function benchPayload() {
+  const v = benchCollect();
+  if (!v) return null;
+  const stats = {};
+  if (v.tokens !== null) stats.tokens = v.tokens;
+  if (v.timeMs !== null) stats.timeMs = v.timeMs;
+  if (v.tps !== null) stats.decodeTps = v.tps;
+  if (v.promptTps !== null) stats.prefillTps = v.promptTps;
+  if (v.promptTokens !== null) stats.promptTokens = v.promptTokens;
+  if (v.ttfMs !== null) stats.ttfMs = v.ttfMs;
+  if (v.truncated) stats.truncated = true;
+  const ctx = {};
+  if (v.ctx !== null) ctx.window = v.ctx;
+  if (v.ctxUsed !== null) ctx.used = v.ctxUsed;
+  return {
+    app: 'xLLM Chat', type: 'xllm-bench', version: APP_VERSION, exportedAt: new Date().toISOString(),
+    model: v.model || null, kind: v.kind || null, live: v.live,
+    stats: stats,
+    context: ctx,
+    speed: benchDownsample(v.series || [], 500),
+    prompt: benchPromptSnippet() || undefined,
+    threadTitle: (function () {
+      try {
+        const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+        const c = chats.find(x => x.id === currentChatId);
+        return c ? (c.title || '') : '';
+      } catch (e) { return ''; }
+    })() || undefined
+  };
+}
+function benchDownload() {
+  const p = benchPayload();
+  if (!p) return showToast('Nothing to download for this message');
+  const slug = String(p.model || 'model').replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '').slice(-48) || 'model';
+  const ts = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
+  downloadJson('bench-' + slug + '-' + ts + '.json', p);
+  showToast('Bench downloaded');
+}
+(function benchBoot() {
+  const d = document.createElement('div');
+  d.id = 'benchPopup';
+  d.className = 'bench-popup';
+  document.body.appendChild(d);
+  benchState.el = d;
+  document.addEventListener('pointermove', (e) => { benchState.cursorX = e.clientX; benchState.cursorY = e.clientY; }, { passive: true });
+  document.addEventListener('pointerover', (e) => {
+    if (!benchHoverCap) return;
+    const b = benchIsModelBadge(e.target);
+    if (b) benchOpenBadge(b, false);
+  });
+  document.addEventListener('click', (e) => {
+    const b = benchIsModelBadge(e.target);
+    if (b) { benchOpenBadge(b, true); return; }
+    if (benchState.open && !e.target.closest('#benchPopup')) benchClose();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && benchState.open) benchClose(); });
+  window.addEventListener('resize', () => { if (benchState.open) benchTick(); });
+})();
 function chatExportEnvelope(chats) {
   return { app: 'xLLM Chat', version: APP_VERSION, type: 'xllm-chat-export', exportedAt: new Date().toISOString(), chats };
 }
