@@ -618,7 +618,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.1.4</span>
+    <span class="footer-version">xLLM Chat v3.1.5</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -2994,7 +2994,7 @@ let TOP_P = parseFloat(localStorage.getItem('chat_top_p') || '0.9');
 let currentModel = localStorage.getItem('chat_current_model') || '';
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.1.4';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.1.5';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -6342,15 +6342,77 @@ async function streamResponse(S) {
     }
     return currentStreamingEl;
   }
-  function updateContentUI(fullText, thinking, inThinking) {
-    const el = liveBubble();
-    if (el) {
+  let _liveRenderTimer = null;
+  let _liveRenderQueued = false;
+  let _lastLiveRenderAt = 0;
+  let _fenceBase = null;
+  let _fenceEl = null;
+  function clearLivePaint() {
+    if (_liveRenderTimer) { clearTimeout(_liveRenderTimer); _liveRenderTimer = null; _liveRenderQueued = false; }
+  }
+  function openFenceTail(text) {
+    // text ends inside an unclosed ``` fence → {prefix, tail} (tail = the code
+    // AFTER the opener's info line), else null. Tracks fence parity over the
+    // whole text so closed fences above don't confuse the count.
+    let open = false, lastOpener = -1, m;
+    const re = /```/g;
+    while ((m = re.exec(text))) { open = !open; if (open) lastOpener = m.index; }
+    if (!open) return null;
+    const nl = text.indexOf('\n', lastOpener + 3);
+    return nl < 0
+      ? { prefix: text.slice(0, lastOpener), tail: '' }
+      : { prefix: text.slice(0, lastOpener), tail: text.slice(nl + 1) };
+  }
+  function scrollLiveToBottom() {
+    if (currentChatId === threadId) {
+      const ca = document.getElementById('chatArea');
+      if (ca) ca.scrollTop = ca.scrollHeight;
+    }
+  }
+  function paintFullContent(fullText, thinking, inThinking, force) {
+    const paint = () => {
+      const el = liveBubble();
+      if (!el) return;
       let html = '';
       if (thinking) html += thinkingPillHTML(thinking, true);
       html += escapeAndFormat(fullText);
       el.innerHTML = html;
-      if (currentChatId === threadId) document.getElementById('chatArea').scrollTop = document.getElementById('chatArea').scrollHeight;
+      scrollLiveToBottom();
+    };
+    if (force) { paint(); return; }
+    if (_liveRenderQueued) return;   // a paint is already scheduled — it reads the latest text
+    _liveRenderQueued = true;
+    const wait = Math.max(0, 100 - (Date.now() - _lastLiveRenderAt));
+    _liveRenderTimer = setTimeout(() => {
+      _liveRenderQueued = false; _liveRenderTimer = null; _lastLiveRenderAt = Date.now();
+      paint();
+    }, wait);
+  }
+  function updateContentUI(fullText, thinking, inThinking) {
+    // Fast-stream render throttle + open-fence streaming (2026-09-06): cloud and
+    // fast local models feed content deltas faster than the full pipeline (marked
+    // → DOMParser sanitize → Prism-highlight every code block) can re-render the
+    // WHOLE accumulated doc per chunk — while a fence is open the whole response
+    // IS one giant code block, so per-chunk re-highlight blocked the main thread
+    // → Chrome "page not responding", then it all clicked in at the end.
+    const open = openFenceTail(fullText);
+    const el = liveBubble();
+    if (open && el) {
+      if (!_fenceBase || !_fenceEl || !el.contains(_fenceEl)) {
+        let base = '';
+        if (thinking) base += thinkingPillHTML(thinking, true);
+        base += escapeAndFormat(open.prefix);   // closed part above: rendered ONCE, full colors
+        _fenceBase = base;
+        el.innerHTML = base + '<pre class="pre-stream"><code class="xllm-tail-code"></code></pre>';
+        _fenceEl = el.querySelector('.xllm-tail-code');
+      } else {
+        _fenceEl.textContent = open.tail;       // open block: cheap raw tail, no re-parse
+      }
+      scrollLiveToBottom();
+      return;
     }
+    _fenceBase = null; _fenceEl = null;
+    paintFullContent(fullText, thinking, inThinking, false);
   }
   function updateThinkingUI(thinking, inThinking) {
     if (inThinking) {
@@ -6535,6 +6597,7 @@ async function streamResponse(S) {
         } catch (e) {}
       }
     }
+    clearLivePaint();   // a queued live paint must never clobber the final render below
     // Finalize
     const finalEl = liveBubble();
     if (finalEl) {
@@ -6613,6 +6676,7 @@ async function streamResponse(S) {
     }
   } catch (e) {
     if (msgStatsTimer) { clearInterval(msgStatsTimer); msgStatsTimer = null; }
+    clearLivePaint();   // stop/error: drop any queued live paint (partial render below is authoritative)
     const errEl = agentContentEl(liveBubble());
     if (e.name === 'AbortError') {
       // only paint [stopped] into an ASSISTANT bubble — after a recycle-triggered

@@ -29,6 +29,7 @@ A single-file browser chat window for **local LLMs and connected agents** — ll
 - **Independent chat threads** — every thread is fully independent: start a long response, flip to any other chat, pick a different source (local / DeepSeek / OpenRouter / agent), and send — other threads' running jobs keep streaming untouched into their own chats; Stop only stops the thread you're looking at. A reload restores each thread's own connection and model
 - **Chat search** — live-filters the chat list by title; Enter searches inside the actual messages and lists every matching chat
 - **Branded headers** — the xLLM favicon mark (35px) leads the sidebar's Chat History header and replaces the 💬 in the main header
+- **Fast-stream rendering** — live response rendering is coalesced (≤10 paints/sec, always latest text) and an open code fence streams as a raw tail instead of re-highlighting the whole block per chunk, so fast models (cloud / local MTP) never freeze the tab or trigger the browser's "not responding" dialog; the block gets its syntax colors the moment it completes
 
 ## Run
 
