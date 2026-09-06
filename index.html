@@ -382,7 +382,19 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
 .agent-status.err{color:var(--red)}
 .agent-key-hint{font-weight:400;opacity:.75;margin-left:6px}
 /* Agent run activity feed + steer note + approval modal (2026-09-05) */
-.agent-activity{display:flex;flex-direction:column;gap:2px;padding:5px 10px;margin-bottom:6px;border:1px solid var(--border);border-radius:10px;background:var(--bg3);position:relative;font-family:ui-monospace,Consolas,Menlo,monospace;font-size:11px;line-height:1.55;max-height:150px;overflow-y:auto;scrollbar-width:thin;max-width:85%;width:fit-content;min-width:200px}
+/* Agent response identity (2026-09-05): each agent response is one rounded
+   CARD — the response bubble itself — with the agent head INSIDE at the top
+   (label + ⚕ to its right), the text, then that response's own agentic
+   process stream inside the card under the text. Stats plate stays the card
+   bottom edge. */
+.msg.agent .bubble{background:color-mix(in srgb,var(--accent) 7%,var(--asstBg));border-color:color-mix(in srgb,var(--accent) 40%,var(--border));border-radius:12px}
+.msg.agent .msg-stats{background:color-mix(in srgb,var(--accent) 7%,var(--asstBg));border-radius:0 0 12px 12px}
+.msg.agent .avatar{background:var(--accentBg);color:var(--accent)}
+.agent-head{display:flex;align-items:center;gap:6px;margin:0 0 8px;padding-bottom:6px;border-bottom:1px solid color-mix(in srgb,var(--accent) 25%,var(--border));font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent);user-select:none;line-height:1;white-space:nowrap;overflow:hidden;max-width:100%}
+.agent-head svg{width:44px;height:47px;flex-shrink:0;opacity:.95;margin:0 0 0 -16px}
+.bubble-content{min-width:0}
+.agent-activity{display:flex;flex-direction:column;gap:2px;margin:10px 0 -2px;padding:8px 10px 2px;border-top:1px solid color-mix(in srgb,var(--accent) 30%,var(--border));background:color-mix(in srgb,var(--accent) 5%,transparent);font-family:ui-monospace,Consolas,Menlo,monospace;font-size:11px;line-height:1.55;max-height:150px;overflow-y:auto;scrollbar-width:thin}
+.agent-activity:empty{display:none}
 .aa-line{display:flex;gap:6px;align-items:baseline;white-space:nowrap;color:var(--dim);min-width:0}
 .aa-line .aa-glyph{flex-shrink:0;width:13px;text-align:center}
 .aa-line .aa-tool{color:var(--accent);flex-shrink:0}
@@ -550,7 +562,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.1.1</span>
+    <span class="footer-version">xLLM Chat v3.1.2</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -2864,7 +2876,7 @@ let TOP_P = parseFloat(localStorage.getItem('chat_top_p') || '0.9');
 let currentModel = localStorage.getItem('chat_current_model') || '';
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.1.1';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.1.2';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -4588,7 +4600,8 @@ function attachmentChipsHTML(list) {
 // and by recycle — the user prompt is already in history, don't re-add it)
 async function streamFromHistory() {
   const input = document.getElementById('chatInput');
-  const agentStream = !!activeAgent();   // agent runs keep the input OPEN so the user can steer mid-run
+  const agentNow = activeAgent();
+  const agentStream = !!agentNow;   // agent runs keep the input OPEN so the user can steer mid-run
   isStreaming = true;
   abortController = new AbortController();
   document.getElementById('sendBtn').style.display = 'none';
@@ -4596,7 +4609,9 @@ async function streamFromHistory() {
   if (!agentStream) input.disabled = true;
   input.placeholder = agentStream ? 'Type to steer the agent… (Enter)' : input.placeholder;
   startStatsTracking();
-  conversationHistory.push({ role: 'assistant', content: '' });
+  const placeholder = { role: 'assistant', content: '' };
+  if (agentNow) placeholder.agentName = agentNow.name || agentNow.id;   // agent responses keep their head row across reloads
+  conversationHistory.push(placeholder);
   saveCurrentChat();   // persist prompt+placeholder NOW — a mid-stream chat switch can't lose the prompt (2026-08-27)
   streamChatId = currentChatId;   // bind this stream to its thread — AFTER save so brand-new chats get the materialized id (2026-08-27)
   try { await streamResponse(); }
@@ -4820,11 +4835,44 @@ function avatarIconHTML(role) {
   }
   return role === 'assistant' ? '🤖' : '⚡';
 }
-function appendMessage(role, content, thinking = null, stats = null, hidx = null, attachments = null, branchCtx = null) {
+// Official Hermes mark = the ⚕ staff glyph as inline SVG text (same technique
+// as the product's own favicon — monochrome, currentColor, no emoji font
+// dependence on the render target).
+function agentMarkSVG(sz) {
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="' + sz + '" height="' + sz + '" fill="currentColor" aria-hidden="true"><text x="12" y="17.6" font-size="16" text-anchor="middle" font-family="DejaVu Sans, Noto Sans Symbols2, system-ui, sans-serif">⚕</text></svg>';
+}
+function agentHeadHTML(name) {
+  // Header row INSIDE the response card: agent label with the ⚕ mark to its right.
+  return '<div class="agent-head">' + escHtml(name) + agentMarkSVG(13) + '</div>';
+}
+// Turn a freshly created assistant message into an AGENT response card: mark
+// avatar, agent class (off-color tint), and INSIDE the bubble — head at top +
+// a dedicated .bubble-content region (streaming writers fill the region so the
+// head and the per-response process stream below it are never clobbered).
+function agentDecorateMsg(div, name) {
+  if (!div) return;
+  div.classList.add('agent');
+  const av = div.querySelector('.avatar');
+  if (av) av.innerHTML = agentMarkSVG(16);
+  const bubble = div.querySelector('.bubble');
+  if (bubble && !bubble.querySelector('.bubble-content')) {
+    bubble.innerHTML = agentHeadHTML(name || 'Agent') + '<div class="bubble-content"></div>';
+  }
+}
+// Live text/thinking/media target of an agent card: the .bubble-content region
+// (falls back to the bubble itself for non-agent messages).
+function agentContentEl(el) {
+  if (!el) return el;
+  const r = el.querySelector && el.querySelector('.bubble-content');
+  return r || el;
+}
+function appendMessage(role, content, thinking = null, stats = null, hidx = null, attachments = null, branchCtx = null, agentName = null) {
   resetJumpIndex();   // new content → walk restarts from the newest message
   const container = document.getElementById('messages');
   const div = document.createElement('div');
   div.className = `msg ${role}`;
+  const isAgent = role === 'assistant' && !!agentName;
+  if (isAgent) div.classList.add('agent');
   let bubbleHtml = '';
   if (role === 'assistant') {
     if (thinking) {
@@ -4853,7 +4901,7 @@ function appendMessage(role, content, thinking = null, stats = null, hidx = null
   if (role === 'assistant' && branchCtx && branchCtx.total >= 2) {
     barHtml = `<div class="branch-bar${isPast ? ' past' : ''}" onclick="cycleBranch(${branchCtx.userIdx})" title="Switch between versions of this response">‹ <b>${branchCtx.viewIdx + 1}</b>/${branchCtx.total} ›</div>`;
   }
-  div.innerHTML = `<div class="avatar">${avatarIconHTML(role)}</div><div class="msg-main">${barHtml}<div class="bubble">${bubbleHtml}</div>${statsHtml}</div>`;
+  div.innerHTML = `<div class="avatar">${isAgent ? agentMarkSVG(16) : avatarIconHTML(role)}</div><div class="msg-main">${barHtml}<div class="bubble">${isAgent ? agentHeadHTML(agentName) : ''}${bubbleHtml}</div>${statsHtml}</div>`;
   // stamp the matching conversationHistory index (system msgs aren't in history — use -1)
   const hidxVal = (hidx !== null && hidx !== undefined) ? hidx : ((role === 'system') ? -1 : (conversationHistory.length - 1));
   div.dataset.hidx = hidxVal;
@@ -4932,12 +4980,8 @@ function startAgentWaitPulse() {
       pinAgentAct(el);
     }
     const wl = _agentWaitLine.querySelector('.wait-label');
-    if (wl) {
-      const secs = Math.round(idle / 1000);
-      wl.textContent = secs < 12
-        ? 'Hermes is working — ' + secs + 's'
-        : 'Hermes is working — ' + secs + 's (cold start: first reply can take 30s+)';
-    }
+    // No invented progress: while a run is genuinely silent just say working.
+    if (wl) wl.textContent = 'Hermes is working…';
     pinAgentAct(el);
   }, 500);
 }
@@ -5078,12 +5122,16 @@ async function agentRunTurn() {
   currentStreamingEl = bubble;
   const msgMain = responseDiv.querySelector('.msg-main');
 
-  // activity strip sits ABOVE the bubble (tools ran before the answer came).
-  // Reference it directly — never by id (duplicate ids across turns sent the
-  // second turn's lines into the FIRST message's box — hit live 2026-09-04).
+  // Agent response card (2026-09-05): decorate puts the agent class + mark
+  // avatar + head INSIDE the bubble + a .bubble-content region; the process
+  // stream for THIS response is appended INSIDE the bubble under the text.
+  // Reference the feed directly — never by id (duplicate ids across turns
+  // sent the second turn's lines into the FIRST message's box — hit live
+  // 2026-09-04).
+  agentDecorateMsg(responseDiv, ag.name || ag.id);
+
   const act = document.createElement('div');
   act.className = 'agent-activity';
-  msgMain.insertBefore(act, msgMain.firstChild);
   _agentActEl = act;
   _agentActPinned = true;
   act.addEventListener('scroll', onAgentActScroll);
@@ -5092,6 +5140,7 @@ async function agentRunTurn() {
   msgStatsEl.className = 'msg-stats';
   msgStatsEl.innerHTML = statsBarHTML(0, 0, null, true, displayModelBadge());
   msgMain.appendChild(msgStatsEl);
+  bubble.appendChild(act);   // this response's agentic stream, inside the card
   msgFirstTokenTime = 0;
   msgRateSamples = [];
   if (msgStatsTimer) clearInterval(msgStatsTimer);
@@ -5108,7 +5157,7 @@ async function agentRunTurn() {
 
   const finishRun = (ended, err) => { runEnded = ended; runErr = err || ''; };
   const renderContent = () => {
-    const el = liveBubble();
+    const el = agentContentEl(liveBubble());
     if (!el) return;
     let html = '';
     if (thinking) html += thinkingPillHTML(thinking, true);
@@ -5117,7 +5166,7 @@ async function agentRunTurn() {
     if (currentChatId === streamChatId) chatScrollBottom();
   };
   const finalizeRun = () => {
-    const finalEl = liveBubble();
+    const finalEl = agentContentEl(liveBubble());
     stopAgentWaitPulse();
     if (msgStatsTimer) { clearInterval(msgStatsTimer); msgStatsTimer = null; }
     const totalMs = Date.now() - streamStartTime;
@@ -5309,6 +5358,13 @@ async function agentRunTurn() {
           finishRun('cancelled', '');
           finalizeRun();
           break;
+        } else {
+          // A stream is a stream (2026-09-05): any event the gateway emits that
+          // isn't modelled above still lands in the feed — never hidden.
+          let pv = '';
+          const raw = (typeof ev.preview === 'string' && ev.preview) ? ev.preview : (typeof ev.text === 'string' ? ev.text : '');
+          if (raw) pv = ' — ' + shortTxt(raw, 120);
+          addActivity('note', '', evt + pv);
         }
       }
       if (runEnded !== 'open') break;
@@ -5335,7 +5391,7 @@ async function agentRunTurn() {
       _agentStopFired = true;
       agentPostRunAction('stop').catch(() => {});
     }
-    const errEl = liveBubble();
+    const errEl = agentContentEl(liveBubble());
     if (e.name === 'AbortError') {
       if (errEl && errEl.closest('.msg') && errEl.closest('.msg').classList.contains('assistant')) {
         errEl.innerHTML = fullText ? renderAssistantContent(fullText) + '<span style="color:var(--dim);font-size:12px"> — [stopped]</span>' : '<span style="color:var(--dim)">[stopped]</span>';
@@ -5412,9 +5468,12 @@ async function agentChatSimpleTurn(ag, sessId, reuseExisting) {
     bubble = responseDiv.querySelector('.bubble');
     currentStreamingEl = bubble;
     msgMain = responseDiv.querySelector('.msg-main');
+    // Same agent response card as the runs path: decorate (mark avatar +
+    // agent class + head + .bubble-content region) and the process stream
+    // INSIDE the bubble under the text.
+    agentDecorateMsg(responseDiv, ag.name || ag.id);
     const act = document.createElement('div');
     act.className = 'agent-activity';
-    msgMain.insertBefore(act, msgMain.firstChild);
     _agentActEl = act;
     _agentActPinned = true;
     act.addEventListener('scroll', onAgentActScroll);
@@ -5422,6 +5481,7 @@ async function agentChatSimpleTurn(ag, sessId, reuseExisting) {
     msgStatsEl.className = 'msg-stats';
     msgStatsEl.innerHTML = statsBarHTML(0, 0, null, true, displayModelBadge());
     msgMain.appendChild(msgStatsEl);
+    bubble.appendChild(act);   // this response's agentic stream, inside the card
     msgFirstTokenTime = 0;
     msgRateSamples = [];
     if (msgStatsTimer) clearInterval(msgStatsTimer);
@@ -5488,7 +5548,7 @@ async function agentChatSimpleTurn(ag, sessId, reuseExisting) {
           if (!msgFirstTokenTime) msgFirstTokenTime = Date.now();
           fullText += delta.content;
           streamChars += delta.content.length; streamContentChars += delta.content.length;
-          const el = liveBubble();
+          const el = agentContentEl(liveBubble());
           if (el) {
             let html = '';
             if (thinking) html += thinkingPillHTML(thinking, true);
@@ -5507,7 +5567,7 @@ async function agentChatSimpleTurn(ag, sessId, reuseExisting) {
     const exactTokens = Math.max(streamTokens, Math.round(streamThinkingChars / 4 + streamContentChars / 2.6));
     const tps = genMs > 0 ? (exactTokens / (genMs / 1000)) : 0;
     const finalStats = { tokens: exactTokens, timeMs: totalMs, tps: tps, truncated: finishReason === 'length' || undefined, model: displayModelBadge() };
-    const finalEl = liveBubble();
+    const finalEl = agentContentEl(liveBubble());
     if (finalEl) {
       let html = '';
       if (thinking) html += thinkingPillHTML(thinking, false);
@@ -5540,7 +5600,7 @@ async function agentChatSimpleTurn(ag, sessId, reuseExisting) {
   } catch (e) {
     stopAgentWaitPulse();
     if (msgStatsTimer) { clearInterval(msgStatsTimer); msgStatsTimer = null; }
-    const errEl = liveBubble();
+    const errEl = agentContentEl(liveBubble());
     if (e.name === 'AbortError') {
       if (errEl && errEl.closest('.msg') && errEl.closest('.msg').classList.contains('assistant')) {
         errEl.innerHTML = fullText ? renderAssistantContent(fullText) + '<span style="color:var(--dim);font-size:12px"> — [stopped]</span>' : '<span style="color:var(--dim)">[stopped]</span>';
@@ -5755,7 +5815,7 @@ async function streamResponse() {
     }
   } catch (e) {
     if (msgStatsTimer) { clearInterval(msgStatsTimer); msgStatsTimer = null; }
-    const errEl = liveBubble();
+    const errEl = agentContentEl(liveBubble());
     if (e.name === 'AbortError') {
       // only paint [stopped] into an ASSISTANT bubble — after a recycle-triggered
       // abort the last bubble may be the user's (chat rebuilt); never clobber it
@@ -5803,7 +5863,7 @@ function liveBubble() {
 
 function updateThinkingUI(thinking, inThinking) {
   if (inThinking) {
-    const el = liveBubble();
+    const el = agentContentEl(liveBubble());
     if (!el) return;
     let tb = el.querySelector('.thinking-block');
     if (!tb) {
@@ -5877,7 +5937,7 @@ function renderAllMessages() {
   conversationHistory.forEach((msg, i) => {
     const d = branchDisplay(i);
     if (msg.role === 'user') appendMessage('user', d.content, null, null, i, d.attachments, d.ctx);
-    else if (msg.role === 'assistant') appendMessage('assistant', d.content, d.thinking, d.stats, i, null, d.ctx);
+    else if (msg.role === 'assistant') appendMessage('assistant', d.content, d.thinking, d.stats, i, null, d.ctx, msg.agentName);
   });
 }
 
