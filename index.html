@@ -550,7 +550,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.1.0</span>
+    <span class="footer-version">xLLM Chat v3.1.1</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -2854,7 +2854,6 @@ Prism.languages.sql={comment:{pattern:/(^|[^\\])(?:\/\*[\s\S]*?\*\/|(?:--|\/\/|#
 let API_URL = localStorage.getItem('chat_api_url') || 'http://127.0.0.1:8080';
 let isLlamaCpp = null; // backend flag: llama.cpp serves /props (vLLM does not) — see detectBackend()
 let _backendKnown = false; // true once a probe got a definitive answer (models owned_by or /props status)
-let _thinkRetry = false; // one-shot self-heal: retry a thinking-only response with thinking OFF
 let SYSTEM_PROMPT = localStorage.getItem('chat_system_prompt') || '';
 let MAX_TOKENS = parseInt(localStorage.getItem('chat_max_tokens') || '0');
 if (isNaN(MAX_TOKENS) || MAX_TOKENS < 0) MAX_TOKENS = 0;
@@ -2865,7 +2864,7 @@ let TOP_P = parseFloat(localStorage.getItem('chat_top_p') || '0.9');
 let currentModel = localStorage.getItem('chat_current_model') || '';
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.1.0';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.1.1';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -4443,11 +4442,10 @@ function loadModels() {
     });
 }
 
-// llama.cpp exposes GET /props (vLLM returns 404). Used to send per-request
-// chat_template_kwargs only to llama.cpp: Qwen4 GGUFs default reasoning_effort to
-// xhigh, which at aggressive quants (IQ1_S/IQ3_XXS) loops forever in reasoning and
-// returns ZERO content tokens — the empty-bubble bug. Capping at 'low' still yields
-// a reasoning pill plus an actual answer (verified 2026-08-29).
+// llama.cpp exposes GET /props (vLLM returns 404). Backend detection only — the
+// client no longer injects reasoning kwargs (2026-09-05: reasoning depth is
+// launch/server-determined; the old reasoning_effort:'low' cap + thinking-off
+// retry were removed).
 // The /props probe is ONLY the fallback: loadModels' /v1/models owned_by check is the
 // primary signal and sets _backendKnown itself — so skip the probe entirely once the
 // backend is known (a vLLM 404 is definitive but logs a noisy console error; 2026-08-31).
@@ -4605,33 +4603,9 @@ async function streamFromHistory() {
   catch (e) {
     if (e.name !== 'AbortError') appendMessage('system', 'Error: ' + e.message);
   }
-  // Thinking-loop self-heal: if the stream finished with a reasoning pill but ZERO
-  // content tokens (Qwen4 xhigh-effort loop at aggressive quants), pop the blank
-  // response and retry ONCE with thinking disabled — never leave an empty bubble.
-  // Fires regardless of the backend flag: an uncapped request (flag unset/failed
-  // probe) is exactly the case that loops, and the retry's thinking-off kwarg is
-  // sent unconditionally below.
-  if (!_thinkRetry && !(abortController && abortController.signal.aborted)) {
-    const last = conversationHistory[conversationHistory.length - 1];
-    if (last && last.role === 'assistant' && !last.content && last.thinking) {
-      conversationHistory.pop();
-      renderAllMessages();
-      conversationHistory.push({ role: 'assistant', content: '' });
-      _thinkRetry = true;
-      try { await streamResponse(); }
-      catch (e2) { if (e2.name !== 'AbortError') appendMessage('system', 'Error: ' + e2.message); }
-      finally { _thinkRetry = false; }
-      if (streamChatId === currentChatId) {
-        const b = document.querySelector('.msg:last-of-type .bubble');
-        if (b) {
-          const n = document.createElement('div');
-          n.className = 'trunc-note';
-          n.textContent = '⚠ Thinking disabled for this retry — the model stayed in reasoning (thinking loop).';
-          b.appendChild(n);
-        }
-      }
-    }
-  }
+  // (2026-09-05: the thinking-loop self-heal retry was REMOVED — it forced
+  // enable_thinking:false client-side. Reasoning is launch/server-determined now;
+  // a thinking-only response finalizes with the loop-warn instead of auto-retrying.)
   ensureBranchBar();
   saveCurrentChat();
   isStreaming = false;
@@ -5634,12 +5608,9 @@ async function streamResponse() {
           stream: true,
           // 0 = unlimited: omit max_tokens so vLLM uses the model's full context
           ...(MAX_TOKENS > 0 ? { max_tokens: MAX_TOKENS } : {}),
-          // llama.cpp Qwen4: cap reasoning_effort at 'low' — the GGUF template defaults
-          // to xhigh which loops at aggressive quants (zero content tokens = empty bubble);
-          // _thinkRetry (one-shot self-heal) retries with thinking OFF, UNCONDITIONALLY —
-          // it must fire even when the backend flag was never confirmed true
-          ...(_thinkRetry ? { chat_template_kwargs: { enable_thinking: false } }
-            : (isLlamaCpp ? { chat_template_kwargs: { reasoning_effort: 'low' } } : {})),
+          // Reasoning is launch/server-determined: the client sends NO
+          // chat_template_kwargs (2026-09-05 — removed the reasoning_effort:'low'
+          // cap and the thinking-off auto-retry; David's call)
           temperature: TEMPERATURE,
           top_p: TOP_P,
           stream_options: { include_usage: true }
@@ -5972,7 +5943,9 @@ function highlightCodeBlocks(html) {
 //    chat-server.py's /api/media (same resolution roots as R1). Path-qualified
 //    tokens (MEDIA:/, /, ~/, ./) are stripped from the bubble TEXT (protocol
 //    syntax, not prose); bare filenames stay visible above their image.
-const MEDIA_TOKEN_RE = /(\S*?\.(?:png|jpe?g|webp|gif|bmp|mp4|mov|m4v|webm|mp3|wav|m4a|aac|ogg|flac|opus))\b/gi;
+const MEDIA_EXT_SRC = '(?:png|jpe?g|webp|gif|bmp|mp4|mov|m4v|webm|mp3|wav|m4a|aac|ogg|flac|opus)';
+const MEDIA_TOKEN_RE = new RegExp('(\\S*?\\.' + MEDIA_EXT_SRC + ')\\b', 'gi');
+const MEDIA_PROTO_RE = new RegExp('MEDIA:.+?\\.' + MEDIA_EXT_SRC + '(?=[\\s.,;:!?)\\]>]|$)', 'gi');
 const MEDIA_BAD_PREFIX = /^(?:https?|data|file|blob|ftp):/i;
 const MEDIA_IMG_RE = /(png|jpe?g|webp|gif|bmp)$/i;
 const MEDIA_VID_RE = /(mp4|mov|m4v|webm)$/i;
@@ -6006,46 +5979,68 @@ function inAnySpan(spans, pos) {
   return false;
 }
 
-function mediaTokensIn(text) {
-  // Order-preserving, deduped media tokens in free text (code spans + URLs +
-  // markdown link/image targets skipped).
-  const toks = [];
-  if (!text) return toks;
+function mediaTokenSpans(text) {
+  // Accepted display-media spans: MEDIA: protocol tokens (paths MAY contain
+  // spaces — the generic regex can't cross them) + path-qualified bare tokens.
+  // Returns [{start,end,tok}] in text order, overlaps removed (the generic
+  // pass matches the bare tail of a spaced MEDIA: line; the proto span wins).
+  const out = [];
+  if (!text) return out;
   const spans = mediaCodeSpans(text);
-  const re = new RegExp(MEDIA_TOKEN_RE.source, 'gi');
+  const cands = [];
   let m;
-  while ((m = re.exec(text))) {
-    const tok = m[1];
+  const proto = new RegExp(MEDIA_PROTO_RE.source, 'gi');
+  while ((m = proto.exec(text))) {
+    const tok = m[0].trim().replace(/[.,;:!?)\]>]+$/, '');
     if (!tok) continue;
     if (inAnySpan(spans, m.index)) continue;
     if (MEDIA_BAD_PREFIX.test(tok)) continue;
-    if (m.index > 0 && /[(\[]/.test(text[m.index - 1])) continue;  // ![](path) / [x](path)
-    if (!toks.includes(tok)) toks.push(tok);
+    if (m.index > 0 && /[(\[]/.test(text[m.index - 1])) continue;
+    cands.push({ start: m.index, end: m.index + m[0].length, tok });
   }
-  return toks;
+  const bare = new RegExp(MEDIA_TOKEN_RE.source, 'gi');
+  while ((m = bare.exec(text))) {
+    const tok = m[1];
+    if (!tok) continue;
+    if (!mediaPathQualified(tok)) continue;
+    if (inAnySpan(spans, m.index)) continue;
+    if (MEDIA_BAD_PREFIX.test(tok)) continue;
+    if (m.index > 0 && /[(\[]/.test(text[m.index - 1])) continue;
+    cands.push({ start: m.index, end: m.index + m[0].length, tok });
+  }
+  cands.sort((a, b) => a.start - b.start || b.end - a.end);
+  let lastEnd = -1;
+  for (const c of cands) {
+    if (c.start < lastEnd) continue;             // inside an accepted span
+    if (out.some(s => s.tok === c.tok)) continue; // dedupe by token
+    out.push(c);
+    lastEnd = c.end;
+  }
+  return out;
+}
+
+function mediaTokensIn(text) {
+  // Order-preserving, deduped media tokens in free text (code spans + URLs +
+  // markdown link/image targets skipped).
+  if (!text) return [];
+  return mediaTokenSpans(text).map(s => s.tok);
 }
 
 function stripMediaPathTokens(text) {
   // Remove path-qualified media tokens from DISPLAY text only. Persisted content
   // keeps the raw text; this is applied at render time so reloads show the same.
   if (!text || !/(?:MEDIA:|[\/~])/i.test(text)) return text;
-  const spans = mediaCodeSpans(text);
-  const re = new RegExp(MEDIA_TOKEN_RE.source, 'gi');
+  const spans = mediaTokenSpans(text);
+  if (!spans.length) return text;
   const out = [];
   let last = 0;
-  let m;
-  while ((m = re.exec(text))) {
-    const tok = m[1];
-    if (!mediaPathQualified(tok)) continue;
-    if (inAnySpan(spans, m.index)) continue;
-    if (m.index > 0 && /[(\[]/.test(text[m.index - 1])) continue;
-    let end = m.index + m[0].length;
+  for (const s of spans) {
+    let end = s.end;
     // eat sentence punctuation glued to the token ("…x.png." / "x.png, next")
     while (end < text.length && /[.,;:!?)\]>]/.test(text[end]) && /[\s]|^$/.test(text[end + 1] || '')) end++;
-    out.push(text.slice(last, m.index));
+    out.push(text.slice(last, s.start));
     last = end;
   }
-  if (last === 0) return text;
   out.push(text.slice(last));
   return out.join('');
 }

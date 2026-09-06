@@ -8,7 +8,7 @@ A single-file browser chat window for **local LLMs and connected agents** — ll
 
 ## Features
 
-- **Any local model, one window** — the header pill flips the chat source between local models and connected agents. Point the API URL at llama.cpp, vLLM, or any OpenAI-compatible server; the client auto-detects the backend (llama.cpp gets its reasoning-effort handling automatically) and shows the serving model on every response
+- **Any local model, one window** — the header pill flips the chat source between local models and connected agents. Point the API URL at llama.cpp, vLLM, or any OpenAI-compatible server; the client auto-detects the backend and shows the serving model on every response. The client never touches model reasoning settings — reasoning depth is whatever the model launch sets (server flags / template), so every model behaves exactly as launched
 - **Live agent sessions** — Settings → Connect Agent configures Hermes (the local gateway on `:8642`) or any OpenAI-compatible agent server (Pi, DS Harness, custom). Each chat thread keeps its own live agent session — returning to a thread resumes the same conversation
 - **Tool-use approvals** — when a connected agent wants to run a tool, xLLM Chat surfaces a native approval prompt (Allow once / Allow this session / Always allow / Deny) with live "agent is working" activity notes; no blind auto-run
 - **Streaming chat** with a live stats bar per response: tokens / time / tok/s (llama.cpp's exact cumulative formula `predicted_n / predicted_ms * 1000`) — a theme-aware plate attached to the response bubble (bottom-rounded, bubble-matched color) so it stays readable over video/image chat backgrounds
