@@ -300,6 +300,12 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .history-item.active .title{color:var(--accent)}
 .history-item .title{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:250px;flex:1;min-width:0}
 .history-item .title .pin-ic{vertical-align:-1px;margin-right:4px;color:var(--accent)}
+/* Per-thread connection icon (2026-09-05): agent ⚕ / cloud / local chat — theme-var colors */
+.history-item .title .conn-ic{display:inline-flex;align-items:center;justify-content:center;width:15px;height:14px;margin-right:5px;vertical-align:-2px;flex:none}
+.history-item .title .conn-ic svg{width:13px;height:13px;display:block}
+.history-item .title .conn-ic.agent{color:var(--green)}
+.history-item .title .conn-ic.cloud{color:var(--purple)}
+.history-item .title .conn-ic.local{color:var(--dim);opacity:.9}
 .history-item .date{font-size:11px;color:var(--dim)}
 .history-item .hi-actions{position:relative;flex-shrink:0;margin-left:6px}
 .history-item .menu-btn{background:none;border:none;color:var(--dim);cursor:pointer;padding:4px 3px;border-radius:6px;display:flex;align-items:center;opacity:.65;transition:all .12s}
@@ -562,7 +568,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
 <div class="sidebar" id="sidebar">
   <div class="sidebar-header">
     <div class="sidebar-header-left">
-      <h3>Chat History</h3>
+      <h3>xLLM Chat History</h3>
       <button class="pin-sidebar-btn" id="pinSidebarBtn" onclick="toggleSidebarPin()" title="Keep panel open"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg></button>
     </div>
     <button onclick="toggleSidebar()">×</button>
@@ -580,7 +586,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.1.2</span>
+    <span class="footer-version">xLLM Chat v3.1.3</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -2927,7 +2933,7 @@ let TOP_P = parseFloat(localStorage.getItem('chat_top_p') || '0.9');
 let currentModel = localStorage.getItem('chat_current_model') || '';
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.1.2';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.1.3';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -4593,7 +4599,7 @@ function loadHistory() {
   container.innerHTML = sorted.map(c => `
     <div class="history-item${c.pinned ? ' pinned' : ''}${c.id === currentChatId ? ' active' : ''}" onclick="loadConversation('${c.id}');if(!sidebarPinned) toggleSidebar();">
       <div style="flex:1;min-width:0">
-        <div class="title">${c.pinned ? '<span class="pin-ic">' + ICON_PIN + '</span>' : ''}${escHtml(threadTitle(c.title))}</div>
+        <div class="title">${connTypeIcon(c)}${c.pinned ? '<span class="pin-ic">' + ICON_PIN + '</span>' : ''}${escHtml(threadTitle(c.title))}</div>
         <div class="date">${formatDate(c.created)}</div>
       </div>
       <div class="hi-actions">
@@ -4738,6 +4744,26 @@ const ICON_PANEL_CLOSE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2
 const ICON_DL = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
 const ICON_TRASH = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
 const ICON_EDIT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
+// ── Thread connection icons (2026-09-05): shown left of each chat's title in the
+//    history list — agent (⚕ mark, same technique as the favicon) / cloud / local
+//    chat bubble. Line SVGs, colors come from theme vars via the .conn-ic classes.
+const ICON_CONN_LOCAL = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>';
+const ICON_CONN_CLOUD = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>';
+const ICON_CONN_AGENT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><text x="12" y="17.4" text-anchor="middle" font-size="19" fill="currentColor">⚕</text></svg>';
+function connTypeIcon(c) {
+  const conn = (c && c.conn && typeof c.conn === 'object') ? c.conn : null;
+  let cls = 'local', ic = ICON_CONN_LOCAL, tip = 'Local model chat';
+  if (conn && conn.kind === 'agent') {
+    const a = (AGENTS && AGENTS[conn.agent]) ? AGENTS[conn.agent] : null;
+    cls = 'agent'; ic = ICON_CONN_AGENT;
+    tip = 'Agent chat — ' + ((a && a.name) || conn.agent);
+  } else if (conn && conn.kind === 'cloud') {
+    const cp = (CLOUD_CONNS && CLOUD_CONNS[conn.provider]) ? CLOUD_CONNS[conn.provider] : null;
+    cls = 'cloud'; ic = ICON_CONN_CLOUD;
+    tip = 'Cloud — ' + ((cp && cp.name) || conn.provider);
+  }
+  return `<span class="conn-ic ${cls}" title="${escAttr(tip)}">${ic}</span>`;
+}
 
 function toggleChatMenu(chatId) {
   const menu = document.getElementById('chatMenu_' + chatId);
