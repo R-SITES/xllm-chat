@@ -100,6 +100,7 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .bubble{max-width:85%;padding:12px 16px;border-radius:16px;line-height:1.75;font-size:var(--bubbleFs,14px);word-wrap:break-word;position:relative}
 .msg.user .bubble{background:var(--userBg);border:1px solid var(--border);border-radius:16px 4px 0px 16px;color:#fff}
 .msg.assistant .bubble{background:var(--asstBg);border:1px solid var(--border);border-radius:4px 16px 16px 0px}
+.msg.user .bubble,.msg.assistant .bubble{font-family:var(--bubbleFont,var(--font))}   /* Google Fonts picker (2026-09-06) — user/assistant text only; system msgs keep the UI font */
 .msg.system .bubble{background:var(--sysBg);border:1px solid var(--sysLine);border-radius:var(--r);color:var(--sysText);font-size:12px}
 .bubble p{margin:1rem 0}
 .bubble p:first-child{margin-top:0}
@@ -587,8 +588,38 @@ function applyTheme(key,persist){
   document.querySelectorAll('#themeRow .theme-swatch').forEach(b=>b.classList.toggle('active',b.dataset.theme===key));
 }
 applyTheme(localStorage.getItem('chat_theme')||'blue',false);
-// Chat bubble font size — applied pre-paint with the theme (no size flash)
-(function(){try{var f=parseInt(localStorage.getItem('chat_font_size')||'14',10);if(f>=12&&f<=26)document.documentElement.style.setProperty('--bubbleFs',f+'px');}catch(e){}})();
+// Chat bubble font family + size — applied pre-paint with the theme (no flash).
+// BUBBLE_FONTS = Google Fonts for chat response bubbles (user AND assistant
+// text, same targets as the size slider). key '' = app default (Inter).
+// css = Google Fonts css2 family spec (weights 400/500/600/700 upright);
+// stack = the CSS font-family value that --bubbleFont carries. Fonts load on
+// demand (only the picked family is fetched — single-file app, no static links).
+const BUBBLE_FONTS=[
+{key:'',label:'Default (Inter)',stack:''},
+{key:'Inter',label:'Inter',css:'Inter:wght@400;500;600;700',stack:"'Inter',system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"},
+{key:'Roboto',label:'Roboto',css:'Roboto:wght@400;500;700',stack:"'Roboto',system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"},
+{key:'Open Sans',label:'Open Sans',css:'Open Sans:wght@400;500;600;700',stack:"'Open Sans',system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"},
+{key:'Lato',label:'Lato',css:'Lato:wght@400;700',stack:"'Lato',system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"},
+{key:'Montserrat',label:'Montserrat',css:'Montserrat:wght@400;500;600;700',stack:"'Montserrat',system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"},
+{key:'Poppins',label:'Poppins',css:'Poppins:wght@400;500;600',stack:"'Poppins',system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"},
+{key:'Nunito Sans',label:'Nunito Sans',css:'Nunito Sans:wght@400;600;700',stack:"'Nunito Sans',system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"},
+{key:'Work Sans',label:'Work Sans',css:'Work Sans:wght@400;500;600;700',stack:"'Work Sans',system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"},
+{key:'Source Sans 3',label:'Source Sans 3',css:'Source Sans 3:wght@400;600;700',stack:"'Source Sans 3',system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"},
+{key:'IBM Plex Sans',label:'IBM Plex Sans',css:'IBM Plex Sans:wght@400;500;600;700',stack:"'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"},
+{key:'DM Sans',label:'DM Sans',css:'DM Sans:wght@400;500;700',stack:"'DM Sans',system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"},
+{key:'Manrope',label:'Manrope',css:'Manrope:wght@400;500;600;700',stack:"'Manrope',system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"},
+{key:'Karla',label:'Karla',css:'Karla:wght@400;600;700',stack:"'Karla',system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"},
+{key:'Rubik',label:'Rubik',css:'Rubik:wght@400;500;600;700',stack:"'Rubik',system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"},
+{key:'Public Sans',label:'Public Sans',css:'Public Sans:wght@400;600;700',stack:"'Public Sans',system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"},
+{key:'Raleway',label:'Raleway',css:'Raleway:wght@400;500;600;700',stack:"'Raleway',system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"},
+{key:'Ubuntu',label:'Ubuntu',css:'Ubuntu:wght@400;500;700',stack:"'Ubuntu',system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"},
+{key:'Lora',label:'Lora',css:'Lora:wght@400;500;600;700',stack:"'Lora',Georgia,'Times New Roman',serif"},
+{key:'Merriweather',label:'Merriweather',css:'Merriweather:wght@400;700',stack:"'Merriweather',Georgia,'Times New Roman',serif"},
+{key:'Source Serif 4',label:'Source Serif 4',css:'Source Serif 4:wght@400;600;700',stack:"'Source Serif 4',Georgia,'Times New Roman',serif"}
+];
+function bubbleFontStack(key){for(var i=0;i<BUBBLE_FONTS.length;i++){if(BUBBLE_FONTS[i].key===key)return BUBBLE_FONTS[i].stack;}return '';}
+function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');if(old)old.remove();if(!key)return;var f=null;for(var i=0;i<BUBBLE_FONTS.length;i++){if(BUBBLE_FONTS[i].key===key){f=BUBBLE_FONTS[i];break;}}if(!f||!f.css)return;var l=document.createElement('link');l.id='gfBubbleFont';l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family='+encodeURIComponent(f.css)+'&display=swap';document.head.appendChild(l);}
+(function(){try{var f=parseInt(localStorage.getItem('chat_font_size')||'14',10);if(f>=12&&f<=26)document.documentElement.style.setProperty('--bubbleFs',f+'px');var fam=localStorage.getItem('chat_bubble_font');if(fam){var st=bubbleFontStack(fam);if(st){document.documentElement.style.setProperty('--bubbleFont',st);loadBubbleFontCss(fam);}}}catch(e){}})();
 </script>
 </head>
 <body>
@@ -618,7 +649,7 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.1.5</span>
+    <span class="footer-version">xLLM Chat v3.1.6</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -737,8 +768,84 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
       <button class="settings-tab active" data-tab="general" onclick="settingsTab('general')">General</button>
       <button class="settings-tab" data-tab="voice" onclick="settingsTab('voice')">Voice</button>
       <button class="settings-tab" data-tab="agent" onclick="settingsTab('agent')">Connect Agent</button>
+      <button class="settings-tab" data-tab="theme" onclick="settingsTab('theme')">Theme</button>
     </div>
     <div class="settings-pane" id="paneGeneral">
+    <label>LLM Connections <span class="conn-sub">— endpoints for Local / DeepSeek / OpenRouter threads; the header pill picks which one each chat uses</span></label>
+    <div class="conn-tabs">
+      <button type="button" class="conn-tab active" data-ctab="local" onclick="connTab('local')">Local</button>
+      <button type="button" class="conn-tab" data-ctab="deepseek" onclick="connTab('deepseek')">DeepSeek</button>
+      <button type="button" class="conn-tab" data-ctab="openrouter" onclick="connTab('openrouter')">OpenRouter</button>
+    </div>
+    <div class="conn-pane" id="ctLocal">
+      <label>API URL</label>
+      <input type="text" id="setApiUrl" value="http://127.0.0.1:8080" spellcheck="false">
+      <div class="bg-note">Local model server (llama.cpp / vLLM / any OpenAI-compatible API). Its models are detected automatically — they appear in the header pill's Local group.</div>
+    </div>
+    <div class="conn-pane" id="ctDeepseek" hidden>
+      <label>Base URL</label>
+      <input type="text" id="dsUrl" placeholder="https://api.deepseek.com/v1" spellcheck="false">
+      <label>API Key</label>
+      <div class="ds-key-row">
+        <input type="password" id="dsKey" autocomplete="off" placeholder="sk-…" oninput="cloudKeyTyped('deepseek')">
+        <button class="ds-refresh" id="dsRefreshBtn" onclick="refreshCloudModels('deepseek')" title="Fetch the model list from this API" style="display:none" aria-label="Refresh DeepSeek model list"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
+      </div>
+      <div class="voice-row">
+        <span class="agent-status" id="dsStatus"><span class="status-dot"></span><span>Not tested</span></span>
+        <button class="bg-btn" id="dsTestBtn" onclick="testCloudConn('deepseek')">Test</button>
+      </div>
+      <label style="margin-top:12px">Models <span class="conn-sub">— click one to chat with it</span></label>
+      <div class="ds-model-list" id="dsModelList"></div>
+      <div class="bg-note">DeepSeek's model API. Keys are stored only in this browser (never in the app files). Enter your key, then hit the ↻ button to pull DeepSeek's current model list from the API — no Save needed. The header pill's DeepSeek group lists the same models.</div>
+    </div>
+    <div class="conn-pane" id="ctOpenrouter" hidden>
+      <label>Base URL</label>
+      <input type="text" id="orUrl" placeholder="https://openrouter.ai/api/v1" spellcheck="false">
+      <label>API Key</label>
+      <input type="password" id="orKey" autocomplete="off" placeholder="sk-or-…">
+      <div class="voice-row">
+        <span class="agent-status" id="orStatus"><span class="status-dot"></span><span>Not tested</span></span>
+        <button class="bg-btn" id="orTestBtn" onclick="testCloudConn('openrouter')">Test</button>
+      </div>
+      <div class="bg-note">OpenRouter's model API — thousands of models incl. Claude / GPT / Gemini. Top models are listed in the pill's OpenRouter group; ✎ custom model accepts any id. Keys stay in this browser only.</div>
+    </div>
+    <label>System Prompt</label>
+    <textarea id="setSysPrompt"></textarea>
+    <label>Max Tokens (0 = unlimited)</label>
+    <input type="number" id="setMaxTokens" value="0" min="0" max="200000">
+    <label>Temperature</label>
+    <input type="number" id="setTemp" value="0.7" min="0" max="2" step="0.1">
+    <label>Top P</label>
+    <input type="number" id="setTopP" value="0.9" min="0" max="1" step="0.01">
+    </div>
+    <div class="settings-pane" id="paneVoice" hidden>
+      <div class="voice-row">
+        <span class="voice-label">Read replies aloud</span>
+        <label class="switch"><input type="checkbox" id="voiceEnable" onchange="setVoiceEnabled(this.checked)"><span class="slider"></span></label>
+      </div>
+      <div class="voice-row">
+        <span class="voice-label">Voice</span>
+        <select id="voiceSelect" onchange="setVoiceName(this.value)"></select>
+        <button class="bg-btn" onclick="testVoice()">Test</button>
+      </div>
+      <div class="bg-note" id="voiceStatus"></div>
+    </div>
+    <div class="settings-pane" id="paneAgent" hidden>
+      <div class="bg-note" style="margin-bottom:2px">Chat with a connected agent instead of the local model — flip the source in the header pill. Agents you aren't running yet (Pi, DS Harness) are ready here: give them a server URL + key when you install them.</div>
+      <label>Agent</label>
+      <select id="agentSelect" onchange="agentSelectChanged(this.value)"></select>
+      <label>Server URL</label>
+      <input type="text" id="agentUrl" placeholder="http://host:port — OpenAI-compatible base URL">
+      <label>API Key<span class="agent-key-hint" id="agentKeyHint"></span></label>
+      <input type="password" id="agentKey" placeholder="optional" autocomplete="off">
+      <div class="voice-row">
+        <span class="agent-status" id="agentStatus"><span class="status-dot"></span><span>Not connected</span></span>
+        <button class="bg-btn" id="agentReconnectBtn" onclick="reconnectAgent()">Reconnect</button>
+      </div>
+      <div class="bg-note">Each chat thread keeps its own live agent session automatically — returning to a thread resumes the same conversation, and multiple turns continue it. Reconnect tests the server and starts a fresh session for this thread. Local model mode uses the API URL on the General tab.</div>
+    </div>
+
+    <div class="settings-pane" id="paneTheme" hidden>
     <label>Theme</label>
     <div class="theme-groups" id="themeRow">
       <div class="theme-group">
@@ -859,84 +966,13 @@ applyTheme(localStorage.getItem('chat_theme')||'blue',false);
       <div class="bg-note">A frosted blue pane over the video — down toward 0 clears it (crisp video), up intensifies the blue glass and frost. Stacks with the Video Overlay tint.</div>
     </div>
     <label>Chat Bubble Font</label>
+    <select id="chatFontSel" onchange="setChatFontFamily(this.value)" title="Bubble text font — Google Fonts; applies to user and assistant messages"></select>
     <div class="bg-slider-row">
       <span class="fs-scale">12</span>
       <input type="range" id="chatFontSize" min="12" max="26" step="1" value="14" oninput="setChatFontSize(this.value)" title="Bubble text size — applies to user and assistant messages">
       <span class="val" id="fontSizeVal">14px</span>
       <span class="fs-scale">26px</span>
     </div>
-    <label>LLM Connections <span class="conn-sub">— endpoints for Local / DeepSeek / OpenRouter threads; the header pill picks which one each chat uses</span></label>
-    <div class="conn-tabs">
-      <button type="button" class="conn-tab active" data-ctab="local" onclick="connTab('local')">Local</button>
-      <button type="button" class="conn-tab" data-ctab="deepseek" onclick="connTab('deepseek')">DeepSeek</button>
-      <button type="button" class="conn-tab" data-ctab="openrouter" onclick="connTab('openrouter')">OpenRouter</button>
-    </div>
-    <div class="conn-pane" id="ctLocal">
-      <label>API URL</label>
-      <input type="text" id="setApiUrl" value="http://127.0.0.1:8080" spellcheck="false">
-      <div class="bg-note">Local model server (llama.cpp / vLLM / any OpenAI-compatible API). Its models are detected automatically — they appear in the header pill's Local group.</div>
-    </div>
-    <div class="conn-pane" id="ctDeepseek" hidden>
-      <label>Base URL</label>
-      <input type="text" id="dsUrl" placeholder="https://api.deepseek.com/v1" spellcheck="false">
-      <label>API Key</label>
-      <div class="ds-key-row">
-        <input type="password" id="dsKey" autocomplete="off" placeholder="sk-…" oninput="cloudKeyTyped('deepseek')">
-        <button class="ds-refresh" id="dsRefreshBtn" onclick="refreshCloudModels('deepseek')" title="Fetch the model list from this API" style="display:none" aria-label="Refresh DeepSeek model list"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
-      </div>
-      <div class="voice-row">
-        <span class="agent-status" id="dsStatus"><span class="status-dot"></span><span>Not tested</span></span>
-        <button class="bg-btn" id="dsTestBtn" onclick="testCloudConn('deepseek')">Test</button>
-      </div>
-      <label style="margin-top:12px">Models <span class="conn-sub">— click one to chat with it</span></label>
-      <div class="ds-model-list" id="dsModelList"></div>
-      <div class="bg-note">DeepSeek's model API. Keys are stored only in this browser (never in the app files). Enter your key, then hit the ↻ button to pull DeepSeek's current model list from the API — no Save needed. The header pill's DeepSeek group lists the same models.</div>
-    </div>
-    <div class="conn-pane" id="ctOpenrouter" hidden>
-      <label>Base URL</label>
-      <input type="text" id="orUrl" placeholder="https://openrouter.ai/api/v1" spellcheck="false">
-      <label>API Key</label>
-      <input type="password" id="orKey" autocomplete="off" placeholder="sk-or-…">
-      <div class="voice-row">
-        <span class="agent-status" id="orStatus"><span class="status-dot"></span><span>Not tested</span></span>
-        <button class="bg-btn" id="orTestBtn" onclick="testCloudConn('openrouter')">Test</button>
-      </div>
-      <div class="bg-note">OpenRouter's model API — thousands of models incl. Claude / GPT / Gemini. Top models are listed in the pill's OpenRouter group; ✎ custom model accepts any id. Keys stay in this browser only.</div>
-    </div>
-    <label>System Prompt</label>
-    <textarea id="setSysPrompt"></textarea>
-    <label>Max Tokens (0 = unlimited)</label>
-    <input type="number" id="setMaxTokens" value="0" min="0" max="200000">
-    <label>Temperature</label>
-    <input type="number" id="setTemp" value="0.7" min="0" max="2" step="0.1">
-    <label>Top P</label>
-    <input type="number" id="setTopP" value="0.9" min="0" max="1" step="0.01">
-    </div>
-    <div class="settings-pane" id="paneVoice" hidden>
-      <div class="voice-row">
-        <span class="voice-label">Read replies aloud</span>
-        <label class="switch"><input type="checkbox" id="voiceEnable" onchange="setVoiceEnabled(this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="voice-row">
-        <span class="voice-label">Voice</span>
-        <select id="voiceSelect" onchange="setVoiceName(this.value)"></select>
-        <button class="bg-btn" onclick="testVoice()">Test</button>
-      </div>
-      <div class="bg-note" id="voiceStatus"></div>
-    </div>
-    <div class="settings-pane" id="paneAgent" hidden>
-      <div class="bg-note" style="margin-bottom:2px">Chat with a connected agent instead of the local model — flip the source in the header pill. Agents you aren't running yet (Pi, DS Harness) are ready here: give them a server URL + key when you install them.</div>
-      <label>Agent</label>
-      <select id="agentSelect" onchange="agentSelectChanged(this.value)"></select>
-      <label>Server URL</label>
-      <input type="text" id="agentUrl" placeholder="http://host:port — OpenAI-compatible base URL">
-      <label>API Key<span class="agent-key-hint" id="agentKeyHint"></span></label>
-      <input type="password" id="agentKey" placeholder="optional" autocomplete="off">
-      <div class="voice-row">
-        <span class="agent-status" id="agentStatus"><span class="status-dot"></span><span>Not connected</span></span>
-        <button class="bg-btn" id="agentReconnectBtn" onclick="reconnectAgent()">Reconnect</button>
-      </div>
-      <div class="bg-note">Each chat thread keeps its own live agent session automatically — returning to a thread resumes the same conversation, and multiple turns continue it. Reconnect tests the server and starts a fresh session for this thread. Local model mode uses the API URL on the General tab.</div>
     </div>
     <div class="btn-row">
       <button class="btn" onclick="closeSettings()">Cancel</button>
@@ -2994,7 +3030,7 @@ let TOP_P = parseFloat(localStorage.getItem('chat_top_p') || '0.9');
 let currentModel = localStorage.getItem('chat_current_model') || '';
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.1.5';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.1.6';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -3775,11 +3811,14 @@ function settingsTab(tab) {
   const p1 = document.getElementById('paneGeneral');
   const p2 = document.getElementById('paneVoice');
   const p3 = document.getElementById('paneAgent');
+  const p4 = document.getElementById('paneTheme');
   if (p1) p1.hidden = tab !== 'general';
   if (p2) p2.hidden = tab !== 'voice';
   if (p3) p3.hidden = tab !== 'agent';
+  if (p4) p4.hidden = tab !== 'theme';
   if (tab === 'voice') loadVoices();   // refresh availability + list each visit
   if (tab === 'agent') { populateAgentPane(); pingAgent(cfgAgentId); }  // refresh + status each visit
+  if (tab === 'theme') updateBgSettingsUI();   // bg buttons/sections reflect the live state each visit
 }
 function testVoice() {
   if (!voiceEnabled) setVoiceEnabled(true);
@@ -3894,6 +3933,7 @@ document.addEventListener('DOMContentLoaded', () => {
   wireTokenTip();
   updateTokenBar();
   loadVoices();   // voice read-aloud: availability + cloned voice list
+  renderBubbleFontSel();   // Settings → Theme: populate the Google Fonts dropdown
 });
 
 function autoResize(e) {
@@ -4031,6 +4071,30 @@ function setChatFontSize(v) {
   const val = document.getElementById('fontSizeVal');
   if (val) val.textContent = n + 'px';
 }
+// Chat bubble font FAMILY (Google Fonts picker, 2026-09-06): same targets as
+// the size slider — user + assistant bubble text — via --bubbleFont (head
+// script pre-applies the stored family + loads its stylesheet before paint).
+function setChatFontFamily(v) {
+  if (v) localStorage.setItem('chat_bubble_font', v);
+  else localStorage.removeItem('chat_bubble_font');
+  const st = bubbleFontStack(v);
+  const s = document.documentElement.style;
+  if (st) s.setProperty('--bubbleFont', st);
+  else s.removeProperty('--bubbleFont');
+  loadBubbleFontCss(v);
+}
+function renderBubbleFontSel() {
+  const sel = document.getElementById('chatFontSel');
+  if (!sel) return;
+  sel.innerHTML = '';
+  for (const f of BUBBLE_FONTS) {
+    const o = document.createElement('option');
+    o.value = f.key;
+    o.textContent = f.label;
+    sel.appendChild(o);
+  }
+  sel.value = localStorage.getItem('chat_bubble_font') || '';
+}
 function openSettings() {
   document.getElementById('setApiUrl').value = API_URL;
   // LLM Connections: cloud fields (2026-09-05) — keys stay browser-local
@@ -4050,6 +4114,12 @@ function openSettings() {
   if (fsEl) fsEl.value = (fs >= 12 && fs <= 26) ? fs : 14;
   const fsV = document.getElementById('fontSizeVal');
   if (fsV) fsV.textContent = ((fs >= 12 && fs <= 26) ? fs : 14) + 'px';
+  // bubble font family dropdown mirrors the stored family (populate once)
+  const famEl = document.getElementById('chatFontSel');
+  if (famEl) {
+    if (famEl.options.length < 2) renderBubbleFontSel();
+    famEl.value = localStorage.getItem('chat_bubble_font') || '';
+  }
   updateBgSettingsUI();
   loadVoices();   // refresh qwen3 availability + voice list each open
   populateAgentPane();   // Connect Agent: fill fields from stored config (agent tab default-hidden; fields kept live)
