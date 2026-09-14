@@ -564,6 +564,24 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
 .ds-model-item.dim:hover{background:none;border-color:transparent}
 .dm-check{width:16px;flex-shrink:0;color:var(--accent);font-size:11px}
 .dm-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:11px;line-height:1.4}
+/* OpenRouter catalog: Free/Premium tabs, sort header, per-1M prices (2026-09-13) */
+#orModelList{max-height:340px}
+.ds-list-head{position:sticky;top:-6px;z-index:2;margin:-6px -6px 2px;padding:6px;background:var(--bg);display:flex;flex-direction:column;gap:5px;border-bottom:1px solid var(--border)}
+.ds-tabs{display:flex;gap:4px}
+.ds-tab{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:5px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--dim);font-family:var(--font);font-size:11.5px;cursor:pointer;transition:all .15s}
+.ds-tab:hover{color:var(--text);border-color:var(--accentLine)}
+.ds-tab.on{background:var(--accentBg);border-color:var(--accentLine);color:var(--accent);font-weight:600}
+.ds-count{font-size:10px;opacity:.75}
+.ds-sort{display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--dim)}
+.ds-sort-label{text-transform:uppercase;letter-spacing:.05em;opacity:.8;margin-right:1px}
+.ds-sort-btn{padding:3px 9px;background:transparent;border:1px solid var(--border);border-radius:999px;color:var(--dim);font-family:var(--font);font-size:10.5px;cursor:pointer;transition:all .15s}
+.ds-sort-btn:hover{color:var(--text);border-color:var(--accentLine)}
+.ds-sort-btn.on{background:var(--accentBg);border-color:var(--accentLine);color:var(--accent)}
+.ds-sort-btn.disabled{opacity:.4;cursor:default}
+.ds-rows{display:flex;flex-direction:column;gap:4px}
+.dm-price{margin-left:auto;flex-shrink:0;font-family:var(--mono);font-size:10.5px;color:var(--dim);white-space:nowrap}
+.dm-price.free{color:var(--accent);font-weight:600}
+.dm-price.var{color:var(--dim);font-style:italic}
 .new-chat-btn{width:100%;padding:10px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:13px;cursor:pointer;font-family:var(--font);margin-bottom:12px;transition:opacity .15s}
 .new-chat-btn:hover{opacity:.85}
 .sidebar-footer{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 10px;border-top:1px solid var(--border);color:var(--dim);font-size:11px;text-align:center;flex-shrink:0}
@@ -703,7 +721,7 @@ function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.3.0</span>
+    <span class="footer-version">xLLM Chat v3.3.1</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -856,12 +874,18 @@ function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');
       <label>Base URL</label>
       <input type="text" id="orUrl" placeholder="https://openrouter.ai/api/v1" spellcheck="false">
       <label>API Key</label>
-      <input type="password" id="orKey" autocomplete="off" placeholder="sk-or-…">
+      <div class="ds-key-row">
+        <input type="password" id="orKey" autocomplete="off" placeholder="sk-or-…" oninput="cloudKeyTyped('openrouter')">
+        <button class="ds-refresh" id="orRefreshBtn" onclick="refreshCloudModels('openrouter')" title="Fetch the model list from this API" style="display:none" aria-label="Refresh OpenRouter model list"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
+      </div>
+      <label style="margin-top:12px">Model <span class="conn-sub">— the model id (path) this thread sends to OpenRouter</span></label>
+      <input type="text" id="orModel" placeholder="e.g. anthropic/claude-sonnet-4.5" spellcheck="false" oninput="orModelTyped()" onchange="orModelApply()" onkeydown="if(event.key==='Enter'){event.preventDefault();orModelApply(true);}">
+      <div class="ds-model-list" id="orModelList"></div>
       <div class="voice-row">
         <span class="agent-status" id="orStatus"><span class="status-dot"></span><span>Not tested</span></span>
         <button class="bg-btn" id="orTestBtn" onclick="testCloudConn('openrouter')">Test</button>
       </div>
-      <div class="bg-note">OpenRouter's model API — thousands of models incl. Claude / GPT / Gemini. Top models are listed in the pill's OpenRouter group; ✎ custom model accepts any id. Keys stay in this browser only.</div>
+      <div class="bg-note">OpenRouter's model API — thousands of models incl. Claude / GPT / Gemini. Hit ↻ to pull the catalog: <b>Free Models</b> / <b>Premium Models</b> tabs, sorted by name or by price (per 1M tokens shown on the right). Typing in the Model field filters both tabs, and Enter applies the typed id for the active OpenRouter thread. Keys stay in this browser only.</div>
     </div>
     <label>System Prompt</label>
     <textarea id="setSysPrompt"></textarea>
@@ -3084,7 +3108,7 @@ let TOP_P = parseFloat(localStorage.getItem('chat_top_p') || '0.9');
 let currentModel = localStorage.getItem('chat_current_model') || '';
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.3.0';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.3.1';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -3166,7 +3190,10 @@ function applyConn(c, opts) {
   if (activeConn.kind === 'agent') {
     if (!o.noModel) currentModel = currentModel;    // agent model is server-side — leave local pick alone
   } else if (activeConn.kind === 'cloud') {
-    currentModel = activeConn.model || CLOUD_CONNS[activeConn.provider].defaultModel || '';
+    // no model pinned on this thread → this provider's remembered model (the OpenRouter
+    // Model field writes it), then the preset default
+    const pc = CLOUD_CONNS[activeConn.provider];
+    currentModel = activeConn.model || (pc && (pc.model || pc.defaultModel)) || '';
   } else {
     const lm = activeConn.model;
     if (lm && !o.keepLocalDefault) currentModel = lm;
@@ -3293,6 +3320,7 @@ function ensureConnStatus(recheck) {
 let cloudModels = { deepseek: null, openrouter: null };   // null = not fetched yet; [] = fetched but empty
 let cloudFetching = {};
 let cloudFallback = { deepseek: false, openrouter: false };   // true = /models unreachable, showing the known set
+let cloudError = { deepseek: '', openrouter: '' };            // last /models failure (shown in the pane)
 function ensureCloudModels(p) {
   if (!cloudConfigured(p) || cloudModels[p] || cloudFetching[p]) return cloudModels[p];
   const c = CLOUD_CONNS[p];
@@ -3304,8 +3332,16 @@ function ensureCloudModels(p) {
   }).then(r => r.json()).then(d => {
     cloudFetching[p] = false;
     if (d && d.ok && Array.isArray(d.models)) {
-      cloudModels[p] = d.models.slice(0, 300).map(m => ({ id: m.id, ctx: m.ctx || 0 }));
+      // keep name + pricing (USD/token) — the OpenRouter pane shows the model name
+      // left and the per-1M price right, and sorts by either
+      cloudModels[p] = d.models.slice(0, 2000).map(m => ({
+        id: m.id, ctx: m.ctx || 0, name: m.name || '',
+        prompt: (typeof m.prompt === 'number') ? m.prompt : null,
+        completion: (typeof m.completion === 'number') ? m.completion : null,
+        pricing: !!m.pricing
+      }));
       cloudFallback[p] = false;
+      cloudError[p] = '';
     } else {
       // DeepSeek's public model set is stable — fall back so the thread is usable
       // even when /models is unreachable or the key rejects it; OpenRouter has no
@@ -3314,16 +3350,18 @@ function ensureCloudModels(p) {
         ? [{ id: 'deepseek-chat', ctx: 128000 }, { id: 'deepseek-reasoner', ctx: 128000 }]
         : [];
       cloudFallback[p] = true;
+      cloudError[p] = (d && d.error) ? String(d.error).slice(0, 200) : 'no model list returned';
     }
     if (!document.getElementById('sourceMenu').hidden) renderSourceMenu();
     renderDsModels(p);
     return cloudModels[p];
-  }).catch(() => {
+  }).catch(err => {
     cloudFetching[p] = false;
     cloudModels[p] = (p === 'deepseek')
       ? [{ id: 'deepseek-chat', ctx: 128000 }, { id: 'deepseek-reasoner', ctx: 128000 }]
       : [];
     cloudFallback[p] = true;
+    cloudError[p] = 'proxy unreachable — ' + String((err && err.message) || err).slice(0, 120);
     if (!document.getElementById('sourceMenu').hidden) renderSourceMenu();
     renderDsModels(p);
     return cloudModels[p];
@@ -3335,17 +3373,17 @@ function ensureCloudModels(p) {
 // returned. Clicking a row picks it for THIS thread (same path as the header pill).
 function cloudKeyTyped(p) {
   const keyEl = document.getElementById(p === 'deepseek' ? 'dsKey' : 'orKey');
-  const btn = document.getElementById(p === 'deepseek' ? 'dsRefreshBtn' : null);
+  const btn = document.getElementById(p === 'deepseek' ? 'dsRefreshBtn' : 'orRefreshBtn');
   if (!keyEl) return;
   const has = String(keyEl.value || '').length > 0;
   if (btn) btn.style.display = has ? 'inline-flex' : 'none';
-  if (p === 'deepseek') renderDsModels('deepseek');
+  renderDsModels(p);
 }
 function refreshCloudModels(p) {
   const c = CLOUD_CONNS[p];
   const url = document.getElementById(p === 'deepseek' ? 'dsUrl' : 'orUrl').value.trim();
   const key = document.getElementById(p === 'deepseek' ? 'dsKey' : 'orKey').value;
-  const btn = document.getElementById(p === 'deepseek' ? 'dsRefreshBtn' : null);
+  const btn = document.getElementById(p === 'deepseek' ? 'dsRefreshBtn' : 'orRefreshBtn');
   if (!url) { showToast('Enter the ' + c.name + ' base URL first', null, true); return; }
   if (!key) { showToast('Enter the ' + c.name + ' API key first', null, true); return; }
   // apply the typed config (Save optional) so the proxy + pickers use it
@@ -3354,13 +3392,182 @@ function refreshCloudModels(p) {
   if (btn) { btn.disabled = true; btn.classList.add('spinning'); }
   ensureCloudModels(p).then(() => { if (btn) { btn.disabled = false; btn.classList.remove('spinning'); } });
 }
-function pickDsModel(id) { pickCloud('deepseek', id); renderDsModels('deepseek'); }
+// ── OpenRouter model path input (2026-09-13, David's ask) ──────────────────────
+// The OpenRouter tab had no place to name the model — the only entry points were the
+// header pill list and the ✎ custom-model prompt. Now the pane carries a Model field:
+// type/paste the id (e.g. anthropic/claude-sonnet-4.5), Enter or blur applies it, and
+// typing live-filters the fetched list. Selecting a row does the same thing.
+let cloudModelFilter = { deepseek: '', openrouter: '' };
+function orModelTyped() {
+  const el = document.getElementById('orModel');
+  cloudModelFilter.openrouter = String((el && el.value) || '').trim().toLowerCase();
+  renderDsModels('openrouter');
+}
+function currentOrModelInput() {
+  const el = document.getElementById('orModel');
+  return el ? String(el.value || '').trim() : '';
+}
+function syncConnModelInput(p) {
+  if (p !== 'openrouter') return;
+  const el = document.getElementById('orModel');
+  if (!el) return;
+  // Use the THREAD's pinned conn model, not the global currentModel: on a fresh boot
+  // currentModel can still hold the last local server's model (chat_current_model),
+  // which showed up in the OpenRouter field as a .gguf path during testing.
+  const pinned = (activeConn.kind === 'cloud' && activeConn.provider === 'openrouter' && activeConn.model)
+    ? String(activeConn.model) : '';
+  el.value = pinned || CLOUD_CONNS.openrouter.model || '';
+  // clear the search filter on a programmatic fill: showing only the current model's
+  // row would hide the catalog the user is browsing
+  cloudModelFilter.openrouter = '';
+}
+function orModelApply(explicit) {
+  const m = currentOrModelInput();
+  CLOUD_CONNS.openrouter.model = m;       // remembered for the provider (and the ✎ prompt)
+  saveCloudConns();
+  renderDsModels('openrouter');
+  const cl = activeCloud();
+  if (!m) {
+    if (explicit) showToast('OpenRouter model cleared — pick one before sending', null, true);
+    return;
+  }
+  if (cl && cl.id === 'openrouter') {
+    if (currentModel !== m) pickCloud('openrouter', m);   // live switch on THIS thread
+  } else if (explicit) {
+    showToast('OpenRouter model saved — ' + shortModel(m) + ' (pick OpenRouter in the header pill to chat)');
+  }
+}
+function pickDsModel(provider, id) {
+  const p = CLOUD_CONNS[provider] ? provider : 'deepseek';
+  CLOUD_CONNS[p].model = String(id); saveCloudConns();
+  pickCloud(p, id);
+  if (p === 'openrouter') syncConnModelInput('openrouter');
+  renderDsModels(p);
+}
+// ── OpenRouter catalog list: Free / Premium tabs + name/price sorting (2026-09-13) ──
+// David's ask: the ↻ list should separate Free models (first tab) from Premium, show the
+// model NAME left and the per-1M-token price right, and sort by name or by price.
+// Pricing comes from OpenRouter's own `pricing` block (USD per token) via /api/agent/models.
+let cloudListPrefs = (() => {
+  try { return JSON.parse(localStorage.getItem('chat_cloud_list_prefs') || '{}') || {}; }
+  catch (e) { return {}; }
+})();
+let cloudListTabs = {};   // in-session tab choice ('' = fall back to the stored pref)
+function cloudListPref(p, tab) {
+  const k = p + ':' + tab;
+  if (!cloudListPrefs[k]) cloudListPrefs[k] = (tab === 'free') ? 'name' : 'price';
+  return cloudListPrefs[k];
+}
+function setCloudListTab(p, tab) {
+  cloudListTabs[p] = tab;
+  cloudListPrefs[p + ':tab'] = tab;
+  try { localStorage.setItem('chat_cloud_list_prefs', JSON.stringify(cloudListPrefs)); } catch (e) {}
+  renderDsModels(p);
+}
+function setCloudListSort(p, sort) {
+  cloudListPrefs[p + ':' + cloudListTab(p)] = sort;
+  try { localStorage.setItem('chat_cloud_list_prefs', JSON.stringify(cloudListPrefs)); } catch (e) {}
+  renderDsModels(p);
+}
+function cloudListTab(p) {
+  const t = cloudListTabs[p] || cloudListPrefs[p + ':tab'];
+  if (t === 'prev' || t === 'free') return t;
+  // no explicit choice yet: Free first when the catalog HAS free models, else Premium
+  // (a provider that ships no pricing would otherwise open on an empty Free tab)
+  const all = cloudModels[p] || [];
+  return all.some(isFreeModel) ? 'free' : 'prev';
+}
+function isFreeModel(m) { return m.pricing && m.prompt === 0 && m.completion === 0; }
+// OpenRouter marks routed/dynamic models with pricing -1 (they cost whatever the model they
+// pick costs) — those are NOT free, and they sort last on price.
+function isVariablePrice(m) { return m.pricing && (m.prompt < 0 || m.completion < 0); }
+// USD per 1M tokens, trimmed to a sensible number of decimals
+function fmtPerM(perToken) {
+  const v = (Number(perToken) || 0) * 1e6;
+  if (!(v > 0)) return '0';
+  if (v >= 100) return v.toFixed(0);
+  if (v >= 10) return v.toFixed(1);
+  if (v >= 1) return v.toFixed(2);
+  return v.toFixed(3);
+}
+function priceLabel(m) {
+  if (!m.pricing) return '';                       // provider has no pricing at all
+  if (isFreeModel(m)) return 'Free';
+  if (isVariablePrice(m)) return 'varies';
+  return '$' + fmtPerM(m.prompt) + ' / $' + fmtPerM(m.completion);
+}
+function priceTitle(m) {
+  if (!m.pricing) return '';
+  if (isFreeModel(m)) return 'Free — no charge per token';
+  if (isVariablePrice(m)) return 'Dynamic pricing — OpenRouter routes to whichever model fits the request';
+  return 'Per 1M tokens — input $' + fmtPerM(m.prompt) + ', output $' + fmtPerM(m.completion)
+       + ' (sorted by input price)';
+}
+function modelLabel(m) { return m.name ? m.name : m.id; }
+function renderOrCatalog(p, cloudNow, filter) {
+  const all = cloudModels[p] || [];
+  const free = all.filter(isFreeModel);
+  const prev = all.filter(m => !isFreeModel(m));
+  const tab = cloudListTab(p);
+  const sort = cloudListPref(p, tab);
+  const source = (tab === 'free') ? free : prev;
+  // filter searches the WHOLE catalog, then the tab narrows it
+  const matches = filter
+    ? source.filter(m => m.id.toLowerCase().includes(filter)
+                         || modelLabel(m).toLowerCase().includes(filter))
+    : source;
+  const rows = matches.slice();
+  if (sort === 'price') {
+    const pk = (m, f) => (m[f] < 0 ? Infinity : m[f]);   // dynamic pricing sorts last
+    rows.sort((a, b) => (pk(a, 'prompt') - pk(b, 'prompt')) || (pk(a, 'completion') - pk(b, 'completion'))
+                        || modelLabel(a).localeCompare(modelLabel(b)));
+  } else {
+    rows.sort((a, b) => modelLabel(a).localeCompare(modelLabel(b), undefined, { sensitivity: 'base' }));
+  }
+  const cap = 150;
+  const shown = rows.slice(0, cap);
+  let html = '';
+  html += '<div class="ds-list-head">'
+        + '<div class="ds-tabs">'
+        + '<button type="button" class="ds-tab' + (tab === 'free' ? ' on' : '') + '" onclick="setCloudListTab(\'' + p + '\',\'free\')">Free Models <span class="ds-count">' + free.length + '</span></button>'
+        + '<button type="button" class="ds-tab' + (tab === 'prev' ? ' on' : '') + '" onclick="setCloudListTab(\'' + p + '\',\'prev\')">Premium Models <span class="ds-count">' + prev.length + '</span></button>'
+        + '</div>'
+        + '<div class="ds-sort"><span class="ds-sort-label">Sort</span>'
+        + '<button type="button" class="ds-sort-btn' + (sort === 'name' ? ' on' : '') + '" onclick="setCloudListSort(\'' + p + '\',\'name\')" title="Sort by model name">Name</button>'
+        + '<button type="button" class="ds-sort-btn' + (sort === 'price' ? ' on' : '') + (tab === 'free' ? ' disabled' : '') + '" onclick="setCloudListSort(\'' + p + '\',\'price\')" title="Sort by price per 1M tokens (input, then output)">Price</button>'
+        + '</div></div>';
+  html += '<div class="ds-rows">';
+  if (!shown.length) {
+    html += '<div class="ds-model-item dim"><span class="dm-check"></span><span class="dm-name">'
+          + (filter ? 'No ' + (tab === 'free' ? 'free' : 'premium') + ' model matches — Enter uses the typed id as-is.'
+                    : 'No ' + (tab === 'free' ? 'free' : 'premium') + ' models in this catalog.')
+          + '</span></div>';
+  }
+  for (const m of shown) {
+    const active = !!cloudNow && cloudNow.id === p && currentModel === m.id;
+    const price = priceLabel(m);
+    html += '<div class="ds-model-item' + (active ? ' active' : '') + '" data-prov="' + escAttr(p) + '" data-model="' + escAttr(m.id)
+          + '" onclick="pickDsModel(this.dataset.prov,this.dataset.model)" title="' + escAttr(m.id + (priceTitle(m) ? ' — ' + priceTitle(m) : '')) + '">'
+          + '<span class="dm-check">' + (active ? '✓' : '') + '</span>'
+          + '<span class="dm-name">' + escHtml(modelLabel(m)) + '</span>'
+          + (price ? '<span class="dm-price' + (price === 'Free' ? ' free' : (price === 'varies' ? ' var' : '')) + '" title="' + escAttr(priceTitle(m)) + '">' + escHtml(price) + '</span>' : '')
+          + '</div>';
+  }
+  if (rows.length > cap) {
+    html += '<div class="ds-model-item dim"><span class="dm-check"></span><span class="dm-name">… ' + (rows.length - cap)
+          + ' more — type above to filter, or sort by ' + (sort === 'price' ? 'name' : 'price') + '</span></div>';
+  }
+  html += '</div>';
+  return html;
+}
 function renderDsModels(p) {
-  const listEl = document.getElementById(p === 'deepseek' ? 'dsModelList' : null);
+  const listEl = document.getElementById(p === 'deepseek' ? 'dsModelList' : 'orModelList');
   if (!listEl) return;
   const c = CLOUD_CONNS[p];
   const keyEl = document.getElementById(p === 'deepseek' ? 'dsKey' : 'orKey');
   const hasKey = !!keyEl && String(keyEl.value || '').length > 0;
+  const filter = (cloudModelFilter[p] || '').trim().toLowerCase();
+  const cloudNow = activeCloud();
   let html = '';
   if (!hasKey) {
     html = '<div class="ds-model-item dim"><span class="dm-check"></span><span class="dm-name">Enter your API key above, then hit ↻ to fetch the model list.</span></div>';
@@ -3368,17 +3575,31 @@ function renderDsModels(p) {
     html = '<div class="ds-model-item dim"><span class="tp-spinner"></span><span class="dm-name">Fetching ' + escHtml(c.name) + ' models…</span></div>';
   } else if (!cloudModels[p]) {
     html = '<div class="ds-model-item dim"><span class="dm-check"></span><span class="dm-name">Press ↻ to pull the model list from the API.</span></div>';
+  } else if (!cloudModels[p].length) {
+    // never leave an empty box with no explanation — a truncated/failed /models used
+    // to look like "it fetched for a second, then nothing" (OpenRouter is ~736KB)
+    html = '<div class="ds-model-item dim"><span class="dm-check"></span><span class="dm-name">No models returned'
+         + (cloudError[p] ? ' — ' + escHtml(cloudError[p]) : '')
+         + '. Check the key/URL and hit ↻ again.</span></div>';
+  } else if (p === 'openrouter') {
+    html = renderOrCatalog(p, cloudNow, filter);
   } else {
-    const cloudNow = activeCloud();
-    const cap = p === 'openrouter' ? 60 : cloudModels[p].length;
+    const cap = cloudModels[p].length;
+    // a filter searches the WHOLE catalog, so the cap only trims the unfiltered view
+    const matches = filter
+      ? cloudModels[p].filter(m => m.id.toLowerCase().includes(filter))
+      : cloudModels[p];
     let n = 0;
-    for (const m of cloudModels[p]) {
+    for (const m of matches) {
       if (n >= cap) break;
       const active = !!cloudNow && cloudNow.id === p && currentModel === m.id;
-      html += '<div class="ds-model-item' + (active ? ' active' : '') + '" data-model="' + escAttr(m.id) + '" onclick="pickDsModel(this.dataset.model)" title="' + escAttr(m.id) + '"><span class="dm-check">' + (active ? '✓' : '') + '</span><span class="dm-name">' + escHtml(m.id) + '</span></div>';
+      html += '<div class="ds-model-item' + (active ? ' active' : '') + '" data-prov="' + escAttr(p) + '" data-model="' + escAttr(m.id) + '" onclick="pickDsModel(this.dataset.prov,this.dataset.model)" title="' + escAttr(m.id) + '"><span class="dm-check">' + (active ? '✓' : '') + '</span><span class="dm-name">' + escHtml(m.id) + '</span></div>';
       n++;
     }
-    if (cloudFallback[p] && p === 'deepseek') {
+    if (filter && !matches.length) {
+      html += '<div class="ds-model-item dim"><span class="dm-check"></span><span class="dm-name">No fetched model matches — Enter uses the typed id as-is.</span></div>';
+    }
+    if (cloudFallback[p]) {
       html += '<div class="ds-model-item dim"><span class="dm-check"></span><span class="dm-name">/models unreachable — showing the known set</span></div>';
     }
   }
@@ -3486,12 +3707,13 @@ function pickCloud(provider, model) {
   updatePill(); refreshStatusPill();
   ensureConnStatus(true);   // fresh verdict on an explicit pick (re-checks a stale offline)
   if (currentChatId) saveCurrentChat();             // per-thread last-known cloud conn
+  if (provider === 'openrouter') syncConnModelInput('openrouter');   // Model field follows the live pick
   showToast('Chatting via ' + CLOUD_CONNS[provider].name + ' — ' + shortModel(String(model)));
 }
 function customCloudModel(provider) {
   const c = CLOUD_CONNS[provider];
   if (!c) return;
-  const cur = (activeCloud() && activeCloud().id === provider) ? (currentModel || '') : '';
+  const cur = (activeCloud() && activeCloud().id === provider) ? (currentModel || '') : (CLOUD_CONNS[provider].model || '');
   const val = prompt('Model id for ' + c.name + ':', cur);
   if (val === null) return;
   const m = String(val).trim();
@@ -4179,6 +4401,7 @@ function openSettings() {
   document.getElementById('orUrl').value = CLOUD_CONNS.openrouter.url || '';
   document.getElementById('orKey').value = CLOUD_CONNS.openrouter.key || '';
   cloudKeyTyped('deepseek'); cloudKeyTyped('openrouter');   // ↻ visibility follows a present key
+  syncConnModelInput('openrouter');                         // Model field mirrors the live/stored id
   renderDsModels('deepseek'); renderDsModels('openrouter');
   document.getElementById('setSysPrompt').value = SYSTEM_PROMPT;
   document.getElementById('setMaxTokens').value = MAX_TOKENS;
@@ -4214,7 +4437,15 @@ function connTab(kind) {
     const el = document.getElementById(panes[k]);
     if (el) el.hidden = (k !== kind);
   }
-  if (kind === 'deepseek') renderDsModels('deepseek');   // fresh states on tab switch
+  if (kind === 'deepseek' || kind === 'openrouter') {
+    renderDsModels(kind);   // fresh states on tab switch
+    // auto-pull the catalog when the endpoint is ready but never fetched — the tab is
+    // where you pick a model, so the list should already be there (↻ still re-fetches)
+    const keyEl = document.getElementById(kind === 'deepseek' ? 'dsKey' : 'orKey');
+    if (cloudConfigured(kind) && keyEl && String(keyEl.value || '').length > 0 && !cloudModels[kind]) {
+      ensureCloudModels(kind);
+    }
+  }
 }
 function cloudStatusLine(provider) {
   const map = { deepseek: 'dsStatus', openrouter: 'orStatus' };
@@ -4274,16 +4505,19 @@ function saveSettings() {
   const dsKey = document.getElementById('dsKey').value;
   const orUrl = document.getElementById('orUrl').value.trim();
   const orKey = document.getElementById('orKey').value;
+  const orModel = currentOrModelInput();   // OpenRouter model path field (2026-09-13)
   const dsChanged = CLOUD_CONNS.deepseek.url !== dsUrl || CLOUD_CONNS.deepseek.key !== dsKey;
   const orChanged = CLOUD_CONNS.openrouter.url !== orUrl || CLOUD_CONNS.openrouter.key !== orKey;
   CLOUD_CONNS.deepseek.url = dsUrl; CLOUD_CONNS.deepseek.key = dsKey;
   CLOUD_CONNS.openrouter.url = orUrl; CLOUD_CONNS.openrouter.key = orKey;
+  CLOUD_CONNS.openrouter.model = orModel;
   saveCloudConns();
   if (dsChanged || orChanged) {
     if (dsChanged) { cloudModels.deepseek = null; cloudFallback.deepseek = false; if (dsUrl && dsKey) pingAgent('deepseek'); else delete agentState.deepseek; }
     if (orChanged) { cloudModels.openrouter = null; cloudFallback.openrouter = false; if (orUrl && orKey) pingAgent('openrouter'); else delete agentState.openrouter; }
   }
   renderDsModels('deepseek');   // list reflects the saved config (cleared -> ↻ prompt)
+  renderDsModels('openrouter');
   SYSTEM_PROMPT = document.getElementById('setSysPrompt').value;
   const mt = parseInt(document.getElementById('setMaxTokens').value);
   MAX_TOKENS = (!isNaN(mt) && mt > 0) ? mt : 0;
@@ -6701,11 +6935,23 @@ async function streamResponse(S) {
       ? { prefix: text.slice(0, lastOpener), tail: '' }
       : { prefix: text.slice(0, lastOpener), tail: text.slice(nl + 1) };
   }
+  let _scrollQueued = false;
   function scrollLiveToBottom() {
-    if (currentChatId === threadId) {
+    // Coalesced scroll (2026-09-13): reading scrollHeight forces a synchronous layout,
+    // and with a big colored code block in the DOM that layout is expensive. Called
+    // once per content delta it made the stream fall progressively behind — measured
+    // on an 83KB fence: the wire delivered cleanly in 42s (max gap 4s) while the page
+    // showed 14.8s / 7.1s / 4.1s holes near the end, i.e. the view lagged what had
+    // already arrived. One scroll per ~150ms keeps the view pinned to the bottom
+    // without paying a full re-layout per token.
+    if (currentChatId !== threadId || _scrollQueued) return;
+    _scrollQueued = true;
+    setTimeout(() => {
+      _scrollQueued = false;
+      if (currentChatId !== threadId) return;
       const ca = document.getElementById('chatArea');
       if (ca) ca.scrollTop = ca.scrollHeight;
-    }
+    }, 150);
   }
   function paintFullContent(fullText, thinking, inThinking, force) {
     const paint = () => {
@@ -6760,16 +7006,25 @@ async function streamResponse(S) {
       const colorize = (txt) => (txt && grammar) ? Prism.highlight(txt, grammar, _fenceLang) : (txt ? escHtml(txt) : '');
       if (Date.now() - _tailLastAt >= 160) {
         _tailLastAt = Date.now();
-        if (tail.length <= 90000) {
-          // full-context recolor of the whole open block (cross-line correct)
+        if (tail.length <= 24000) {
+          // full-context recolor of the whole open block (cross-line correct).
+          // Threshold lowered 90K → 24K (2026-09-13): measured in-page on a code
+          // tail, one pass = Prism.highlight + innerHTML + layout of the colored
+          // block — 24K ≈ 25ms, but 90K ≈ 100ms (41ms Prism + 57ms innerHTML/layout
+          // of 843KB of markup). At the 160ms throttle that is ~60% of the main
+          // thread during a long code generation: the stream LOOKS locked up
+          // (updates only land when the parser yields), which is the second half of
+          // David's "code preview updates in lagged blocks" report. Above 24K the
+          // incremental path below keeps per-pass work bounded by the delta.
           _fenceEl.innerHTML = colorize(done) + '<span class="xllm-tail-partial">' + escHtml(partial) + '</span>';
           _fenceDoneChars = done.length;
         } else if (done.length > _fenceDoneChars) {
-          // Giant tail (>90K): a whole-block recolor per pass would re-tokenize
-          // the ENTIRE open block ~6x/sec — unbounded cost. Color only the lines
-          // completed since the last pass (per-pass work bounded by the stream
-          // delta, never the total), so colors keep landing line-by-line at ANY
-          // response size (David's white-until-close regression, 2026-09-06).
+          // Big tail (well over 24K): a whole-block recolor per pass would
+          // re-tokenize + re-parse the ENTIRE open block ~6x/sec — unbounded cost.
+          // Color only the lines completed since the last pass (per-pass work
+          // bounded by the stream delta, never the total), so colors keep landing
+          // line-by-line at ANY response size. Finalize re-colors with full
+          // context, so cross-line constructs end up correct on screen.
           const fresh = done.slice(_fenceDoneChars);
           _fenceDoneChars = done.length;
           let pe = _fenceEl.querySelector('.xllm-tail-partial');

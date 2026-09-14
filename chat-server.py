@@ -32,6 +32,8 @@ TTS_MAX_TEXT = 6000        # per-request text cap (sanity guard)
 #    types for other agents ride the request body over localhost (runtime data,
 #    never baked into any shipped file).
 AGENT_PING_TIMEOUT = 4     # reachability probe cap
+AGENT_MODELS_TIMEOUT = 20  # /models pull cap — OpenRouter's catalog is ~736KB (445 models)
+MAX_MODELS_BYTES = 8 * 1024 * 1024   # sanity guard on a catalog body (was a hard 400KB read)
 AGENT_CHAT_TIMEOUT = None  # no cap — agent tasks can run 30+ minutes
 _MODEL_CACHE = {}          # base url -> (model_id, fetched_ts) — default model resolution
 # Runs protocol (2026-09-05): agent mode chats via POST /v1/runs — the gateway
@@ -265,8 +267,32 @@ def tts_synthesize(voice_name, text):
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
+    # SSE latency (2026-09-13): every streamed write is a small packet; with
+    # Nagle on, small SSE events wait for an ACK before leaving the box.
+    disable_nagle_algorithm = True
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=os.path.dirname(os.path.abspath(__file__)), **kwargs)
+
+    def _stream_out(self, upstream):
+        """Forward upstream bytes to the browser the moment they arrive.
+
+        read(8192) BLOCKS until 8192 bytes accumulate or the upstream closes —
+        a stub that emitted one event then waited 4s delivered NOTHING until
+        EOF (measured 2026-09-13), so on a long code generation the chat
+        preview updated in lagged ~8KB blocks every few seconds instead of
+        streaming. read1() returns as soon as any data is available (at most
+        one socket read / one chunk), which is the correct primitive here.
+        """
+        while True:
+            if hasattr(upstream, "read1"):
+                chunk = upstream.read1(65536)
+            else:
+                chunk = upstream.read(65536)
+            if not chunk:
+                break
+            self.wfile.write(chunk)
+            self.wfile.flush()
 
     def end_headers(self):
         # no-store: the browser must NEVER keep index.html (all CSS/JS is
@@ -501,9 +527,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def _handle_agent_models(self):
         """List an OpenAI-compatible endpoint's models (DeepSeek / OpenRouter /
-        custom) so the client's cloud group in the header pill can render model
-        rows. Returns {ok, models:[{id, ctx}]} — ctx from the provider's own
-        context fields when present (token-bar limit)."""
+        custom) so the client's cloud rows / settings list can render them.
+        Returns {ok, models:[{id, name, ctx, prompt, completion, pricing}]}.
+
+        - ctx from the provider's own context fields when present (token-bar limit)
+        - prompt/completion = USD PER TOKEN straight from the provider's pricing
+          block (OpenRouter); pricing=True means the block was present (so the
+          client can tell "free" from "unknown"), False for providers that have
+          no pricing at all (DeepSeek)."""
         req, err = self._read_json_body()
         if err:
             self._json(err[0], err[1])
@@ -517,23 +548,52 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         _, models_url = agent_urls(base)
         key = agent_secret(agent_id, (req.get("key") or "").strip())
         try:
-            with agent_open(models_url, key, timeout=AGENT_PING_TIMEOUT) as r:
+            with agent_open(models_url, key, timeout=AGENT_MODELS_TIMEOUT) as r:
                 if r.status != 200:
                     detail = r.read(300).decode("utf-8", "replace")
                     self._json({"ok": False, "status": r.status,
                                 "error": (detail or f"HTTP {r.status}")[:300]})
                     return
-                data = json.loads(r.read(400_000).decode("utf-8", "replace"))
+                # NO fixed cap: OpenRouter's catalog is ~736KB / 445 models (measured
+                # 2026-09-13). The old read(400_000) truncated the JSON, json.loads
+                # threw and the client showed an EMPTY model list (David's "shows
+                # Fetching… then collapses"). Guard only against an absurd body.
+                raw = r.read(MAX_MODELS_BYTES + 1)
+            if len(raw) > MAX_MODELS_BYTES:
+                self._json({"ok": False,
+                            "error": f"model list larger than {MAX_MODELS_BYTES // (1024 * 1024)}MB"})
+                return
+            data = json.loads(raw.decode("utf-8", "replace"))
             out = []
-            for m in (data.get("data") or [])[:500]:
-                mid = (m or {}).get("id")
+            for m in (data.get("data") or [])[:2000]:
+                if not isinstance(m, dict):
+                    continue
+                mid = m.get("id")
                 if not mid:
                     continue
-                meta = (m.get("meta") or {}) if isinstance(m.get("meta"), dict) else {}
+                meta_raw = m.get("meta")
+                meta = meta_raw if isinstance(meta_raw, dict) else {}
+                top_raw = m.get("top_provider")
+                top = top_raw if isinstance(top_raw, dict) else {}
                 ctx = (m.get("max_model_len") or m.get("context_length")
-                       or m.get("max_context_length") or meta.get("n_ctx")
-                       or meta.get("n_ctx_train") or 0)
-                out.append({"id": mid, "ctx": int(ctx) if ctx else 0})
+                       or m.get("max_context_length") or top.get("context_length")
+                       or meta.get("n_ctx") or meta.get("n_ctx_train") or 0)
+                pr = m.get("pricing") if isinstance(m.get("pricing"), dict) else None
+                ent = {"id": mid,
+                       "name": (m.get("name") or "")[:90],
+                       "ctx": int(ctx) if ctx else 0,
+                       "prompt": 0.0, "completion": 0.0,
+                       "pricing": bool(pr)}
+                if pr:
+                    for api_key, field in (("prompt", "prompt"), ("completion", "completion")):
+                        try:
+                            ent[field] = float(pr.get(api_key) or 0)
+                        except (TypeError, ValueError):
+                            ent[field] = 0.0
+                    # NEGATIVE pricing is deliberate on OpenRouter: -1 marks dynamic /
+                    # routed pricing (openrouter/auto, fusion, pareto-code …). Pass it
+                    # through — clamping it to 0 filed those 5 models under "Free".
+                out.append(ent)
             self._json({"ok": True, "models": out})
         except urllib.error.HTTPError as e:
             detail = ""
@@ -611,14 +671,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Connection", "close")
             self.end_headers()
             with upstream:
-                while True:
-                    chunk = upstream.read(8192)
-                    if not chunk:
-                        break
-                    self.wfile.write(chunk)
-                    self.wfile.flush()
+                self._stream_out(upstream)
         except (BrokenPipeError, ConnectionResetError):
-            pass  # client walked away mid-stream — normal
+            pass  # client walked away mid-stream — normal (stop button / tab close)
         except Exception as e:
             print(f"[agent-chat] stream error: {e}", flush=True)
 
@@ -730,12 +785,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Connection", "close")
             self.end_headers()
             with upstream:
-                while True:
-                    chunk = upstream.read(8192)
-                    if not chunk:
-                        break
-                    self.wfile.write(chunk)
-                    self.wfile.flush()
+                self._stream_out(upstream)
         except (BrokenPipeError, ConnectionResetError):
             pass  # client walked away mid-stream — the run keeps going server-side
         except Exception as e:
