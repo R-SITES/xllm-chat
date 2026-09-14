@@ -194,7 +194,7 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .bench-ghead .gl{color:var(--dim);text-transform:uppercase;letter-spacing:.8px;font-size:9px}
 .bench-ghead .gv{font-variant-numeric:tabular-nums;font-weight:700;color:var(--accent);font-size:14px;line-height:1;padding-right:6px}
 .bench-svg{width:100%;height:auto;display:block}
-.bench-svg text{fill:var(--dim);font-size:8px;font-family:var(--font)}
+.bench-svg text{fill:var(--dim);font-size:9.5px;font-family:var(--font)}
 .bench-svg .grid{stroke:var(--border);stroke-width:.5}
 .bench-svg .axisline{stroke:var(--border);stroke-width:.75}
 .bench-svg .area{fill:url(#benchFill)}
@@ -721,7 +721,7 @@ function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.3.1</span>
+    <span class="footer-version">xLLM Chat v3.3.2</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -3108,7 +3108,7 @@ let TOP_P = parseFloat(localStorage.getItem('chat_top_p') || '0.9');
 let currentModel = localStorage.getItem('chat_current_model') || '';
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.3.1';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.3.2';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -6870,6 +6870,16 @@ async function streamResponse(S) {
   let msgFirstTokenTime = 0;
   let msgRateSamples = [];
   let benchSamples = [];             // [tMs since first token, cumulative decode t/s] — bench popup (2026-09-06)
+  let benchSampleMinMs = 180;        // min gap between samples; doubles when the cap halves the series
+  // Append a bench sample via the shared (pure, testable) helper: past the 1500-sample
+  // cap the resolution halves instead of the oldest samples being dropped, so the series
+  // always spans the WHOLE run. Front-splicing made an 8min54s run's graph start at 159s
+  // with a big empty area left of the line (David 2026-09-14).
+  function pushBenchSample(genMs, tps) {
+    const r = benchAppendSample(benchSamples, genMs, tps, benchSampleMinMs);
+    benchSampleMinMs = r.minMs;
+    return r.added;
+  }
   let srvLiveT = null;               // llama.cpp per-chunk timings (timings_per_token:true) — exact live decode stats (2026-09-06)
   const benchCtxLimit = contextLimit;   // window ctx at run start, captured for the bench
   let currentModel = S.model;        // this thread's model — pinned at send
@@ -6896,6 +6906,11 @@ async function streamResponse(S) {
     // model pushed ~199 t/s. The char estimate tracks true throughput within
     // ~10-25%; residual drift lands exactly on the usage rate via the
     // benchCalibrateSeries finalize step, so no far-right spike either.
+    // llama.cpp keeps the EVENT count: its streams are 1 token/event (measured), so
+    // there the count is exact and the estimate would only add error. (2026-09-14: an
+    // MTP build COULD batch multiple tokens per event — if that shows up, the fix is a
+    // measured tokens-per-event ratio, NOT swapping in the estimate; the live graph is
+    // already protected by the headline anchor + repair in benchHTML/benchSVGHTML.)
     if (S.kind === 'cloud') return estLiveTokens();
     if (isLlamaCpp === true) return streamTokens;
     return estLiveTokens();
@@ -7094,15 +7109,15 @@ async function streamResponse(S) {
         if (genMs > 0) tps = (tokens / genMs) * 1000;
       }
     }
-    // bench: sample the SAME cumulative decode t/s the bar shows, ≥180ms apart
+    // bench: sample the SAME cumulative decode t/s the bar shows, ≥180ms apart.
+    // The cap used to FRONT-SPLICE (keep the newest 1500), so a long run lost its
+    // beginning: an 8min54s run's series started at 159s and the popup graph drew a
+    // big empty gap to the left of the line (David 2026-09-14: "large empty space to
+    // the left of the orange graph"). Now the cap HALVES the resolution instead —
+    // every other sample — so the series always spans the WHOLE run.
     if (tps !== null && msgFirstTokenTime > 0) {
       const genMs = now - msgFirstTokenTime;
-      if (genMs > 0) {
-        if (!benchSamples.length || genMs - benchSamples[benchSamples.length - 1][0] >= 180) {
-          benchSamples.push([genMs, tps]);
-          if (benchSamples.length > 1500) benchSamples.splice(0, benchSamples.length - 1500);
-        }
-      }
+      if (genMs > 0) pushBenchSample(genMs, tps);
     }
     if (benchLive && benchLive.chatId === threadId && currentChatId === threadId) {
       if (!benchLive.tFirst) benchLive.tFirst = msgFirstTokenTime;
@@ -8099,6 +8114,30 @@ function benchCalibrateSeries(samples, exactTps) {
   if (k < 0.1 || k > 10) return;          // pathological — leave the series as-is
   for (let i = 0; i < n; i++) samples[i][1] *= k;
 }
+function benchFmtTime(ms) {
+  // x-axis tick for the bench graph: "0.2s" / "159s" / "533.9s" / "120min". The LEFT tick
+  // is the series' own first sample, so a series that starts late says so ("159s") instead
+  // of leaving an unlabelled empty area (2026-09-14).
+  if (ms >= 600000) return (ms / 60000).toFixed(1) + 'min';   // 10 minutes and up
+  return (+(ms / 1000).toFixed(1)) + 's';
+}
+function benchAppendSample(samples, genMs, tps, minMs) {
+  // Bench series append with a bounded size. Past 1500 samples the resolution HALVES
+  // (keep every other point) rather than dropping the oldest — a front-splice lost the
+  // start of every long run, so the popup graph began ~30% in with a large empty area to
+  // the left of the line (David 2026-09-14). Pure function of its args (the samples array
+  // is per-run state owned by the caller) so it can be unit-tested from the console.
+  if (samples.length && genMs - samples[samples.length - 1][0] < minMs) return { added: false, minMs: minMs };
+  samples.push([genMs, tps]);
+  if (samples.length > 1500) {
+    const kept = [];
+    for (let i = 0; i < samples.length; i += 2) kept.push(samples[i]);
+    samples.length = 0;
+    for (const s of kept) samples.push(s);
+    minMs *= 2;
+  }
+  return { added: true, minMs: minMs };
+}
 function benchDownsample(arr, maxN) {
   if (!arr || !arr.length) return [];
   const out = [];
@@ -8182,9 +8221,14 @@ function benchPromptSnippet() {
   return '';
 }
 function benchSVGHTML(series, finTps) {
-  const W = 236, H = 88, L = 8, R = 6, T = 10, B = 15;
+  // L = 34 (was 8): the y-axis labels are right-aligned at L-3, so with L=8 a 4-glyph
+  // label ("48.3") started at x≈-9 — OUTSIDE the viewBox — and the SVG viewport CLIPPED
+  // it, leaving only the last digit on screen ("8", "6", "4", "2"). The canvas export
+  // never clipped, so the downloaded card showed the real numbers and the popup didn't
+  // (David 2026-09-14: "the card shows it right, the rollover is wrong"). The left
+  // margin now fits the widest label; font-size is 9.5 (was 8) so they read.
+  const W = 236, H = 88, L = 34, R = 6, T = 10, B = 15;
   if (!series || !series.length) return null;
-  const tMax = Math.max(100, series[series.length - 1][0]);
   let rawMax = 0.01;
   for (const p of series) if (p[1] > rawMax) rawMax = p[1];
   // Stale-series repair (2026-09-06): series recorded before the calibration
@@ -8217,9 +8261,16 @@ function benchSVGHTML(series, finTps) {
   }
   const anchor = (finTps > 0) ? finTps : (n >= 5 ? series[n - 1][1] : rawMax);
   const scale = Math.max(robust, anchor, 0.01) * 1.15;
-  const X = (t) => L + (t / tMax) * (W - L - R);
+  // X domain = the series' OWN span (2026-09-14): runs whose samples begin late (an old
+  // front-spliced long run starting at 159s, or a long prefill before the first sample)
+  // used to draw a big empty area to the left of the line. Now the curve always spans the
+  // full plot width and the left x-label states the real start time ("0s" when the first
+  // sample is at the start, "159s" when it isn't).
+  const tStart = series[0][0];
+  const tEnd = Math.max(series[series.length - 1][0], tStart + 100, 100);
+  const X = (t) => L + ((t - tStart) / (tEnd - tStart)) * (W - L - R);
   const YY = (v) => Math.max(T, T + (1 - v / scale) * (H - T - B));  // pin above-scale at the top gridline
-  const fmtAx = (v) => (v >= 20 ? String(Math.round(v)) : (+v.toFixed(1)) + '');
+  const fmtAx = (v) => (v >= 100 ? String(Math.round(v)) : ('' + (+v.toFixed(1))));
   let s = '<svg class="bench-svg" viewBox="0 0 ' + W + ' ' + H + '">';
   s += '<defs><linearGradient id="benchFill" x1="0" y1="0" x2="0" y2="1"><stop class="b0" offset="0"/><stop class="b1" offset="1"/></linearGradient></defs>';
   // y gridlines (0..scale in 4 steps) + x time labels
@@ -8228,8 +8279,8 @@ function benchSVGHTML(series, finTps) {
     s += '<line class="grid" x1="' + L + '" y1="' + y + '" x2="' + (W - R) + '" y2="' + y + '"/>';
     s += '<text x="' + (L - 3) + '" y="' + (y + 2.6) + '" text-anchor="end">' + fmtAx(v) + '</text>';
   }
-  s += '<text x="' + L + '" y="' + (H - 3) + '">0s</text>';
-  s += '<text x="' + (W - R) + '" y="' + (H - 3) + '" text-anchor="end">' + (+(tMax / 1000).toFixed(1)) + 's</text>';
+  s += '<text x="' + L + '" y="' + (H - 3) + '">' + benchFmtTime(tStart) + '</text>';
+  s += '<text x="' + (W - R) + '" y="' + (H - 3) + '" text-anchor="end">' + benchFmtTime(tEnd) + '</text>';
   s += '<line class="axisline" x1="' + L + '" y1="' + YY(0) + '" x2="' + (W - R) + '" y2="' + YY(0) + '"/>';
   if (series.length >= 2) {
     let d = '', da = 'M' + X(series[0][0]) + ',' + YY(0);
@@ -8266,7 +8317,13 @@ function benchHTML(v) {
   const headV = (v.tps !== null && v.tps !== undefined) ? v.tps
     : (v.series && v.series.length ? v.series[v.series.length - 1][1] : null);
   let graphHtml = '';
-  const svg = benchSVGHTML(v.series, (v.live ? 0 : v.tps));
+  // Live renders pass the live rate as the anchor too (2026-09-14): if the sample
+  // series reads far below the headline (batching drift, estimate offset), that
+  // anchors the axis to the number the user sees AND lets benchSVGHTML's repair
+  // scale the series up — before this, live passed 0, so a series stuck ~6x low
+  // drew a 0-8 axis under a 40 t/s headline (exact match: David's popup).
+  const anchorTps = (v.tps !== null && v.tps !== undefined && v.tps > 0) ? v.tps : 0;
+  const svg = benchSVGHTML(v.series, anchorTps);
   if (svg) graphHtml = svg;
   else if (v.live) graphHtml = '<div class="bench-empty">waiting for first token…</div>';
   else if (v.hasAny) graphHtml = '<div class="bench-empty">no speed samples<br>recorded for this run</div>';
@@ -8424,7 +8481,9 @@ function benchRoundRectPath(ctx, x, y, w, h, r) {
 function benchPaintGraphSVG(ctx, svg, pr, v, rel) {
   const r = rel(svg.getBoundingClientRect());
   if (r.w < 4 || r.h < 4) return;
-  const W = 236, H = 88, L = 8, R = 6, T = 10, B = 15;
+  // geometry MUST match benchSVGHTML exactly (L=34 leaves room for the y labels —
+  // with L=8 the SVG clipped them to their last digit while the canvas did not)
+  const W = 236, H = 88, L = 34, R = 6, T = 10, B = 15;
   const series = v.series;
   if (!series || !series.length) return;
   const pline = svg.querySelector('.pline'), grid = svg.querySelector('.grid'), ax = svg.querySelector('text');
@@ -8434,15 +8493,35 @@ function benchPaintGraphSVG(ctx, svg, pr, v, rel) {
   ctx.save();
   ctx.translate(r.x, r.y);
   ctx.scale(r.w / W, r.h / H);
-  const tMax = Math.max(100, series[series.length - 1][0]);
+  const tStart = series[0][0];
+  const tEnd = Math.max(series[series.length - 1][0], tStart + 100, 100);
   let vMax = 0.01;
   for (const p of series) if (p[1] > vMax) vMax = p[1];
-  const scale = vMax * 1.15;
-  const X = (t) => L + (t / tMax) * (W - L - R);
-  const Y = (vv) => T + (1 - vv / scale) * (H - T - B);
-  const fmtAx = (vv) => (vv >= 100 ? String(Math.round(vv)) : (+vv.toFixed(1)) + '');
+  // SAME axis rule as the on-screen SVG (2026-09-14) — the exported card must never
+  // disagree with the popup it was exported from. It used to scale from the RAW max
+  // (`vMax * 1.15`) while the popup used max(p90, exact rate): one early burst spike
+  // then stretched only the card, and a series reading far below the headline (a
+  // batching undercount) drew a tiny axis only in the popup. Repair + p90 + anchor now
+  // match, and above-scale points pin to the top gridline like the SVG does.
+  let local = series.map(p => [p[0], p[1]]);
+  const anchor = (v.tps !== null && v.tps !== undefined && v.tps > 0) ? v.tps : 0;
+  if (anchor > 0 && local.length >= 2 && vMax < anchor * 0.6) {
+    const k = anchor / vMax;
+    for (const p of local) p[1] *= k;
+    vMax = anchor;
+  }
+  const nn = local.length;
+  let robust = vMax;
+  if (nn >= 8) {
+    const ys = local.map(p => p[1]).sort((a, b) => a - b);
+    robust = ys[Math.min(nn - 1, Math.floor(nn * 0.9))];
+  }
+  const scale = Math.max(robust, anchor, 0.01) * 1.15;
+  const X = (t) => L + ((t - tStart) / (tEnd - tStart)) * (W - L - R);
+  const Y = (vv) => Math.max(T, T + (1 - vv / scale) * (H - T - B));
+  const fmtAx = (vv) => (vv >= 100 ? String(Math.round(vv)) : ('' + (+vv.toFixed(1))));
   const fam = getComputedStyle(document.getElementById('benchPopup')).fontFamily || 'sans-serif';
-  ctx.font = '8px ' + fam;
+  ctx.font = '9.5px ' + fam;
   ctx.textBaseline = 'alphabetic';
   for (let i = 0; i <= 4; i++) {
     const vv = scale * i / 4, y = Y(vv);
@@ -8452,9 +8531,9 @@ function benchPaintGraphSVG(ctx, svg, pr, v, rel) {
     ctx.fillText(fmtAx(vv), L - 3.5, y + 2.6);
   }
   ctx.textAlign = 'left';
-  ctx.fillText('0s', L, H - 2.5);
+  ctx.fillText(benchFmtTime(tStart), L, H - 2.5);
   ctx.textAlign = 'right';
-  ctx.fillText((+(tMax / 1000).toFixed(1)) + 's', W - R, H - 2.5);
+  ctx.fillText(benchFmtTime(tEnd), W - R, H - 2.5);
   ctx.beginPath(); ctx.moveTo(L, Y(0)); ctx.lineTo(W - R, Y(0));
   ctx.strokeStyle = gridC || 'rgba(255,255,255,.2)'; ctx.lineWidth = 0.8; ctx.stroke();
   if (series.length >= 2) {
@@ -8462,19 +8541,19 @@ function benchPaintGraphSVG(ctx, svg, pr, v, rel) {
     grad.addColorStop(0, benchHexToRgba(accent, 0.22) || 'rgba(88,166,255,.22)');
     grad.addColorStop(1, benchHexToRgba(accent, 0) || 'rgba(88,166,255,0)');
     ctx.beginPath();
-    ctx.moveTo(X(series[0][0]), Y(0));
-    for (const p of series) ctx.lineTo(X(p[0]), Y(p[1]));
-    ctx.lineTo(X(series[series.length - 1][0]), Y(0));
+    ctx.moveTo(X(local[0][0]), Y(0));
+    for (const p of local) ctx.lineTo(X(p[0]), Y(p[1]));
+    ctx.lineTo(X(local[local.length - 1][0]), Y(0));
     ctx.closePath();
     ctx.fillStyle = grad; ctx.fill();
     ctx.beginPath();
-    ctx.moveTo(X(series[0][0]), Y(series[0][1]));
-    for (const p of series) ctx.lineTo(X(p[0]), Y(p[1]));
+    ctx.moveTo(X(local[0][0]), Y(local[0][1]));
+    for (const p of local) ctx.lineTo(X(p[0]), Y(p[1]));
     ctx.strokeStyle = accent || '#58a6ff';
     ctx.lineWidth = 1.7; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     ctx.stroke();
   }
-  const lp = series[series.length - 1];
+  const lp = local[local.length - 1];
   ctx.beginPath(); ctx.arc(X(lp[0]), Y(lp[1]), 3, 0, Math.PI * 2);
   ctx.fillStyle = accent || '#58a6ff'; ctx.fill();
   ctx.restore();
