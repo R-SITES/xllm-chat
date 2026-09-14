@@ -721,7 +721,7 @@ function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.3.2</span>
+    <span class="footer-version">xLLM Chat v3.3.3</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -3106,9 +3106,49 @@ if (isNaN(contextLimit) || contextLimit <= 0) contextLimit = 180000;
 let TEMPERATURE = parseFloat(localStorage.getItem('chat_temperature') || '0.7');
 let TOP_P = parseFloat(localStorage.getItem('chat_top_p') || '0.9');
 let currentModel = localStorage.getItem('chat_current_model') || '';
+// ── The model NAME shown to the user (2026-09-14, David: "the bench popup + the
+//    header pill should show the alias, not the path") ──
+// The local server is the source of truth for its own model name: llama.cpp with
+// --alias serves the alias as /v1/models data[i].id, and WITHOUT one it serves the
+// model PATH (common_params_model::get_name() returns params.model.path); vLLM also
+// serves a path. So: (a) a pinned local model the server no longer serves is healed to
+// the server's own name, and (b) a path-like name is never rendered raw — the last
+// path segment is the friendly name (the full string stays in tooltips/JSON).
+let LOCAL_MODELS = [];        // ids the local server last reported via /v1/models
+let SERVER_MODEL_ALIAS = '';  // llama.cpp /props model_alias (fallback when /v1/models is empty)
+function modelIsPath(m) { return /^[\/~]/.test(m) || /^[A-Za-z]:[\\/]/.test(m); }
+function displayModelName(m) {
+  if (m === null || m === undefined) return '';
+  m = String(m);
+  if (!m) return '';
+  if (modelIsPath(m)) {
+    const seg = m.replace(/[\\/]+$/, '').split(/[\\/]/).pop();
+    if (seg) return seg;
+  }
+  return m;
+}
+function healLocalModelPin(name) {
+  // A pinned local model the server no longer serves (the model PATH recorded before
+  // the launch had an --alias) must not survive: it lives in activeConn AND in the
+  // thread's chat.conn, so every thread switch restored the path into the header pill
+  // and the bench popup/badge (David 2026-09-14).
+  if (!name) return;
+  if (activeConn && activeConn.kind === 'local' && activeConn.model !== name) {
+    activeConn.model = name;
+    persistLastConn();
+    localStorage.setItem('chat_current_model', name);
+  }
+  try {
+    const c = currentChatId ? chatStore.find(x => x.id === currentChatId) : null;
+    if (c && c.conn && c.conn.kind === 'local' && c.conn.model !== name) {
+      c.conn.model = name;
+      chatStoreWrite(currentChatId);
+    }
+  } catch (e) {}
+}
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.3.2';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.3.3';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -3195,7 +3235,14 @@ function applyConn(c, opts) {
     const pc = CLOUD_CONNS[activeConn.provider];
     currentModel = activeConn.model || (pc && (pc.model || pc.defaultModel)) || '';
   } else {
-    const lm = activeConn.model;
+    // local: a pin the server no longer serves (an old model PATH recorded before the
+    // launch had an --alias) is healed to the server's own model name FIRST — otherwise
+    // the stale string rides every thread switch back into the pill / bench popup.
+    let lm = activeConn.model;
+    if (lm && LOCAL_MODELS.length && LOCAL_MODELS.indexOf(lm) === -1) {
+      const healed = LOCAL_MODELS[0] || '';
+      if (healed) { healLocalModelPin(healed); lm = healed; }
+    }
     if (lm && !o.keepLocalDefault) currentModel = lm;
   }
   if (!o.noSave) {
@@ -3271,8 +3318,8 @@ function updatePill() {
     lab.innerHTML = `<span class="pill-dot cloud"></span>${escHtml(cl.name)}<span class="pill-sub">${escHtml(shortModel(m))}</span>`;
     lab.title = `Chatting via ${escHtml(cl.name)} — ${escHtml(m)}. Click to switch source.`;
   } else {
-    lab.textContent = currentModel || 'Local model';
-    lab.title = 'Chatting with the local model. Click to switch source.';
+    lab.textContent = displayModelName(currentModel) || 'Local model';
+    lab.title = 'Chatting with the local model' + (currentModel ? ' — ' + currentModel : '') + '. Click to switch source.';
   }
 }
 function refreshStatusPill() {
@@ -5502,6 +5549,7 @@ function loadModels() {
     .then(r => r.json())
     .then(data => {
       const models = (data.data || []).filter(m => m.id);
+      LOCAL_MODELS = models.map(m => m.id);   // server truth for the local model name(s)
       const sel = document.getElementById('modelSelect');
       if (models.length) {
         sel.innerHTML = models.map(m => `<option value="${escAttr(m.id)}">${escHtml(m.id)}</option>`).join('');
@@ -5514,6 +5562,7 @@ function loadModels() {
           } else {
             currentModel = models[0].id;
             localStorage.setItem('chat_current_model', currentModel);
+            healLocalModelPin(currentModel);   // drop a stale pin (old model PATH) everywhere
           }
         }
         // PRIMARY backend signal: llama.cpp reports owned_by:"llamacpp" in /v1/models.
@@ -5568,6 +5617,24 @@ async function detectBackend() {
     const r = await fetch(API_URL + '/props', { signal: ctrl.signal });
     clearTimeout(t);
     isLlamaCpp = r.ok;
+    if (r.ok) {
+      // llama.cpp /props carries the model's own name (model_alias = the --alias, or the
+      // model PATH when none was given). Used only as the NAME fallback for a local pin
+      // when /v1/models gave nothing (2026-09-14).
+      try {
+        const j = await r.json();
+        if (j && j.model_alias) {
+          SERVER_MODEL_ALIAS = String(j.model_alias);
+          if (!LOCAL_MODELS.length && activeConn && activeConn.kind === 'local'
+              && activeConn.model !== SERVER_MODEL_ALIAS
+              && (modelIsPath(activeConn.model) || modelIsPath(currentModel))) {
+            currentModel = SERVER_MODEL_ALIAS;
+            healLocalModelPin(SERVER_MODEL_ALIAS);
+            updatePill();
+          }
+        }
+      } catch (e) {}
+    }
     _backendKnown = true;   // definitive either way (llama.cpp 200 / vLLM 404)
   } catch (e) {
     isLlamaCpp = false;
@@ -8333,7 +8400,7 @@ function benchHTML(v) {
   const footBrand = '<img class="bench-mark" src="favicon-32.png" alt="xLLM" title="xLLM Chat">';
   const footNote = v.truncated ? '⚠ stopped at the token cap'
     : (v.live ? 'recording live decode speed…' : (v.stateLabel === 'partial' ? 'run stopped early — partial bench' : footBrand));
-  return '<div class="bench-head"><span class="bm-diamond">◆</span><span class="bm-name" title="' + escAttr(v.model) + '">' + escHtml(v.model || '—') + '</span>' + kindChip + liveChip + '</div>' +
+  return '<div class="bench-head"><span class="bm-diamond">◆</span><span class="bm-name" title="' + escAttr(v.model) + '">' + escHtml(displayModelName(v.model) || '—') + '</span>' + kindChip + liveChip + '</div>' +
     '<div class="bench-body"><div class="bench-stats">' + statsHtml + '</div>' +
     '<div class="bench-gcol"><div class="bench-ghead"><span class="gl">decode tok/s</span><span class="gv' + (v.live ? '" style="color:var(--green)' : '') + '">' + benchFmtTps(headV) + '</span></div>' + graphHtml + '</div></div>' +
     '<div class="bench-foot"><span class="note">' + footNote + '</span>' +
