@@ -703,7 +703,7 @@ function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.2.0</span>
+    <span class="footer-version">xLLM Chat v3.3.0</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -3084,7 +3084,7 @@ let TOP_P = parseFloat(localStorage.getItem('chat_top_p') || '0.9');
 let currentModel = localStorage.getItem('chat_current_model') || '';
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.2.0';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.3.0';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -3998,10 +3998,14 @@ document.addEventListener('DOMContentLoaded', () => {
   input.addEventListener('input', autoResize);
   input.focus();
   loadModels().then(() => { if (!_backendKnown) detectBackend(); });
-  loadHistory();
-  if (currentChatId) {
-    loadConversation(currentChatId);   // restores the thread's conn → applyConn pings cloud/agent if never checked
-  }
+  // Chat history now lives in IndexedDB (2026-09-13) — hydrate/migrate BEFORE the
+  // first sidebar render + thread restore. The synchronous mirror still holds the
+  // legacy localStorage chats, so an init failure never leaves the UI empty.
+  chatStoreInit().catch(e => { console.warn('[xllm] chat store init failed:', e); })
+    .then(() => {
+      loadHistory();
+      if (currentChatId) loadConversation(currentChatId);   // restores the thread's conn → applyConn pings cloud/agent if never checked
+    });
   wireTokenTip();
   updateTokenBar();
   loadVoices();   // voice read-aloud: availability + cloned voice list
@@ -4898,8 +4902,153 @@ function clearChatSearch() {
   loadHistory();
   inp.focus();
 }
+// ── CHAT STORE — IndexedDB (2026-09-13): "unlimited" chat memory ─────────────
+// chat_history used to be ONE localStorage blob holding EVERY thread, and
+// localStorage caps at ~5MB per origin (measured 5,242,094 chars in Chromium 148).
+// A few big SVG threads filled it, the next save threw QuotaExceededError, and the
+// finished response was lost (and, before the teardown fix, the run was stranded
+// with the stop button lit). Chats now live in IndexedDB, whose quota is a share of
+// free DISK rather than 5MB, so thread count/size is no longer a practical limit.
+// `chatStore` is the synchronous in-memory source of truth for every UI path;
+// writes persist the whole mirror to IDB in the background (coalesced), so the old
+// read-modify-write call sites keep working unchanged. localStorage keeps only the
+// small settings keys; the legacy chat_history blob is migrated once, verified,
+// then removed so it stops eating the origin's quota.
+const CHAT_STORE_DB = 'xllm-chat-store';
+const CHAT_STORE_VER = 2;        // v1 held one '__all__' blob; v2 = one record per thread
+let chatStore = (() => { try { return JSON.parse(localStorage.getItem('chat_history') || '[]'); } catch (e) { return []; } })();
+let chatStoreReady = false;      // IDB init finished (migration done)
+let chatStoreFallback = false;   // IDB unusable (private mode / blocked) → legacy localStorage store
+let chatWriteQueue = new Map();  // id → chat record to put (or null = delete), flushed in one transaction
+let chatWriteTimer = null;
+function chatDbOpen() {
+  return new Promise((resolve, reject) => {
+    let rq;
+    try { rq = indexedDB.open(CHAT_STORE_DB, CHAT_STORE_VER); } catch (e) { reject(e); return; }
+    rq.onupgradeneeded = () => {
+      // Also runs for an EXISTING older schema — an open() that names a store which is
+      // missing throws NotFoundError on the first transaction, which would silently
+      // drop the app back to the localStorage store.
+      const db = rq.result;
+      try {
+        if (!db.objectStoreNames.contains('chats')) db.createObjectStore('chats', { keyPath: 'id' });
+        if (db.objectStoreNames.contains('kv')) {   // drain the short-lived v1 blob store
+          const get = rq.transaction.objectStore('kv').get('__all__');
+          get.onsuccess = () => {
+            const list = get.result;
+            if (Array.isArray(list)) {
+              const os = rq.transaction.objectStore('chats');
+              list.forEach(c => { if (c && c.id) { try { os.put(c); } catch (e) {} } });
+            }
+          };
+        }
+      } catch (e) { console.warn('[xllm] chat store upgrade issue:', e); }
+    };
+    rq.onsuccess = () => resolve(rq.result);
+    rq.onerror = () => reject(rq.error);
+    rq.onblocked = () => reject(new Error('IndexedDB upgrade blocked by another tab'));
+  });
+}
+function chatDbGetAll() {
+  return chatDbOpen().then(db => new Promise((resolve, reject) => {
+    const rq = db.transaction('chats', 'readonly').objectStore('chats').getAll();
+    rq.onsuccess = () => resolve(rq.result || []);
+    rq.onerror = () => reject(rq.error);
+  }));
+}
+function chatDbWrite(puts, dels) {
+  if (!puts.length && !dels.length) return Promise.resolve();
+  return chatDbOpen().then(db => new Promise((resolve, reject) => {
+    // attach success/error to the TRANSACTION: a put on a large store may resolve
+    // its request before the record is actually committed.
+    const tx = db.transaction('chats', 'readwrite');
+    const os = tx.objectStore('chats');
+    puts.forEach(c => { try { os.put(c); } catch (e) {} });
+    dels.forEach(id => { try { os.delete(id); } catch (e) {} });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('aborted'));
+  }));
+}
+// Persist only the chats that changed (one record per thread), so a save costs
+// O(that thread) no matter how big the store gets.
+function chatStoreFlush() {
+  chatWriteTimer = null;
+  const pending = chatWriteQueue;
+  chatWriteQueue = new Map();
+  if (!pending.size) return;
+  if (!chatStoreReady || chatStoreFallback) {
+    // pre-init or no IndexedDB: legacy whole-blob write (settings-sized only)
+    try { localStorage.setItem('chat_history', JSON.stringify(chatStore)); } catch (e) {}
+    return;
+  }
+  const puts = [], dels = [];
+  for (const [id, v] of pending) { if (v === null) dels.push(id); else puts.push(v); }
+  chatDbWrite(puts, dels).catch(e => console.warn('[xllm] chat write failed:', e));
+}
+function chatStoreSchedule() { if (!chatWriteTimer) chatWriteTimer = setTimeout(chatStoreFlush, 0); }
+function chatStoreWrite(id) {
+  const cid = id || currentChatId;
+  if (!cid) return;
+  const chat = chatStore.find(c => c.id === cid);
+  if (!chat) return;
+  chatWriteQueue.set(cid, chat);
+  chatStoreSchedule();
+}
+function chatStorePutAll(list) {
+  (list || []).forEach(c => { if (c && c.id) chatWriteQueue.set(c.id, c); });
+  chatStoreSchedule();
+}
+function chatStoreDelete(id) {
+  chatStore = chatStore.filter(c => c.id !== id);
+  chatWriteQueue.set(id, null);
+  chatStoreSchedule();
+}
+window.addEventListener('pagehide', () => { if (chatWriteTimer) { clearTimeout(chatWriteTimer); chatStoreFlush(); } });
+// Boot: hydrate from IndexedDB, migrate the legacy localStorage blob once, prove the
+// copy landed before dropping it.
+async function chatStoreInit() {
+  // Snapshot the mirror FIRST: it is seeded from the legacy blob at parse time, and a
+  // message sent while init is still awaiting IndexedDB must not be dropped when the
+  // stored list is adopted.
+  const memSnapshot = chatStore.slice();
+  let legacy = [];
+  try { legacy = JSON.parse(localStorage.getItem('chat_history') || '[]'); } catch (e) { legacy = []; }
+  const seedById = new Map();
+  legacy.forEach(c => { if (c && c.id) seedById.set(c.id, c); });
+  memSnapshot.forEach(c => { if (c && c.id) seedById.set(c.id, c); });   // in-memory wins
+  const seed = [...seedById.values()];
+  try {
+    const stored = await chatDbGetAll();
+    if (stored.length) {
+      chatStore = stored;
+      const have = new Set(chatStore.map(c => c.id));
+      const missing = seed.filter(c => !have.has(c.id));
+      if (missing.length) { chatStore = chatStore.concat(missing); chatStorePutAll(missing); }
+      chatStoreReady = true;
+      try { localStorage.removeItem('chat_history'); } catch (_) {}
+      console.log('[xllm] chat store ready — ' + chatStore.length + ' threads from IndexedDB');
+    } else if (seed.length) {
+      chatStore = seed;
+      await chatDbWrite(chatStore, []);          // migration must land…
+      const back = await chatDbGetAll();
+      chatStoreReady = true;
+      if (back.length === chatStore.length) {
+        try { localStorage.removeItem('chat_history'); } catch (_) {}   // …then free the 5MB blob
+        console.log('[xllm] migrated ' + chatStore.length + ' chats to IndexedDB');
+      } else {
+        console.warn('[xllm] IndexedDB migration not verified — keeping the localStorage copy');
+      }
+    } else {
+      chatStoreReady = true;
+    }
+  } catch (e) {
+    chatStoreFallback = true; chatStoreReady = true; chatStore = seed.length ? seed : chatStore;
+    console.warn('[xllm] IndexedDB unavailable — chats stay in localStorage:', e);
+  }
+}
 function loadHistory() {
-  const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+  const chats = chatStore;
   const container = document.getElementById('chatHistory');
   if (!chats.length) {
     container.innerHTML = '<p style="padding:16px;color:var(--dim);font-size:13px;text-align:center">No conversations yet</p>';
@@ -4960,7 +5109,7 @@ function saveCurrentChat() {
   if (!currentChatId) {
     currentChatId = 'chat_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
   }
-  const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+  const chats = chatStore;
   let existing = chats.find(c => c.id === currentChatId);
   if (!existing) {
     existing = { id: currentChatId, title: '', created: Date.now(), messages: [] };
@@ -4972,22 +5121,16 @@ function saveCurrentChat() {
   existing.systemPrompt = SYSTEM_PROMPT;   // per-thread system prompt (2026-08-18)
   existing.conn = JSON.parse(JSON.stringify(activeConn));   // per-thread connection: local | cloud:<provider> | agent:<id> (2026-09-05)
   existing.agentSessions = chatAgentSessions;   // per-thread agent keep-alive sessions (2026-09-04)
-  let serialized = JSON.stringify(chats);
-  if (serialized.length > 4500000) {
-    // attachment payloads (image base64, big extractions) can blow the
-    // localStorage quota — keep name/kind/size, drop the data; the chat still
-    // renders chips/thumbnails-less (attachments added 2026-08-21).
-    const slim = chats.map(c => ({ ...c, messages: (c.messages || []).map(m => m.attachments
-      ? { ...m, attachments: m.attachments.map(a => ({ name: a.name, kind: a.kind, size: a.size })) }
-      : m) }));
-    serialized = JSON.stringify(slim);
-  }
-  localStorage.setItem('chat_history', serialized);
-  localStorage.setItem('chat_current_id', currentChatId);
+  // Persist to the IndexedDB-backed store (2026-09-13): no 5MB cap, so no slim pass,
+  // no quota failure and no "storage full" toast. Writes are coalesced + async; the
+  // in-memory mirror is already authoritative for the UI.
+  chatStoreWrite(currentChatId);
+  try { localStorage.setItem('chat_current_id', currentChatId); } catch (_) {}
   loadHistory();
+  return true;
 }
 function loadConversation(chatId) {
-  const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+  const chats = chatStore;
   const chat = chats.find(c => c.id === chatId);
   if (!chat) return;
   currentChatId = chatId;
@@ -5013,9 +5156,7 @@ function loadConversation(chatId) {
   updateStreamUI();   // entering a thread: its own run (if any) drives the send/stop UI
 }
 function deleteChat(chatId) {
-  let chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
-  chats = chats.filter(c => c.id !== chatId);
-  localStorage.setItem('chat_history', JSON.stringify(chats));
+  chatStoreDelete(chatId);
   if (currentChatId === chatId) newChat();
   loadHistory();
 }
@@ -5023,7 +5164,7 @@ function deleteChat(chatId) {
 // ── Rename chat (thread menu) — modal with Save/Cancel, sets a custom title ──
 let renameChatId = null;
 function renameChat(chatId) {
-  const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+  const chats = chatStore;
   const chat = chats.find(c => c.id === chatId);
   if (!chat) return;
   closeChatMenus();
@@ -5040,7 +5181,7 @@ function closeRename() {
 function saveRename() {
   const title = document.getElementById('renameInput').value.trim();
   if (!renameChatId) { closeRename(); return; }
-  const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+  const chats = chatStore;
   const chat = chats.find(c => c.id === renameChatId);
   if (chat) {
     if (title) {
@@ -5052,7 +5193,7 @@ function saveRename() {
       const firstUser = (chat.messages || []).find(m => m.role === 'user')?.content;
       chat.title = firstUser ? threadTitle(firstUser) : '';
     }
-    localStorage.setItem('chat_history', JSON.stringify(chats));
+    chatStoreWrite(chat.id);
   }
   renameChatId = null;
   closeRename();
@@ -5101,16 +5242,16 @@ function closeChatMenus() {
   document.querySelectorAll('.chat-menu.open').forEach(m => m.classList.remove('open'));
 }
 function togglePin(chatId) {
-  const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+  const chats = chatStore;
   const chat = chats.find(c => c.id === chatId);
   if (!chat) return;
   chat.pinned = !chat.pinned;
-  localStorage.setItem('chat_history', JSON.stringify(chats));
+  chatStoreWrite(chat.id);
   showToast(chat.pinned ? 'Chat pinned — moved to top' : 'Chat unpinned');
   loadHistory();
 }
 function exportThread(chatId) {
-  const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+  const chats = chatStore;
   const chat = chats.find(c => c.id === chatId);
   if (!chat || !(chat.messages || []).length) return showToast('No messages');
   const base = (threadTitle(chat.title) || 'chat').replace(/[^a-z0-9 _-]+/gi, '').trim().replace(/\s+/g, '-').slice(0, 60) || 'chat';
@@ -5369,43 +5510,62 @@ async function streamFromHistory() {
     // Errors that happened BEFORE a bubble existed (missing model, server down).
     // Visible run: system line as before. Hidden run: never touch the thread the
     // user is reading — write the error onto THIS run's stored placeholder instead.
-    if (e.name !== 'AbortError') {
+    // (Nested guard: a throw HERE must not skip the run teardown in `finally`.)
+    try {
+      if (e.name !== 'AbortError') {
+        if (threadId === currentChatId) {
+          appendMessage('system', 'Error: ' + e.message);
+        } else {
+          try {
+            const chats = chatStore;
+            const chat = chats.find(c => c.id === threadId);
+            const la = chat && chat.messages ? chat.messages[chat.messages.length - 1] : null;
+            if (la && la.role === 'assistant' && !la.content) {
+              la.content = '⚠ Error: ' + e.message;
+              chatStoreWrite(threadId);
+              loadHistory();
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (e2) { console.warn('[xllm] error-path reporting failed:', e2); }
+  } finally {
+    // ── RUN TEARDOWN — MUST ALWAYS RUN (2026-09-13) ──────────────────────────
+    // This block used to sit unprotected after the try/catch: when the final
+    // saveCurrentChat() threw (a big response pushing the old localStorage blob over
+    // the ~5MB origin quota = QuotaExceededError), `delete runs[threadId]` never ran,
+    // so curRun() stayed truthy forever — the response finished but the stop button
+    // stayed lit red, the send button stayed hidden and the input stayed disabled,
+    // with no error shown (saveMessageEdit/recycle call streamFromHistory without
+    // awaiting, so the rejection was silent). Teardown in `finally` makes that
+    // impossible. Chats now live in IndexedDB (see the CHAT STORE block), so the
+    // quota failure itself is gone too; this guard stays for any other fault.
+    // (2026-09-05 note: the thinking-loop self-heal retry stays removed — reasoning
+    // is launch/server-determined; a thinking-only response finalizes with the
+    // loop-warn instead of auto-retrying.)
+    try {
       if (threadId === currentChatId) {
-        appendMessage('system', 'Error: ' + e.message);
-      } else {
-        try {
-          const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
-          const chat = chats.find(c => c.id === threadId);
-          const la = chat && chat.messages ? chat.messages[chat.messages.length - 1] : null;
-          if (la && la.role === 'assistant' && !la.content) {
-            la.content = '⚠ Error: ' + e.message;
-            localStorage.setItem('chat_history', JSON.stringify(chats));
-            loadHistory();
-          }
-        } catch (_) {}
+        ensureBranchBar();
+        saveCurrentChat();   // visible: persist the finalized turn (hidden runs already wrote it)
+      }
+    } catch (err) {
+      console.warn('[xllm] post-stream save failed:', err);
+    } finally {
+      delete runs[threadId];
+      if (kind === 'agent') {
+        agentRunActive = false;
+        isStreaming = false;
+        streamChatId = null;
+        abortController = null;
+      }
+      updateStreamUI();
+      const input = document.getElementById('chatInput');
+      if (input) {
+        input.disabled = false;
+        input.placeholder = 'Type a message...';
+        if (threadId === currentChatId) input.focus();
       }
     }
-  }
-  // (2026-09-05: the thinking-loop self-heal retry was REMOVED — it forced
-  // enable_thinking:false client-side. Reasoning is launch/server-determined now;
-  // a thinking-only response finalizes with the loop-warn instead of auto-retrying.)
-  if (threadId === currentChatId) {
-    ensureBranchBar();
-    saveCurrentChat();   // visible: persist the finalized turn (hidden runs already wrote it)
-  }
-  delete runs[threadId];
-  if (kind === 'agent') {
-    agentRunActive = false;
-    isStreaming = false;
-    streamChatId = null;
-    abortController = null;
-  }
-  updateStreamUI();
-  const input = document.getElementById('chatInput');
-  if (input) {
-    input.disabled = false;
-    input.placeholder = 'Type a message...';
-    if (threadId === currentChatId) input.focus();
   }
 }
 function copyMessage(btn) {
@@ -5565,13 +5725,22 @@ function editMessage(btn) {
 function cancelMessageEdit(idx) {
   renderAllMessages();
 }
-function saveMessageEdit(idx) {
+async function saveMessageEdit(idx) {
   const msg = conversationHistory[idx];
   if (!msg || msg.role !== 'user') return;
   const ta = document.getElementById('editTa');
   const text = ta ? ta.value.trim() : '';
   if (!text) { showToast('Message cannot be empty'); return; }
-  if (curRun()) stopGeneration();
+  // Stop a live run in THIS thread and WAIT for it to leave `runs` before deciding
+  // whether to regenerate (same pattern as recycleMessage, 2026-09-05): while the
+  // aborted run was still registered, the `!curRun()` guard below silently skipped
+  // the regeneration — "Save & send" on a prompt that already had a response did
+  // nothing at all when a response was mid-stream. (2026-09-13)
+  if (curRun()) {
+    stopGeneration();
+    let waited = 0;
+    while (curRun() && waited < 50) { await new Promise(r => setTimeout(r, 100)); waited++; }
+  }
   const next = conversationHistory[idx + 1];
   const hadResponse = !!(next && next.role === 'assistant');
   if (hadResponse) {
@@ -6033,14 +6202,14 @@ async function agentRunTurn() {
         lastAi.stats = finalStats;
       }
     } else {
-      const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+      const chats = chatStore;
       const chat = chats.find(c => c.id === streamChatId);
       const la = chat && chat.messages ? chat.messages[chat.messages.length - 1] : null;
       if (la && la.role === 'assistant') {
         la.content = fullText;
         if (thinking) la.thinking = thinking;
         la.stats = finalStats;
-        localStorage.setItem('chat_history', JSON.stringify(chats));
+        chatStoreWrite(streamChatId);
         loadHistory();
       }
     }
@@ -6407,14 +6576,14 @@ async function agentChatSimpleTurn(ag, sessId, reuseExisting) {
         lastAi.stats = finalStats;
       }
     } else {
-      const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+      const chats = chatStore;
       const chat = chats.find(c => c.id === streamChatId);
       const la = chat && chat.messages ? chat.messages[chat.messages.length - 1] : null;
       if (la && la.role === 'assistant') {
         la.content = fullText;
         if (thinking) la.thinking = thinking;
         la.stats = finalStats;
-        localStorage.setItem('chat_history', JSON.stringify(chats));
+        chatStoreWrite(streamChatId);
         loadHistory();
       }
     }
@@ -6716,6 +6885,7 @@ async function streamResponse(S) {
   let finalUsage = null;
   let finishReason = null;
   let serverTimings = null;
+  let lastDataAt = Date.now();   // stall guard: last byte received from the stream (2026-09-13)
 
   try {
     let res;
@@ -6785,8 +6955,36 @@ async function streamResponse(S) {
     let buffer = '';
 
     while (true) {
-      const { done, value } = await reader.read();
+      // ── STREAM STALL GUARD (2026-09-13) ──────────────────────────────────────
+      // The loop used to end only on EOF (done) or an error. A server that writes
+      // the whole response and then leaves the connection open (no close / no
+      // terminating chunk) made reader.read() wait forever: the answer sat fully
+      // rendered on screen while the run stayed registered — stop button lit red
+      // with nothing left to stop. Once the server has marked the response
+      // finished, the only things left are the usage chunk / [DONE] / EOF, so wait
+      // at most 3s for them and finalize without them if they never come. And if a
+      // stream goes fully silent for 3 minutes mid-response, stop pretending it is
+      // alive (visible '[stream stalled]' on the partial answer, run torn down).
+      let chunk;
+      if (finishReason) {
+        chunk = await Promise.race([
+          reader.read(),
+          new Promise(res => setTimeout(() => res({ __stall: 'tail' }), 3000))
+        ]);
+      } else if (Date.now() - lastDataAt > 180000) {
+        try { await reader.cancel(); } catch (_) {}
+        throw Object.assign(new Error('Stream stalled — no data received for 3 minutes'), { name: 'StallError' });
+      } else {
+        chunk = await reader.read();
+      }
+      if (chunk && chunk.__stall === 'tail') {
+        console.warn('[xllm] response finished but the stream never closed — finalizing without the trailing usage chunk');
+        try { reader.cancel(); } catch (_) {}
+        break;
+      }
+      const { done, value } = chunk;
       if (done) break;
+      lastDataAt = Date.now();
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
       buffer = lines.pop();
@@ -6935,14 +7133,14 @@ async function streamResponse(S) {
         lastAi.stats = finalStats;
       }
     } else {
-      const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+      const chats = chatStore;
       const chat = chats.find(c => c.id === streamChatId);
       const la = chat && chat.messages ? chat.messages[chat.messages.length - 1] : null;
       if (la && la.role === 'assistant') {
         la.content = fullText;
         if (thinking) la.thinking = thinking;
         la.stats = finalStats;
-        localStorage.setItem('chat_history', JSON.stringify(chats));
+        chatStoreWrite(streamChatId);
         loadHistory();
       }
     }
@@ -6958,23 +7156,26 @@ async function streamResponse(S) {
     if (msgStatsTimer) { clearInterval(msgStatsTimer); msgStatsTimer = null; }
     clearLivePaint();   // stop/error: drop any queued live paint (partial render below is authoritative)
     const errEl = agentContentEl(liveBubble());
-    if (e.name === 'AbortError') {
-      // only paint [stopped] into an ASSISTANT bubble — after a recycle-triggered
+    if (e.name === 'AbortError' || e.name === 'StallError') {
+      // Stall (2026-09-13) rides the stop path: keep the partial answer on screen
+      // and mark it — never wipe a long response with an error line.
+      const mark = (e.name === 'StallError') ? '[stream stalled]' : '[stopped]';
+      // only paint the marker into an ASSISTANT bubble — after a recycle-triggered
       // abort the last bubble may be the user's (chat rebuilt); never clobber it
       if (errEl && errEl.closest('.msg') && errEl.closest('.msg').classList.contains('assistant')) {
-        errEl.innerHTML = fullText ? renderAssistantContent(fullText) + '<span style="color:var(--dim);font-size:12px"> — [stopped]</span>' : '<span style="color:var(--dim)">[stopped]</span>';
+        errEl.innerHTML = fullText ? renderAssistantContent(fullText) + '<span style="color:var(--dim);font-size:12px"> — ' + mark + '</span>' : '<span style="color:var(--dim)">' + mark + '</span>';
       }
       // persist whatever streamed so far into the stream's thread (2026-08-27)
       if (streamChatId === currentChatId) {
         const lastAi = conversationHistory.length ? conversationHistory[conversationHistory.length - 1] : null;
         if (lastAi && lastAi.role === 'assistant') lastAi.content = fullText;
       } else {
-        const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+        const chats = chatStore;
         const chat = chats.find(c => c.id === streamChatId);
         const la = chat && chat.messages ? chat.messages[chat.messages.length - 1] : null;
         if (la && la.role === 'assistant') {
           la.content = fullText;
-          localStorage.setItem('chat_history', JSON.stringify(chats));
+          chatStoreWrite(streamChatId);
           loadHistory();
         }
       }
@@ -7922,7 +8123,7 @@ function benchPayload() {
     prompt: benchPromptSnippet() || undefined,
     threadTitle: (function () {
       try {
-        const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+        const chats = chatStore;
         const c = chats.find(x => x.id === currentChatId);
         return c ? (c.title || '') : '';
       } catch (e) { return ''; }
@@ -8216,7 +8417,7 @@ function chatExportEnvelope(chats) {
 }
 function exportChat() {   // header button — current chat only
   if (!conversationHistory.length) return showToast('No messages');
-  const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+  const chats = chatStore;
   const stored = currentChatId ? chats.find(c => c.id === currentChatId) : null;
   const chat = {
     id: currentChatId || ('chat_' + Date.now()),
@@ -8234,7 +8435,7 @@ function exportChat() {   // header button — current chat only
 
 // ── Export modal (sidebar footer) — select all or individual chats → JSON ──
 function openExportModal() {
-  const chats = JSON.parse(localStorage.getItem('chat_history') || '[]');
+  const chats = chatStore;
   // same ordering as the sidebar list: pinned first, then recency
   const sorted = [...chats.filter(c => c.pinned), ...chats.filter(c => !c.pinned)];
   const list = document.getElementById('exportChatList');
@@ -8262,7 +8463,7 @@ function exportToggleAll(el) {
 function doExportSelected() {
   const ids = new Set([...document.querySelectorAll('#exportChatList input[type=checkbox]:checked')].map(cb => cb.value));
   if (!ids.size) return showToast('Select at least one chat');
-  const chats = JSON.parse(localStorage.getItem('chat_history') || '[]').filter(c => ids.has(c.id));
+  const chats = chatStore.filter(c => ids.has(c.id));
   downloadJson(`xllm-chats_${new Date().toISOString().slice(0,10)}.json`, chatExportEnvelope(chats));
   showToast(`Exported ${chats.length} chat${chats.length > 1 ? 's' : ''}`);
   closeExportModal();
@@ -8312,29 +8513,14 @@ function importChatsFromFile(input) {
       ...(c.renamed ? { renamed: true } : {}),
       ...(c.pinned ? { pinned: true } : {})
     }));
-    const store = JSON.parse(localStorage.getItem('chat_history') || '[]');
+    const store = chatStore;
     let added = 0, replaced = 0;
     for (const chat of norm) {
       const idx = store.findIndex(c => c.id === chat.id);
       if (idx >= 0) { store[idx] = chat; replaced++; }
       else { store.unshift(chat); added++; }
     }
-    try {
-      let serialized = JSON.stringify(store);
-      if (serialized.length > 4500000) {
-        // same slim-down as saveCurrentChat: keep name/kind/size, drop attachment payloads
-        const slim = store.map(c => ({ ...c, messages: (c.messages || []).map(m => m.attachments
-          ? { ...m, attachments: m.attachments.map(a => ({ name: a.name, kind: a.kind, size: a.size })) }
-          : m) }));
-        serialized = JSON.stringify(slim);
-      }
-      localStorage.setItem('chat_history', serialized);
-    } catch (e) {
-      status.textContent = 'Import failed — chat storage is full.';
-      status.className = 'import-status err';
-      input.value = '';
-      return;
-    }
+    chatStorePutAll(norm);   // IndexedDB store: no quota pass needed (2026-09-13)
     loadHistory();
     const total = added + replaced;
     status.textContent = `Imported ${total} chat${total > 1 ? 's' : ''} — ${added} new, ${replaced} updated.`;
@@ -8345,9 +8531,11 @@ function importChatsFromFile(input) {
   reader.readAsText(file);
 }
 
-function showToast(msg) {
+function showToast(msg, ms) {
   const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
-  document.body.appendChild(t); setTimeout(() => t.remove(), 2000);
+  document.body.appendChild(t);
+  // duration is optional (some callers pass a 2nd/3rd arg of other kinds — ignore those)
+  setTimeout(() => t.remove(), (typeof ms === 'number' && ms > 0) ? ms : 2000);
 }
 
 document.addEventListener('click', (e) => {
