@@ -721,7 +721,7 @@ function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.3.3</span>
+    <span class="footer-version">xLLM Chat v3.3.4</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -3148,7 +3148,7 @@ function healLocalModelPin(name) {
 }
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.3.3';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.3.4';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -6998,11 +6998,23 @@ async function streamResponse(S) {
   let _lastLiveRenderAt = 0;
   let _fenceBase = null;
   let _fenceEl = null;
-  let _fenceLang = null;      // Prism language of the OPEN fence (progressive tail coloring)
-  let _tailLastAt = 0;        // last full tail color pass timestamp
-  let _fenceDoneChars = 0;    // open-block tail chars already colored into the DOM (giant-tail incremental path)
+  let _fenceLang = null;      // Prism language of the OPEN fence (live tail coloring)
+  let _tailLastAt = 0;        // last tail DOM write (at most one per TAIL_WRITE_MS)
+  let _fenceDoneChars = 0;    // open-block tail chars already COLORED into the DOM
+  let _fencePlain = null;     // plain text node carrying the uncolored rest (big blocks)
+  let _fencePlainLen = 0;     // chars already in _fencePlain (appendData costs the delta only)
+  let _fencePartialEl = null; // cached node for the unfinished last line (no querySelector per token)
+  const LIVE_COLOR_MAX = 6000;  // color the live tail up to this size; above it stream PLAIN
+  const TAIL_WRITE_MS = 110;    // one tail DOM write per ~110ms regardless of token rate
   function clearLivePaint() {
     if (_liveRenderTimer) { clearTimeout(_liveRenderTimer); _liveRenderTimer = null; _liveRenderQueued = false; }
+  }
+  function fencePartialEl() {
+    if (_fencePartialEl && _fencePartialEl.parentNode === _fenceEl) return _fencePartialEl;
+    _fencePartialEl = document.createElement('span');
+    _fencePartialEl.className = 'xllm-tail-partial';
+    _fenceEl.appendChild(_fencePartialEl);
+    return _fencePartialEl;
   }
   function openFenceTail(text) {
     // text ends inside an unclosed ``` fence → {prefix, tail} (tail = the code
@@ -7048,7 +7060,13 @@ async function streamResponse(S) {
     if (force) { paint(); return; }
     if (_liveRenderQueued) return;   // a paint is already scheduled — it reads the latest text
     _liveRenderQueued = true;
-    const wait = Math.max(0, 100 - (Date.now() - _lastLiveRenderAt));
+    // Full-document paints cost ~25ms at a 60K-char response and ~90-165ms once the
+    // thread already holds big responses (measured 2026-09-16: escapeAndFormat 23ms +
+    // innerHTML 16ms + forced layout 27ms, x6 past scenes in the thread). At a fixed
+    // 100ms cadence that saturates the main thread and starves the stream reader, so
+    // back off to 300ms once the text is big — still live, stays responsive.
+    const floor = (fullText && fullText.length > 20000) ? 300 : 100;
+    const wait = Math.max(0, floor - (Date.now() - _lastLiveRenderAt));
     _liveRenderTimer = setTimeout(() => {
       _liveRenderQueued = false; _liveRenderTimer = null; _lastLiveRenderAt = Date.now();
       paint();
@@ -7074,54 +7092,54 @@ async function streamResponse(S) {
         _fenceLang = resolveFenceLang(fullText);   // colors the STREAMED code (David: colors used to land per line)
         _tailLastAt = 0;
         _fenceDoneChars = 0;
+        _fencePlain = null;
+        _fencePlainLen = 0;
+        _fencePartialEl = null;
       }
-      // Progressive tail coloring (2026-09-06): completed lines are Prism-colored
-      // with full context (re-tokenized from the fence start, throttled ≤6/s — the
-      // quadratic freeze fix stays intact since only the OPEN block is tokenized,
-      // never the whole doc); the unfinished last line stays raw until it ends with
-      // a newline, so colors visibly "land line by line" like they used to.
+      // Live tail rendering — REBUILT 2026-09-16 (David: "browser locked up on long
+      // code responses"). The old path re-tokenized and innerHTML-REPLACED the whole
+      // open block up to ~6x/second (≤24K branch), and above that appended a fresh
+      // Prism span set every pass — so a long code response created tens of thousands
+      // of elements, threw them away and re-laid them out continuously. MEASURED on a
+      // 60K-char SVG fence streamed at 120 tok/s: main thread 126% CPU by 17K chars,
+      // page locked by 24K, 9.7GB RSS with a 6100% CPU GC/layout storm — llama.cpp's
+      // send buffer filled and the MODEL ITSELF blocked waiting on the browser.
+      // Now nothing already rendered is ever rebuilt: completed lines are colored ONCE
+      // (inserted before the partial node) while the tail is small; past LIVE_COLOR_MAX
+      // the rest streams as ONE plain text node via appendData (cost = the delta, no
+      // parse, no elements); every write is capped at one per TAIL_WRITE_MS. The final
+      // pass (fence close / finalize) still colors the whole block with full context.
       const tail = open.tail;
       const nlIdx = tail.lastIndexOf('\n');
       const partial = nlIdx < 0 ? tail : tail.slice(nlIdx + 1);
       const done = tail.slice(0, Math.max(0, tail.length - partial.length));
-      const grammar = (_fenceLang && Prism.languages[_fenceLang]) ? Prism.languages[_fenceLang] : null;
-      const colorize = (txt) => (txt && grammar) ? Prism.highlight(txt, grammar, _fenceLang) : (txt ? escHtml(txt) : '');
-      if (Date.now() - _tailLastAt >= 160) {
+      const pe = fencePartialEl();
+      if (Date.now() - _tailLastAt >= TAIL_WRITE_MS) {
         _tailLastAt = Date.now();
-        if (tail.length <= 24000) {
-          // full-context recolor of the whole open block (cross-line correct).
-          // Threshold lowered 90K → 24K (2026-09-13): measured in-page on a code
-          // tail, one pass = Prism.highlight + innerHTML + layout of the colored
-          // block — 24K ≈ 25ms, but 90K ≈ 100ms (41ms Prism + 57ms innerHTML/layout
-          // of 843KB of markup). At the 160ms throttle that is ~60% of the main
-          // thread during a long code generation: the stream LOOKS locked up
-          // (updates only land when the parser yields), which is the second half of
-          // David's "code preview updates in lagged blocks" report. Above 24K the
-          // incremental path below keeps per-pass work bounded by the delta.
-          _fenceEl.innerHTML = colorize(done) + '<span class="xllm-tail-partial">' + escHtml(partial) + '</span>';
-          _fenceDoneChars = done.length;
-        } else if (done.length > _fenceDoneChars) {
-          // Big tail (well over 24K): a whole-block recolor per pass would
-          // re-tokenize + re-parse the ENTIRE open block ~6x/sec — unbounded cost.
-          // Color only the lines completed since the last pass (per-pass work
-          // bounded by the stream delta, never the total), so colors keep landing
-          // line-by-line at ANY response size. Finalize re-colors with full
-          // context, so cross-line constructs end up correct on screen.
-          const fresh = done.slice(_fenceDoneChars);
-          _fenceDoneChars = done.length;
-          let pe = _fenceEl.querySelector('.xllm-tail-partial');
-          if (!pe) { pe = document.createElement('span'); pe.className = 'xllm-tail-partial'; _fenceEl.appendChild(pe); }
-          pe.insertAdjacentHTML('beforebegin', colorize(fresh));
+        if (tail.length <= LIVE_COLOR_MAX) {
+          const grammar = (_fenceLang && Prism.languages[_fenceLang]) ? Prism.languages[_fenceLang] : null;
+          if (done.length > _fenceDoneChars) {
+            const fresh = done.slice(_fenceDoneChars);
+            _fenceDoneChars = done.length;
+            pe.insertAdjacentHTML('beforebegin', grammar ? Prism.highlight(fresh, grammar, _fenceLang) : escHtml(fresh));
+          }
+        } else {
+          if (_fencePlain === null) {          // plain mode: keep what is colored, append the rest
+            _fencePlain = document.createTextNode('');
+            _fencePlainLen = _fenceDoneChars;
+            _fenceEl.insertBefore(_fencePlain, pe);
+          }
+          if (done.length > _fencePlainLen) {
+            _fencePlain.appendData(done.slice(_fencePlainLen));
+            _fencePlainLen = done.length;
+          }
         }
       }
-      // the raw unfinished line always tracks the latest text
-      let pe = _fenceEl.querySelector('.xllm-tail-partial');
-      if (!pe) { pe = document.createElement('span'); pe.className = 'xllm-tail-partial'; _fenceEl.appendChild(pe); }
-      pe.textContent = partial;
+      pe.textContent = partial;   // the unfinished last line tracks every token
       scrollLiveToBottom();
       return;
     }
-    _fenceBase = null; _fenceEl = null; _fenceLang = null;
+    _fenceBase = null; _fenceEl = null; _fenceLang = null; _fencePlain = null; _fencePartialEl = null;
     paintFullContent(fullText, thinking, inThinking, false);
   }
   function updateThinkingUI(thinking, inThinking) {
