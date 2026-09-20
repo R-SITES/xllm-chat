@@ -394,6 +394,12 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .sidebar-search-clear{flex-shrink:0;width:22px;height:22px;border-radius:6px;background:none;border:none;color:var(--dim);cursor:pointer;font-size:12px;display:none;align-items:center;justify-content:center;padding:0}
 .sidebar-search-clear:hover{color:var(--text);background:var(--accentSoft)}
 .sidebar-search-clear.show{display:flex}
+/* Chat-list SORT row (2026-09-20) — sits under the search box, above the list.
+   One compact line of segmented chips; the active sort is accent-tinted. */
+.sidebar-sort{display:flex;align-items:center;gap:4px;padding:8px 12px 2px;flex-wrap:nowrap}
+.sort-btn{flex:1 1 0;min-width:0;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--dim);font-family:var(--font);font-size:10.5px;font-weight:500;letter-spacing:.02em;padding:5px 2px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;transition:color .15s,border-color .15s,background .15s}
+.sort-btn:hover{color:var(--text);border-color:var(--accentLine)}
+.sort-btn.active{color:var(--accent);background:var(--accentBg);border-color:var(--accentLine)}
 .sidebar-body::-webkit-scrollbar{width:8px}
 .sidebar-body::-webkit-scrollbar-track{background:transparent}
 .sidebar-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;border:2px solid transparent;background-clip:content-box}
@@ -716,12 +722,19 @@ function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');
     <input type="text" id="chatSearch" placeholder="Search chats..." oninput="filterChats(this.value)" onkeydown="if(event.key==='Enter')chatSearchEnter()" spellcheck="false" title="Type to filter titles — Enter to search chat contents">
     <button class="sidebar-search-clear" id="chatSearchClear" onclick="clearChatSearch()" title="Clear filter">✕</button>
   </div>
+  <div class="sidebar-sort" id="chatSortBar">
+    <button class="sort-btn active" data-sort="newest" onclick="setChatSort('newest')" title="Most recent first (newest created on top)">Newest</button>
+    <button class="sort-btn" data-sort="oldest" onclick="setChatSort('oldest')" title="Oldest first">Oldest</button>
+    <button class="sort-btn" data-sort="az" onclick="setChatSort('az')" title="Title A → Z">A–Z</button>
+    <button class="sort-btn" data-sort="za" onclick="setChatSort('za')" title="Title Z → A">Z–A</button>
+    <button class="sort-btn" data-sort="msgs" onclick="setChatSort('msgs')" title="Most messages first">Msgs</button>
+  </div>
   <div class="sidebar-body" id="chatHistory"></div>
   <div class="sidebar-footer">
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.3.4</span>
+    <span class="footer-version">xLLM Chat v3.3.5</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -3148,7 +3161,7 @@ function healLocalModelPin(name) {
 }
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.3.4';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.3.5';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -4276,6 +4289,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (currentChatId) loadConversation(currentChatId);   // restores the thread's conn → applyConn pings cloud/agent if never checked
     });
   wireTokenTip();
+  paintChatSort();   // sidebar sort row: highlight the restored mode (newest by default)
   updateTokenBar();
   loadVoices();   // voice read-aloud: availability + cloned voice list
   renderBubbleFontSel();   // Settings → Theme: populate the Google Fonts dropdown
@@ -5183,6 +5197,40 @@ function clearChatSearch() {
   loadHistory();
   inp.focus();
 }
+// ── Sidebar SORT (2026-09-20) — David's ask: a sort row under the search box ──
+// PINNED CHATS ALWAYS STAY ON TOP: the sort only orders items WITHIN the pinned
+// group and WITHIN the rest, so pinning keeps its meaning under every sort.
+// Default (and the restore fallback) is newest-first.
+const CHAT_SORTS = {
+  newest: { label: 'Newest', cmp: (a, b) => (b.created || 0) - (a.created || 0) },
+  oldest: { label: 'Oldest', cmp: (a, b) => (a.created || 0) - (b.created || 0) },
+  az:     { label: 'A–Z',    cmp: (a, b) => chatSortKey(a).localeCompare(chatSortKey(b)) },
+  za:     { label: 'Z–A',    cmp: (a, b) => chatSortKey(b).localeCompare(chatSortKey(a)) },
+  msgs:   { label: 'Msgs',   cmp: (a, b) => ((b.messages || []).length - (a.messages || []).length) || ((b.created || 0) - (a.created || 0)) }
+};
+let chatSortMode = 'newest';
+try { if (CHAT_SORTS[localStorage.getItem('chat_sort_mode')]) chatSortMode = localStorage.getItem('chat_sort_mode'); } catch (e) {}
+function chatSortKey(c) { return (threadTitle(c.title) || '').toLowerCase(); }
+// stable sort: equal keys keep the store's own order, so the list never jitters
+function sortChatGroup(arr, cmp) {
+  return arr.map((c, i) => ({ c, i })).sort((x, y) => cmp(x.c, y.c) || (x.i - y.i)).map(o => o.c);
+}
+function sortChats(list) {
+  const cmp = (CHAT_SORTS[chatSortMode] || CHAT_SORTS.newest).cmp;
+  return [...sortChatGroup(list.filter(c => c.pinned), cmp), ...sortChatGroup(list.filter(c => !c.pinned), cmp)];
+}
+function setChatSort(mode) {
+  if (!CHAT_SORTS[mode]) return;
+  chatSortMode = mode;
+  try { localStorage.setItem('chat_sort_mode', mode); } catch (e) {}
+  paintChatSort();
+  loadHistory();
+}
+function paintChatSort() {
+  const bar = document.getElementById('chatSortBar');
+  if (!bar) return;
+  bar.querySelectorAll('.sort-btn').forEach(b => b.classList.toggle('active', b.dataset.sort === chatSortMode));
+}
 // ── CHAT STORE — IndexedDB (2026-09-13): "unlimited" chat memory ─────────────
 // chat_history used to be ONE localStorage blob holding EVERY thread, and
 // localStorage caps at ~5MB per origin (measured 5,242,094 chars in Chromium 148).
@@ -5347,9 +5395,9 @@ function loadHistory() {
     container.innerHTML = '<p style="padding:16px;color:var(--dim);font-size:13px;text-align:center">No chats match “' + escHtml(chatSearchQuery) + '”</p>';
     return;
   }
-  // pinned chats float to the top as favorites; order within each group is the
-  // existing recency order (newest first)
-  const sorted = [...list.filter(c => c.pinned), ...list.filter(c => !c.pinned)];
+  // pinned chats always float to the top; the sort row only orders WITHIN each
+  // group (newest-first by default — David's 2026-09-20 spec)
+  const sorted = sortChats(list);
   container.innerHTML = sorted.map(c => `
     <div class="history-item${c.pinned ? ' pinned' : ''}${c.id === currentChatId ? ' active' : ''}" onclick="loadConversation('${c.id}');if(!sidebarPinned) toggleSidebar();">
       <div style="flex:1;min-width:0">
@@ -8855,8 +8903,8 @@ function exportChat() {   // header button — current chat only
 // ── Export modal (sidebar footer) — select all or individual chats → JSON ──
 function openExportModal() {
   const chats = chatStore;
-  // same ordering as the sidebar list: pinned first, then recency
-  const sorted = [...chats.filter(c => c.pinned), ...chats.filter(c => !c.pinned)];
+  // same ordering as the sidebar list: pinned first, then the active sort
+  const sorted = sortChats(chats);
   const list = document.getElementById('exportChatList');
   const all = document.getElementById('exportSelectAll');
   if (!sorted.length) {
