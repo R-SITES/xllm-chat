@@ -754,7 +754,7 @@ function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.3.7</span>
+    <span class="footer-version">xLLM Chat v3.3.8</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -852,7 +852,7 @@ function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
         </button>
       </div>
-      <button class="clip-btn" id="clipBtn" onclick="document.getElementById('fileInput').click()" title="Attach files — images, txt, csv, json, md, pdf, xlsx, xls, docx">
+      <button class="clip-btn" id="clipBtn" onclick="document.getElementById('fileInput').click()" title="Attach files — images, txt, csv, json, md, pdf, xlsx, xls, docx. Ctrl+Shift+V attaches whatever is on the clipboard (pasted text arrives as a file); a copied image attaches with plain Ctrl+V too.">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
       </button>
     </div>
@@ -3191,7 +3191,7 @@ function healLocalModelPin(name) {
 }
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.3.7';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.3.8';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -4371,6 +4371,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const input = document.getElementById('chatInput');
   input.addEventListener('input', autoResize);
   input.addEventListener('input', histOnTyped);   // typing cancels history browsing (2026-09-24)
+  input.addEventListener('paste', pasteAttachEvent);   // Ctrl+Shift+V / image paste → attachments (2026-09-24)
   input.focus();
   loadModels().then(() => { if (!_backendKnown) detectBackend(); });
   // Chat history now lives in IndexedDB (2026-09-13) — hydrate/migrate BEFORE the
@@ -5979,6 +5980,61 @@ function readFileAsDataURL(f) {
     r.onerror = () => rej(new Error('read failed'));
     r.readAsDataURL(f);
   });
+}
+
+// ── Clipboard → attachments (Ctrl+Shift+V, Big AGI parity, 2026-09-24) ──
+// Big AGI binds Ctrl+Shift+V to "Attach Clipboard": images arrive as image attachments,
+// any other clipboard payload arrives as a TEXT attachment. Plain Ctrl+V still pastes
+// text into the box — EXCEPT when the clipboard holds a file (an image), which a textarea
+// cannot take anyway; those attach on plain Ctrl+V too, matching Big AGI's paste intercept
+// (attachAppendDataTransfer(..., attachText = false)). The keydown only ARMS the flag: the
+// paste event itself is where the data lives, and preventDefault-ing the keydown would stop
+// the paste event from ever firing.
+let _pasteAttachText = false;
+function pasteAttachKeydown(e) {
+  if (!(e.ctrlKey || e.metaKey) || !e.shiftKey) return false;
+  if (String(e.key || '').toLowerCase() !== 'v') return false;
+  _pasteAttachText = true;
+  setTimeout(() => { _pasteAttachText = false; }, 1500);   // never leave it armed
+  return true;
+}
+function _clipName(prefix, ext, stamp) { return prefix + '-' + stamp + '.' + ext; }
+async function pasteAttachEvent(e) {
+  const dt = e.clipboardData;
+  const wantText = _pasteAttachText;
+  _pasteAttachText = false;
+  if (!dt) return;
+  const imgFiles = [];
+  for (const it of Array.from(dt.items || [])) {
+    if (it.kind === 'file' && String(it.type || '').startsWith('image/')) {
+      const f = it.getAsFile();
+      if (f) imgFiles.push(f);
+    }
+  }
+  const payload = (dt.files && dt.files.length) ? Array.from(dt.files) : imgFiles;
+  const text = dt.getData('text/plain') || '';
+  const html = dt.getData('text/html') || '';
+  if (!payload.length && !wantText) return;    // plain text paste → let the browser insert it
+  e.preventDefault();
+  const stamp = new Date().toTimeString().slice(0, 8).replace(/:/g, '');
+  let n = 0, textAdded = false;
+  for (const f of payload) {
+    const generic = !f.name || /^image\.(png|jpe?g|gif|webp)$/i.test(f.name);
+    const ext = (String(f.type || '').split('/')[1] || 'png').replace('jpeg', 'jpg');
+    const named = generic ? new File([f], _clipName('clipboard', ext, stamp), { type: f.type || 'image/png' }) : f;
+    await processFile(named);
+    n++;
+  }
+  if (wantText && (text || html)) {
+    await processFile(new File([text || html], _clipName('clipboard', 'txt', stamp), { type: 'text/plain' }));
+    n++; textAdded = true;
+  }
+  if (n) {
+    // showToast(msg, ms) only renders its FIRST argument (existing call sites pass 3 args, but the
+    // count would be lost) — build one string so the number is visible.
+    showToast('Clipboard attached — ' + n + (n === 1 ? ' item' : ' items') + (textAdded ? ' (text as a file)' : ''));
+    renderAttachments();
+  }
 }
 
 function renderAttachments() {
@@ -8335,7 +8391,7 @@ function closePreview() {
 function escHtml(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
 function escAttr(s) { return escHtml(s); }
 
-function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+function handleKey(e) { if (pasteAttachKeydown(e)) return; if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
 
 // ── Message walk (up/down chevrons, 2026-08-18; viewport-anchored 2026-09-06) ──
 // First click targets the message currently in context at the viewport top;
