@@ -597,7 +597,13 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
 .ds-sort-btn{padding:3px 9px;background:transparent;border:1px solid var(--border);border-radius:999px;color:var(--dim);font-family:var(--font);font-size:10.5px;cursor:pointer;transition:all .15s}
 .ds-sort-btn:hover{color:var(--text);border-color:var(--accentLine)}
 .ds-sort-btn.on{background:var(--accentBg);border-color:var(--accentLine);color:var(--accent)}
+.ds-sort-btn .dir{font-size:9px;margin-left:3px;vertical-align:1px}
 .ds-sort-btn.disabled{opacity:.4;cursor:default}
+/* Catalog filter box (2026-09-24): lives in the sticky head so it stays put while the list scrolls */
+.ds-search{display:flex;align-items:center}
+.ds-search input{margin-top:0;padding:5px 9px;font-size:11.5px;border-radius:7px;background:var(--bg3);height:auto}
+.ds-search input::placeholder{color:var(--dim);opacity:.8}
+.ds-count-note{font-size:10.5px;color:var(--dim);padding:0 2px 3px}
 .ds-rows{display:flex;flex-direction:column;gap:4px}
 .dm-price{margin-left:auto;flex-shrink:0;font-family:var(--mono);font-size:10.5px;color:var(--dim);white-space:nowrap}
 .dm-price.free{color:var(--accent);font-weight:600}
@@ -748,7 +754,7 @@ function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.3.6</span>
+    <span class="footer-version">xLLM Chat v3.3.7</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -922,7 +928,7 @@ function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');
         <span class="agent-status" id="orStatus"><span class="status-dot"></span><span>Not tested</span></span>
         <button class="bg-btn" id="orTestBtn" onclick="testCloudConn('openrouter')">Test</button>
       </div>
-      <div class="bg-note">OpenRouter's model API — thousands of models incl. Claude / GPT / Gemini. Hit ↻ to pull the catalog: <b>Free Models</b> / <b>Premium Models</b> tabs, sorted by name or by price (per 1M tokens shown on the right). Typing in the Model field filters both tabs, and Enter applies the typed id for the active OpenRouter thread. Keys stay in this browser only.</div>
+      <div class="bg-note">OpenRouter's model API — thousands of models incl. Claude / GPT / Gemini. Hit ↻ to pull the catalog: <b>Free Models</b> / <b>Premium Models</b> tabs, sorted by name or by price (per 1M tokens shown on the right) — click a sort chip again to flip it between ascending and descending (the ▲/▼ shows which way it is going). The box under the sort row filters the list live as you type (e.g. <b>open</b> for OpenAI), the Model field's own filter still applies, and Enter applies the typed id for the active OpenRouter thread. Keys stay in this browser only.</div>
     </div>
     <label>System Prompt</label>
     <textarea id="setSysPrompt"></textarea>
@@ -3185,7 +3191,7 @@ function healLocalModelPin(name) {
 }
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.3.6';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.3.7';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -3482,6 +3488,9 @@ function refreshCloudModels(p) {
 // type/paste the id (e.g. anthropic/claude-sonnet-4.5), Enter or blur applies it, and
 // typing live-filters the fetched list. Selecting a row does the same thing.
 let cloudModelFilter = { deepseek: '', openrouter: '' };
+// Catalog search box (2026-09-24, David's ask): a live filter right above the OpenRouter model list.
+// Kept in memory only (a transient search), separate from the Model field's filter.
+let cloudListSearch = { deepseek: '', openrouter: '' };
 function orModelTyped() {
   const el = document.getElementById('orModel');
   cloudModelFilter.openrouter = String((el && el.value) || '').trim().toLowerCase();
@@ -3549,9 +3558,30 @@ function setCloudListTab(p, tab) {
   renderDsModels(p);
 }
 function setCloudListSort(p, sort) {
-  cloudListPrefs[p + ':' + cloudListTab(p)] = sort;
+  // Clicking the ACTIVE chip flips ascending/descending; clicking the other chip switches to
+  // it ascending (David 2026-09-24: the chips looked dead — a repeat click had nothing to do,
+  // and Price was disabled on the Free tab, which is the tab OpenRouter opens on).
+  const tab = cloudListTab(p);
+  const cur = parseSortKey(cloudListPref(p, tab));
+  cloudListPrefs[p + ':' + tab] = (cur.key === sort) ? sortValue(sort, -cur.dir) : sortValue(sort, 1);
   try { localStorage.setItem('chat_cloud_list_prefs', JSON.stringify(cloudListPrefs)); } catch (e) {}
   renderDsModels(p);
+}
+// Sort prefs are stored as 'name' | 'name-desc' | 'price' | 'price-desc' (old plain 'name'/'price'
+// values still parse — anything not ending in -desc is ascending).
+function parseSortKey(v) {
+  const s = String(v || '');
+  return { key: s.indexOf('price') === 0 ? 'price' : 'name', dir: /-desc$/.test(s) ? -1 : 1 };
+}
+function sortValue(key, dir) { return key + (dir === -1 ? '-desc' : ''); }
+function sortDirTitle(key, ps) {   // what the NEXT click will do
+  const same = (ps.key === key);
+  if (key === 'name') return same ? (ps.dir === -1 ? 'reversing to A→Z' : 'reversing to Z→A') : 'A→Z';
+  return same ? (ps.dir === -1 ? 'reversing to cheapest first' : 'reversing to priciest first') : 'cheapest first';
+}
+function orHit(m, q) {
+  if (!q) return true;
+  return m.id.toLowerCase().indexOf(q) !== -1 || modelLabel(m).toLowerCase().indexOf(q) !== -1;
 }
 function cloudListTab(p) {
   const t = cloudListTabs[p] || cloudListPrefs[p + ':tab'];
@@ -3588,43 +3618,59 @@ function priceTitle(m) {
        + ' (sorted by input price)';
 }
 function modelLabel(m) { return m.name ? m.name : m.id; }
-function renderOrCatalog(p, cloudNow, filter) {
+function orCatalogHeadHTML(p, tab, free, prev, sortStr) {
+  const ps = parseSortKey(sortStr);
+  const nameArrow = (ps.key === 'name') ? ' <span class="dir">' + (ps.dir === -1 ? '▼' : '▲') + '</span>' : '';
+  const priceArrow = (ps.key === 'price') ? ' <span class="dir">' + (ps.dir === -1 ? '▼' : '▲') + '</span>' : '';
+  return '<div class="ds-list-head">'
+    + '<div class="ds-tabs">'
+    + '<button type="button" class="ds-tab' + (tab === 'free' ? ' on' : '') + '" onclick="setCloudListTab(\'' + p + '\',\'free\')">Free Models <span class="ds-count">' + free.length + '</span></button>'
+    + '<button type="button" class="ds-tab' + (tab === 'prev' ? ' on' : '') + '" onclick="setCloudListTab(\'' + p + '\',\'prev\')">Premium Models <span class="ds-count">' + prev.length + '</span></button>'
+    + '</div>'
+    + '<div class="ds-sort"><span class="ds-sort-label">Sort</span>'
+    + '<button type="button" class="ds-sort-btn' + (ps.key === 'name' ? ' on' : '') + '" onclick="setCloudListSort(\'' + p + '\',\'name\')" title="Sort by model name — click again to reverse (next click: ' + sortDirTitle('name', ps) + ')">Name' + nameArrow + '</button>'
+    + '<button type="button" class="ds-sort-btn' + (ps.key === 'price' ? ' on' : '') + '" onclick="setCloudListSort(\'' + p + '\',\'price\')" title="Sort by price per 1M tokens, input then output — click again to reverse (next click: ' + sortDirTitle('price', ps) + '); free models all cost $0 so price order falls back to name">Price' + priceArrow + '</button>'
+    + '</div>'
+    + '<div class="ds-search">'
+    + '<input type="text" id="dsSearch_' + p + '" value="' + escAttr(cloudListSearch[p] || '') + '" placeholder="Filter models — type a few letters (openai, claude, qwen…)" spellcheck="false" autocomplete="off" oninput="catalogSearchTyped(this)" onkeydown="if(event.key===\'Escape\'){this.value=\'\';catalogSearchTyped(this);}">'
+    + '</div>'
+    + '</div>';
+}
+function orRowsHTML(p, cloudNow) {
   const all = cloudModels[p] || [];
   const free = all.filter(isFreeModel);
   const prev = all.filter(m => !isFreeModel(m));
   const tab = cloudListTab(p);
-  const sort = cloudListPref(p, tab);
+  const ps = parseSortKey(cloudListPref(p, tab));
   const source = (tab === 'free') ? free : prev;
-  // filter searches the WHOLE catalog, then the tab narrows it
-  const matches = filter
-    ? source.filter(m => m.id.toLowerCase().includes(filter)
-                         || modelLabel(m).toLowerCase().includes(filter))
-    : source;
-  const rows = matches.slice();
-  if (sort === 'price') {
-    const pk = (m, f) => (m[f] < 0 ? Infinity : m[f]);   // dynamic pricing sorts last
-    rows.sort((a, b) => (pk(a, 'prompt') - pk(b, 'prompt')) || (pk(a, 'completion') - pk(b, 'completion'))
-                        || modelLabel(a).localeCompare(modelLabel(b)));
+  // TWO filters, both over the WHOLE tab list: the Model field's own filter (kept) and the
+  // catalog search box right above the list (2026-09-24). A model must match both.
+  const qModel = (cloudModelFilter[p] || '').trim().toLowerCase();
+  const qSearch = (cloudListSearch[p] || '').trim().toLowerCase();
+  const matches = source.filter(m => orHit(m, qModel) && orHit(m, qSearch));
+  let ordered;
+  if (ps.key === 'price') {
+    const dyn = matches.filter(isVariablePrice);          // routed/dynamic (-1) pricing always trails
+    const real = matches.filter(m => !isVariablePrice(m));
+    real.sort((a, b) => ((a.prompt || 0) - (b.prompt || 0)) || ((a.completion || 0) - (b.completion || 0))
+                        || modelLabel(a).localeCompare(modelLabel(b), undefined, { sensitivity: 'base' }));
+    if (ps.dir === -1) real.reverse();
+    ordered = real.concat(dyn);
   } else {
-    rows.sort((a, b) => modelLabel(a).localeCompare(modelLabel(b), undefined, { sensitivity: 'base' }));
+    ordered = matches.slice().sort((a, b) => modelLabel(a).localeCompare(modelLabel(b), undefined, { sensitivity: 'base' }));
+    if (ps.dir === -1) ordered.reverse();
   }
   const cap = 150;
-  const shown = rows.slice(0, cap);
+  const shown = ordered.slice(0, cap);
   let html = '';
-  html += '<div class="ds-list-head">'
-        + '<div class="ds-tabs">'
-        + '<button type="button" class="ds-tab' + (tab === 'free' ? ' on' : '') + '" onclick="setCloudListTab(\'' + p + '\',\'free\')">Free Models <span class="ds-count">' + free.length + '</span></button>'
-        + '<button type="button" class="ds-tab' + (tab === 'prev' ? ' on' : '') + '" onclick="setCloudListTab(\'' + p + '\',\'prev\')">Premium Models <span class="ds-count">' + prev.length + '</span></button>'
-        + '</div>'
-        + '<div class="ds-sort"><span class="ds-sort-label">Sort</span>'
-        + '<button type="button" class="ds-sort-btn' + (sort === 'name' ? ' on' : '') + '" onclick="setCloudListSort(\'' + p + '\',\'name\')" title="Sort by model name">Name</button>'
-        + '<button type="button" class="ds-sort-btn' + (sort === 'price' ? ' on' : '') + (tab === 'free' ? ' disabled' : '') + '" onclick="setCloudListSort(\'' + p + '\',\'price\')" title="Sort by price per 1M tokens (input, then output)">Price</button>'
-        + '</div></div>';
-  html += '<div class="ds-rows">';
+  if (qModel || qSearch) {
+    html += '<div class="ds-count-note">' + ordered.length + ' of ' + source.length + ' '
+          + (tab === 'free' ? 'free' : 'premium') + ' model' + (source.length === 1 ? '' : 's') + ' shown</div>';
+  }
   if (!shown.length) {
     html += '<div class="ds-model-item dim"><span class="dm-check"></span><span class="dm-name">'
-          + (filter ? 'No ' + (tab === 'free' ? 'free' : 'premium') + ' model matches — Enter uses the typed id as-is.'
-                    : 'No ' + (tab === 'free' ? 'free' : 'premium') + ' models in this catalog.')
+          + ((qModel || qSearch) ? 'No ' + (tab === 'free' ? 'free' : 'premium') + ' model matches — Enter uses the typed id as-is.'
+                                 : 'No ' + (tab === 'free' ? 'free' : 'premium') + ' models in this catalog.')
           + '</span></div>';
   }
   for (const m of shown) {
@@ -3637,12 +3683,31 @@ function renderOrCatalog(p, cloudNow, filter) {
           + (price ? '<span class="dm-price' + (price === 'Free' ? ' free' : (price === 'varies' ? ' var' : '')) + '" title="' + escAttr(priceTitle(m)) + '">' + escHtml(price) + '</span>' : '')
           + '</div>';
   }
-  if (rows.length > cap) {
-    html += '<div class="ds-model-item dim"><span class="dm-check"></span><span class="dm-name">… ' + (rows.length - cap)
-          + ' more — type above to filter, or sort by ' + (sort === 'price' ? 'name' : 'price') + '</span></div>';
+  if (ordered.length > cap) {
+    html += '<div class="ds-model-item dim"><span class="dm-check"></span><span class="dm-name">… ' + (ordered.length - cap)
+          + ' more — type above to filter, or sort by ' + (ps.key === 'price' ? 'name' : 'price') + '</span></div>';
   }
-  html += '</div>';
   return html;
+}
+function renderOrCatalog(p, cloudNow, filter) {
+  const all = cloudModels[p] || [];
+  const free = all.filter(isFreeModel);
+  const prev = all.filter(m => !isFreeModel(m));
+  const tab = cloudListTab(p);
+  return orCatalogHeadHTML(p, tab, free, prev, cloudListPref(p, tab))
+       + '<div class="ds-rows" id="dsRows_' + p + '">' + orRowsHTML(p, cloudNow) + '</div>';
+}
+// Re-render ONLY the rows — the search box lives in the head, so typing never rebuilds it and the
+// caret never jumps (a full renderDsModels() per keystroke would recreate the input).
+function refreshCloudRows(p) {
+  const wrap = document.getElementById('dsRows_' + p);
+  if (!wrap) { renderDsModels(p); return; }
+  wrap.innerHTML = orRowsHTML(p, activeCloud());
+}
+function catalogSearchTyped(el) {
+  const p = String((el && el.id) || '').replace('dsSearch_', '') || 'openrouter';
+  cloudListSearch[p] = (el && el.value) || '';
+  refreshCloudRows(p);
 }
 function renderDsModels(p) {
   const listEl = document.getElementById(p === 'deepseek' ? 'dsModelList' : 'orModelList');
