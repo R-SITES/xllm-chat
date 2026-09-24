@@ -121,6 +121,11 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .bubble hr{border:none;border-top:1px solid var(--border);margin:1.5rem 0}
 .bubble a{color:var(--accent);text-decoration:none}
 .bubble a:hover{text-decoration:underline}
+/* External-link marker (2026-09-22): every link in a response opens in a NEW TAB;
+   the NE arrow to the right of the text says so before the click. Inline SVG,
+   currentColor so it tracks the link color in all 5 themes. */
+.bubble a .ext-link-arrow{display:inline-block;width:11px;height:11px;margin-left:4px;vertical-align:-1px;opacity:.6;pointer-events:none}
+.bubble a:hover .ext-link-arrow{opacity:1}
 .bubble code{background:var(--bg);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:13px}
 .bubble pre{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:12px;overflow-x:auto;margin:8px 0;position:relative}
 .bubble pre[data-ishtml]{padding-bottom:56px}
@@ -280,7 +285,7 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .sp-btn:hover{border-color:var(--accent);color:var(--accent)}
 .sp-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .sp-btn.primary:hover{opacity:.85}
-.input-container{max-width:820px;margin:0 auto;display:flex;gap:8px;align-items:flex-end;padding:2px;border:1px solid var(--border);border-radius:10px;background:var(--bg3)}
+.input-container{position:relative;max-width:820px;margin:0 auto;display:flex;gap:8px;align-items:flex-end;padding:29px 2px 2px;border:1px solid var(--border);border-radius:10px;background:var(--bg3)}   /* 29px top = the strip INSIDE the bar that holds the floated .hist-row (5px clear of the input box) */
 .input-wrap{flex:1;position:relative}
 #chatInput{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:10px 16px;color:var(--text);font-size:14px;font-family:var(--font);resize:none;outline:none;min-height:42px;max-height:200px;line-height:1.4;transition:border-color .15s}
 #chatInput:focus{border-color:var(--accent)}
@@ -299,6 +304,15 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 /* ── Attachments (paperclip) ── */
 .clip-btn{width:42px;height:42px;flex-shrink:0;border-radius:50%;border:1px solid var(--border);background:var(--bg3);color:var(--dim);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
 .clip-btn:hover{border-color:var(--accent);color:var(--accent)}
+/* ── Prompt history: up + down arrow buttons floated ABOVE the chat input, 80px in
+   from the row's left edge (2026-09-24). Buttons (not keyboard arrows) so the cursor
+   keys stay free for caret movement. The paperclip stays in .left-stack and is the only
+   thing in that column, so it centres vertically in the row. ── */
+.left-stack{display:flex;flex-direction:column;align-items:center;justify-content:center;align-self:center;flex-shrink:0}
+.hist-row{position:absolute;left:62px;top:4px;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:2px;flex-shrink:0}
+.hist-btn{width:20px;height:20px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--dim);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:all .15s}
+.hist-btn:hover:not(.hist-off):not([disabled]){border-color:var(--accent);color:var(--accent)}
+.hist-btn.hist-off,.hist-btn[disabled]{opacity:.3;cursor:default}
 .attach-bar{max-width:820px;margin:0 auto 8px;display:flex;flex-wrap:wrap;gap:6px}
 .attach-chip{display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:4px 10px;font-size:12px;color:var(--text);max-width:280px}
 .attach-chip .a-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -319,7 +333,7 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .send-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .stop-btn{background:var(--red);font-size:16px}
 .stop-btn:hover{opacity:.85;transform:scale(1.05)}
-.jump-stack{position:fixed;bottom:78px;right:max(calc((100vw - 820px)/2),16px);display:flex;flex-direction:column;gap:8px;z-index:50;will-change:transform;transform:translateZ(0)}
+.jump-stack{position:fixed;bottom:93px;right:max(calc((100vw - 820px)/2),16px);display:flex;flex-direction:column;gap:8px;z-index:50;will-change:transform;transform:translateZ(0)}
 .jump-btn{width:44px;height:44px;border-radius:50%;border:1px solid var(--border);background:var(--bg3);color:var(--dim);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;box-shadow:0 4px 14px rgba(0,0,0,.4)}
 .jump-btn:hover{color:var(--text);border-color:var(--accent);transform:scale(1.05)}
 .jump-btn:disabled{opacity:.4;cursor:default;transform:none;border-color:var(--border)}
@@ -734,7 +748,7 @@ function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.3.5</span>
+    <span class="footer-version">xLLM Chat v3.3.6</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -823,9 +837,19 @@ function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');
 <div class="input-area">
   <div class="attach-bar" id="attachBar" style="display:none"></div>
   <div class="input-container">
-    <button class="clip-btn" id="clipBtn" onclick="document.getElementById('fileInput').click()" title="Attach files — images, txt, csv, json, md, pdf, xlsx, xls, docx">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-    </button>
+    <div class="left-stack">
+      <div class="hist-row">
+        <button class="hist-btn hist-off" id="histUpBtn" onmousedown="event.preventDefault()" onclick="histPrev()" title="Older prompt" aria-label="Older prompt">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+        </button>
+        <button class="hist-btn hist-off" id="histDownBtn" onmousedown="event.preventDefault()" onclick="histNext()" title="Newer prompt" aria-label="Newer prompt">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+        </button>
+      </div>
+      <button class="clip-btn" id="clipBtn" onclick="document.getElementById('fileInput').click()" title="Attach files — images, txt, csv, json, md, pdf, xlsx, xls, docx">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+      </button>
+    </div>
     <input type="file" id="fileInput" multiple accept="image/*,.txt,.csv,.json,.md,.pdf,.xlsx,.xls,.docx" style="display:none" onchange="pickFiles(this)">
     <div class="input-wrap">
       <textarea id="chatInput" placeholder="Type a message..." rows="1" onkeydown="handleKey(event)"></textarea>
@@ -3161,7 +3185,7 @@ function healLocalModelPin(name) {
 }
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.3.5';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.3.6';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -4004,6 +4028,9 @@ const STAT_ICON_EDIT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 
 const STAT_ICON_VOICE_ON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
 const STAT_ICON_VOICE_OFF = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M11 5 6 9H2v6h4l5 4z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></svg>';
 const STAT_ICON_VOICE_PLAY = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="m6 3 14 9-14 9V3z"/></svg>';
+// NE arrow marker appended to every link in a response (opens in a new tab) — see
+// markExternalLinks(). 11px, stroke on currentColor, sits to the RIGHT of the text.
+const EXTERNAL_LINK_ARROW = '<svg class="ext-link-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>';
 
 // llama.cpp formatPerformanceTime port
 function formatPerfTime(ms) {
@@ -4278,6 +4305,7 @@ function updateMsgStatsLive() {
 document.addEventListener('DOMContentLoaded', () => {
   const input = document.getElementById('chatInput');
   input.addEventListener('input', autoResize);
+  input.addEventListener('input', histOnTyped);   // typing cancels history browsing (2026-09-24)
   input.focus();
   loadModels().then(() => { if (!_backendKnown) detectBackend(); });
   // Chat history now lives in IndexedDB (2026-09-13) — hydrate/migrate BEFORE the
@@ -4290,6 +4318,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   wireTokenTip();
   paintChatSort();   // sidebar sort row: highlight the restored mode (newest by default)
+  updateHistBtns();  // prompt history: buttons reflect the restored list (2026-09-24)
   updateTokenBar();
   loadVoices();   // voice read-aloud: availability + cloned voice list
   renderBubbleFontSel();   // Settings → Theme: populate the Google Fonts dropdown
@@ -4300,6 +4329,7 @@ function autoResize(e) {
   el.style.height = 'auto';
   el.style.height = Math.min(el.scrollHeight, 200) + 'px';
   updateTokenBar();
+  if (typeof _syncJumpStackOffset === 'function') _syncJumpStackOffset();   // keep the fixed jump pair above the growing box
 }
 
 // ── Token context bar (Big AGI TokenProgressbar + TokenTooltip port) ──
@@ -5704,6 +5734,94 @@ function selectModel(val) {
   if (currentChatId) saveCurrentChat();   // per-thread last-known conn (2026-09-05)
 }
 
+// ── Prompt history (up/down buttons above the paperclip, 2026-09-24) ──
+// Shell-like history: every SUBMITTED prompt is appended (newest last, earlier
+// duplicates erased so the list stays a clean most-recent-first set), capped at
+// HIST_MAX. Browsing is driven by the two buttons only — the keyboard arrows are
+// deliberately left alone so they keep moving the caret inside the textarea.
+const HIST_MAX = 200;
+const HIST_KEY = 'xllm_prompt_history';
+let promptHistory = (() => { try { const v = JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; } catch (e) { return []; } })();
+let histIdx = -1;         // -1 = not browsing (input is the user's own draft); else index into promptHistory
+let histDraft = '';       // the draft parked when browsing started, restored after the newest entry
+let _histSelfSet = false; // guard: our own programmatic writes must not cancel browsing
+
+function histSave() {
+  try { localStorage.setItem(HIST_KEY, JSON.stringify(promptHistory.slice(-HIST_MAX))); } catch (e) {}
+}
+function resetHistBrowse() {
+  histIdx = -1; histDraft = '';
+  updateHistBtns();
+}
+function pushPromptHistory(text) {
+  const t = String(text || '').trim();
+  if (!t) { resetHistBrowse(); return; }
+  const prev = promptHistory.indexOf(t);
+  if (prev !== -1) promptHistory.splice(prev, 1);   // erasedups, like HISTCONTROL=erasedups
+  promptHistory.push(t);
+  if (promptHistory.length > HIST_MAX) promptHistory.splice(0, promptHistory.length - HIST_MAX);
+  histSave();
+  resetHistBrowse();
+}
+function histSetInput(v) {
+  const input = document.getElementById('chatInput');
+  if (!input) return;
+  _histSelfSet = true;
+  input.value = v;
+  input.selectionStart = input.selectionEnd = input.value.length;   // caret at the end, ready to re-send or edit
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+  if (typeof updateTokenBar === 'function') updateTokenBar();
+  input.focus();
+  _histSelfSet = false;
+  updateHistBtns();
+}
+function histPrev() {   // older
+  if (!promptHistory.length) return;
+  const input = document.getElementById('chatInput');
+  if (!input) return;
+  if (histIdx === -1) {
+    histDraft = input.value;                    // parked verbatim (an empty box is restored empty)
+    histIdx = promptHistory.length - 1;
+  } else if (histIdx > 0) {
+    histIdx--;
+  } else {
+    updateHistBtns();   // already at the oldest entry
+    return;
+  }
+  histSetInput(promptHistory[histIdx]);
+}
+function histNext() {   // newer
+  if (histIdx === -1) { updateHistBtns(); return; }
+  if (histIdx < promptHistory.length - 1) {
+    histIdx++;
+    histSetInput(promptHistory[histIdx]);
+  } else {
+    const draft = histDraft;
+    histIdx = -1; histDraft = '';
+    histSetInput(draft);      // past the newest entry → the parked draft comes back
+  }
+}
+function histOnTyped() {
+  if (_histSelfSet) return;
+  if (histIdx !== -1) resetHistBrowse();
+  else updateHistBtns();
+}
+function updateHistBtns() {
+  const up = document.getElementById('histUpBtn');
+  const dn = document.getElementById('histDownBtn');
+  if (!up || !dn) return;
+  const n = promptHistory.length;
+  const canUp = n > 0 && (histIdx === -1 || histIdx > 0);
+  const canDn = histIdx !== -1;
+  up.disabled = !canUp; dn.disabled = !canDn;
+  up.classList.toggle('hist-off', !canUp);
+  dn.classList.toggle('hist-off', !canDn);
+  const pos = histIdx === -1 ? 'newest' : (histIdx + 1) + ' of ' + n;
+  up.title = n ? `Older prompt — ${pos}` : 'Older prompt — nothing sent yet';
+  dn.title = canDn ? 'Newer prompt — click past the newest to get your draft back' : 'Newer prompt';
+}
+
 async function sendMessage() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
@@ -5723,6 +5841,8 @@ async function sendMessage() {
   }
   input.value = '';
   input.style.height = 'auto';
+  if (typeof _syncJumpStackOffset === 'function') _syncJumpStackOffset();   // box back to one line → pair drops back
+  pushPromptHistory(text);   // shell-like history for the up/down buttons (2026-09-24)
   document.getElementById('emptyState')?.remove();
   const userAttachments = attachments;
   attachments = [];
@@ -7956,8 +8076,41 @@ function mvClose() {
 function mvKey(e) {
   if (!mvOpenState()) return;
   if (e.key === 'Escape') { e.preventDefault(); mvClose(); }
-  else if (e.key === 'ArrowRight' && _mvItems.length > 1) { e.preventDefault(); mvStep(1); }
-  else if (e.key === 'ArrowLeft' && _mvItems.length > 1) { e.preventDefault(); mvStep(-1); }
+  else if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    if (e.shiftKey) { if (_mvItems.length > 1) mvStep(1); return; }   // Shift+arrow keeps the old walk
+    if (mvSeek(1)) return;                     // playing media → skip ahead 10s
+    if (_mvItems.length > 1) mvStep(1);        // images / nothing to seek → walk the viewer
+  }
+  else if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    if (e.shiftKey) { if (_mvItems.length > 1) mvStep(-1); return; }
+    if (mvSeek(-1)) return;                    // playing media → rewind 10s
+    if (_mvItems.length > 1) mvStep(-1);
+  }
+}
+// ── Arrow keys SEEK the previewed audio/video ±10s; they must NOT step the viewer while a
+// track is open (David 2026-09-24: "when i use the right arrow or left arrow when previewing
+// music dropped in the chat, it's supposed to skip ahead playback 10 secs or rewind ...
+// instead starts the track over from the beginning"). The old handler always called mvStep(),
+// which REBUILDS the stage (mvBuildStage creates a fresh <audio autoplay>) → playback restarted
+// at 0s. Seeking on the live element instead leaves the track playing where it is.
+const MV_SEEK_STEP = 10;   // seconds per arrow press
+function mvStageMedia() {
+  const stage = document.getElementById('mvStage');
+  const el = stage && stage.firstElementChild;
+  return (el && (el.tagName === 'AUDIO' || el.tagName === 'VIDEO')) ? el : null;
+}
+function mvSeek(delta) {
+  const m = mvStageMedia();
+  if (!m) return false;
+  const dur = m.duration;
+  const target = (m.currentTime || 0) + delta * MV_SEEK_STEP;
+  // clamp into [0, duration-0.25]; a stream with no known duration just clamps at 0
+  const max = (typeof dur === 'number' && isFinite(dur) && dur > 0) ? Math.max(dur - 0.25, 0) : Infinity;
+  const t = Math.min(Math.max(target, 0), max);
+  try { m.currentTime = t; } catch (err) { return false; }
+  return true;
 }
 function openMediaViewerFrom(itemEl) {
   const wrap = itemEl.closest('.bubble-media');
@@ -7986,6 +8139,27 @@ document.addEventListener('click', (e) => {
   });
 })();
 
+function markExternalLinks(html) {
+  // Every anchor marked emits from model/agent text gets target="_blank" plus a
+  // top-right arrow marker to the RIGHT of the link text (David's ask 2026-09-22:
+  // links already loaded on click — now they load in a NEW tab and say so).
+  // Runs AFTER sanitizeModelHtml + Prism, so the injected <svg> survives the
+  // sanitizer (which strips author-supplied svg). Idempotent: a link that
+  // already carries the marker is left alone across streaming re-paints.
+  if (!html || html.indexOf('<a ') === -1) return html;
+  return html.replace(/<a\s+([^>]*?)>([\s\S]*?)<\/a>/gi, (match, attrs, inner) => {
+    const hm = /\bhref\s*=\s*"([^"]*)"/i.exec(attrs);
+    if (!hm) return match;
+    const href = hm[1].trim();
+    // In-page anchors, mail/phone and script/data links keep their native behavior.
+    if (!href || /^(#|mailto:|tel:|javascript:|data:)/i.test(href)) return match;
+    if (/bubble-media-item/.test(attrs)) return match;      // media tiles → lightbox
+    if (/ext-link-arrow/.test(inner)) return match;
+    const clean = attrs.replace(/\s*target\s*=\s*"[^"]*"/gi, '').replace(/\s*rel\s*=\s*"[^"]*"/gi, '');
+    return `<a ${clean} target="_blank" rel="noopener noreferrer">${inner}${EXTERNAL_LINK_ARROW}</a>`;
+  });
+}
+
 function escapeAndFormat(text) {
   if (!text) return '';
   // Proper GFM via marked (Big-AGI-style rendering): headings, lists, tables,
@@ -8002,7 +8176,7 @@ function escapeAndFormat(text) {
   // Prism syntax highlight (Big-AGI port) — colors code blocks like Big AGI
   // does. Runs BEFORE the button post-process; keeps the language class so the
   // post-process regexes below still match. No caps: every block, every frame.
-  const hl = highlightCodeBlocks(safe);
+  const hl = markExternalLinks(highlightCodeBlocks(safe));
   // Post-process code blocks: add copy / try-it / download to the pre blocks
   // that marked emitted, preserving the html-preview integration.
   return hl.replace(/<pre><code class="language-(html|htm|svelte|jsx|tsx|css)">([\s\S]*?)<\/code><\/pre>/g, (match, lang, code) => {
@@ -8173,6 +8347,34 @@ function jumpDown() {
 }
 
 function resetJumpIndex() { _jumpIndex = -1; _updateJumpButtons(); }
+
+// The jump stack is position:fixed, so an input box that GROWS (multi-line typing,
+// attachment chips, the system-prompt bar) would slide up underneath it. Track the
+// input area and keep the pair just above whatever the box is now (David 2026-09-24:
+// "the pg up/pg down buttons need to go up too as the text input lines grow").
+function _syncJumpStackOffset() {
+  const stack = document.getElementById('jumpStack');
+  const area = document.querySelector('.input-area');
+  const bar = document.querySelector('.input-container');
+  if (!stack || !area || !bar) return;
+  // Anchor on the INPUT BAR so the resting gap (2px, = the old fixed bottom:93px) never moves;
+  // while attachment chips are showing, anchor on the whole input AREA instead so the pair clears
+  // the chips row, which lives in the area's own top padding band.
+  const chips = document.getElementById('attachBar');
+  const chipsShown = chips && chips.style.display !== 'none' && chips.offsetHeight > 0;
+  const anchorTop = (chipsShown ? area : bar).getBoundingClientRect().top;
+  const GAP = 2;        // clearance above the input bar
+  const MIN_ROOM = 80;  // never push the pair off the top of a short viewport
+  const bottom = Math.max(window.innerHeight - anchorTop + GAP, 8);
+  stack.style.bottom = Math.min(bottom, Math.max(window.innerHeight - MIN_ROOM, 8)) + 'px';
+}
+(function () {
+  const area = document.querySelector('.input-area');
+  if (!area) return;
+  if (window.ResizeObserver) new ResizeObserver(_syncJumpStackOffset).observe(area);
+  window.addEventListener('resize', _syncJumpStackOffset);
+  _syncJumpStackOffset();
+})();
 
 // Manual scrolling re-anchors the walk to whatever message is at the viewport top
 // and live-updates the greyed states (the old index-only logic wedged the down
