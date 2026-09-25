@@ -309,7 +309,6 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
    keys stay free for caret movement. The paperclip stays in .left-stack and is the only
    thing in that column, so it centres vertically in the row. ── */
 .left-stack{display:flex;flex-direction:column;align-items:center;justify-content:center;align-self:center;flex-shrink:0}
-.hist-row{position:absolute;left:62px;top:4px;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:2px;flex-shrink:0}
 .hist-btn{width:20px;height:20px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--dim);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:all .15s}
 .hist-btn:hover:not(.hist-off):not([disabled]){border-color:var(--accent);color:var(--accent)}
 .hist-btn.hist-off,.hist-btn[disabled]{opacity:.3;cursor:default}
@@ -652,6 +651,24 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
    50% → 22% purple on 2026-09-24 after David: "after a preview the play icon simply dims a bit.. can we
    have it dim a bit more?" — the knob is this percentage; lower = dimmer. */
 .bubble-media-item.mv-played .mva-ico{color:color-mix(in srgb, var(--purple) 22%, var(--dim))}
+/* ── The input strip above the message box (2026-09-24): ONE row holding, in order,
+   [+ Add Preset] [↑] [↓] [saved prompt presets], sitting in the bar's empty top-left corner — the button
+   lands directly ABOVE the paperclip. Left is 2px (the bar's own inner padding edge): that is a 60px shift
+   from the first build, which is exactly flush with the paperclip; the 80px David asked for would have hung
+   the button 17px outside the bar's left edge.
+   The + button keeps its SPACE while hidden (visibility, not display) — otherwise the arrows would jump
+   sideways every time the box gains or loses text. */
+.prompt-strip{position:absolute;left:2px;top:4px;display:flex;align-items:center;gap:4px;max-width:calc(100% - 14px);overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+.prompt-strip::-webkit-scrollbar{display:none}
+.preset-list{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.preset-add{flex-shrink:0;height:20px;padding:0 8px;border-radius:6px;border:1px dashed var(--border);background:transparent;color:var(--dim);font-family:var(--font);font-size:10.5px;cursor:pointer;display:flex;align-items:center;white-space:nowrap;transition:all .15s}
+.preset-add:hover{color:var(--accent);border-color:var(--accentLine);background:var(--accentSoft)}
+.preset-add.off{visibility:hidden}   /* nothing in the box to save → hidden but still holding its place */
+.preset-pill{flex-shrink:0;height:20px;padding:0 3px 0 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--dim);font-family:var(--font);font-size:10.5px;display:flex;align-items:center;gap:4px;cursor:pointer;transition:all .15s}
+.preset-pill:hover{color:var(--accent);border-color:var(--accentLine)}
+.preset-pill .pp-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:128px}
+.preset-pill .pp-x{color:var(--dim);font-size:10px;line-height:1;padding:2px 3px;border-radius:4px}
+.preset-pill .pp-x:hover{color:var(--red);background:var(--accentSoft)}
 .mva-name{font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #mediaViewer{background:rgba(2,4,6,.94);backdrop-filter:blur(2px)}
 .mv-box{position:relative;width:100%;height:100%;display:flex;flex-direction:column}
@@ -780,7 +797,7 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.3.9</span>
+    <span class="footer-version">xLLM Chat v3.4.0</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -870,19 +887,21 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
   <div class="attach-bar" id="attachBar" style="display:none"></div>
   <div class="input-container">
     <div class="left-stack">
-      <div class="hist-row">
-        <button class="hist-btn hist-off" id="histUpBtn" onmousedown="event.preventDefault()" onclick="histPrev()" title="Older prompt" aria-label="Older prompt">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
-        </button>
-        <button class="hist-btn hist-off" id="histDownBtn" onmousedown="event.preventDefault()" onclick="histNext()" title="Newer prompt" aria-label="Newer prompt">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
-        </button>
-      </div>
       <button class="clip-btn" id="clipBtn" onclick="document.getElementById('fileInput').click()" title="Attach files — images, txt, csv, json, md, pdf, xlsx, xls, docx. Ctrl+Shift+V attaches whatever is on the clipboard (pasted text arrives as a file); a copied image attaches with plain Ctrl+V too.">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
       </button>
     </div>
     <input type="file" id="fileInput" multiple accept="image/*,.txt,.csv,.json,.md,.pdf,.xlsx,.xls,.docx" style="display:none" onchange="pickFiles(this)">
+    <div class="prompt-strip" id="promptStrip">
+      <button type="button" class="preset-add off" id="presetAddBtn" onclick="openPresetDialog()" title="Save what is in the message box as a preset prompt">+ Add Preset</button>
+      <button class="hist-btn hist-off" id="histUpBtn" onmousedown="event.preventDefault()" onclick="histPrev()" title="Older prompt" aria-label="Older prompt">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+      </button>
+      <button class="hist-btn hist-off" id="histDownBtn" onmousedown="event.preventDefault()" onclick="histNext()" title="Newer prompt" aria-label="Newer prompt">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+      </button>
+      <div class="preset-list" id="presetList"></div>
+    </div>
     <div class="input-wrap">
       <textarea id="chatInput" placeholder="Type a message..." rows="1" onkeydown="handleKey(event)"></textarea>
       <div class="token-progress" id="tokenProgress" style="display:none"></div>
@@ -1124,6 +1143,19 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
     <div class="btn-row">
       <button class="btn" onclick="closeSettings()">Cancel</button>
       <button class="btn primary" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="presetModal">
+  <div class="modal" style="width:440px">
+    <h2>+ Add Preset</h2>
+    <label>Preset name</label>
+    <input type="text" id="presetNameInput" maxlength="60" placeholder="e.g. bench MTP4" onkeydown="if(event.key==='Enter'){event.preventDefault();savePresetDialog()}else if(event.key==='Escape'){closePresetDialog()}">
+    <div class="bg-note" id="presetPreview"></div>
+    <div class="btn-row">
+      <button class="btn" onclick="closePresetDialog()">Cancel</button>
+      <button class="btn primary" onclick="savePresetDialog()">Save</button>
     </div>
   </div>
 </div>
@@ -3217,7 +3249,7 @@ function healLocalModelPin(name) {
 }
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.3.9';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.4.0';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -4411,6 +4443,7 @@ document.addEventListener('DOMContentLoaded', () => {
   wireTokenTip();
   paintChatSort();   // sidebar sort row: highlight the restored mode (newest by default)
   updateHistBtns();  // prompt history: buttons reflect the restored list (2026-09-24)
+  renderPresets();   // prompt presets: saved pills + the + Add Preset button state (2026-09-24)
   updateTokenBar();
   loadVoices();   // voice read-aloud: availability + cloned voice list
   renderBubbleFontSel();   // Settings → Theme: populate the Google Fonts dropdown
@@ -5892,6 +5925,7 @@ function histSetInput(v) {
   input.focus();
   _histSelfSet = false;
   updateHistBtns();
+  updatePresetAddBtn();          // a prompt pulled up from the history is exactly what you save as a preset
 }
 function histPrev() {   // older
   if (!promptHistory.length) return;
@@ -5923,6 +5957,7 @@ function histOnTyped() {
   if (_histSelfSet) return;
   if (histIdx !== -1) resetHistBrowse();
   else updateHistBtns();
+  updatePresetAddBtn();          // the + Add Preset button follows whether the box has anything in it
 }
 // Ctrl+↑ / Ctrl+↓ walk the prompt history from the keyboard (2026-09-24, David's ask: the bare
 // arrows stay free for caret movement, the modifier is the opt-in). Mirrors the two buttons
@@ -5934,6 +5969,79 @@ function histKeydown(e) {
   if (e.key === 'ArrowUp') histPrev(); else histNext();
   return true;
 }
+// ── Prompt presets (2026-09-24, David's ask): a saved-prompt library in the input strip, next to the
+//    history arrows. Deliberately a SEPARATE store from the prompt history — xllm_prompt_presets vs
+//    xllm_prompt_history — so browsing history never mixes with the saved list. The + Add Preset button
+//    only reveals itself while there is text in the box to save (which includes a prompt pulled up from
+//    the history), and a saved preset lands as a pill to the right of that button.
+const PRESET_KEY = 'xllm_prompt_presets';
+const PRESET_MAX = 50;
+let promptPresets = (() => {
+  try { const v = JSON.parse(localStorage.getItem(PRESET_KEY) || '[]'); return Array.isArray(v) ? v.filter(p => p && typeof p.text === 'string') : []; }
+  catch (e) { return []; }
+})();
+let _presetDraft = '';
+function presetSave() { try { localStorage.setItem(PRESET_KEY, JSON.stringify(promptPresets)); } catch (e) {} }
+function presetInputHasText() { const i = document.getElementById('chatInput'); return !!(i && i.value.trim()); }
+function updatePresetAddBtn() {
+  const b = document.getElementById('presetAddBtn');
+  if (b) b.classList.toggle('off', !presetInputHasText());   // hidden but still holding its space
+}
+function renderPresets() {
+  const list = document.getElementById('presetList');
+  if (!list) return;
+  // The + Add Preset button is static markup in .prompt-strip (it sits LEFT of the history arrows and must
+  // not move when the pills change) — only the pills are rendered here.
+  list.innerHTML = promptPresets.map((p, i) =>
+      '<span class="preset-pill" title="' + escAttr(p.text) + '" onclick="applyPreset(' + i + ')">'
+    + '<span class="pp-name">' + escHtml(p.name) + '</span>'
+    + '<span class="pp-x" title="Delete preset" onclick="event.stopPropagation();deletePreset(' + i + ')">✕</span>'
+    + '</span>').join('');
+  updatePresetAddBtn();
+}
+function presetSuggestedName(text) {
+  const one = String(text || '').split('\n')[0].trim();
+  return one.length > 34 ? one.slice(0, 34) + '…' : (one || 'Preset');
+}
+function openPresetDialog() {
+  const input = document.getElementById('chatInput');
+  const text = ((input && input.value) || '').trim();
+  if (!text) { showToast('Nothing to save — type or load a prompt first'); return; }
+  _presetDraft = text;
+  const nameEl = document.getElementById('presetNameInput');
+  nameEl.value = presetSuggestedName(text);
+  document.getElementById('presetPreview').textContent =
+    'Saves: ' + (text.length > 160 ? text.slice(0, 160) + '…' : text);
+  document.getElementById('presetModal').classList.add('show');
+  setTimeout(() => { nameEl.focus(); nameEl.select(); }, 30);
+}
+function closePresetDialog() { document.getElementById('presetModal').classList.remove('show'); }
+function savePresetDialog() {
+  const text = _presetDraft;
+  if (!text) { closePresetDialog(); return; }
+  const name = (document.getElementById('presetNameInput').value || '').trim() || presetSuggestedName(text);
+  const at = promptPresets.findIndex(p => String(p.name).toLowerCase() === name.toLowerCase());
+  if (at >= 0) { promptPresets[at].text = text; showToast('Preset updated — ' + name); }
+  else {
+    if (promptPresets.length >= PRESET_MAX) { showToast('Preset limit reached (' + PRESET_MAX + ') — delete one first'); closePresetDialog(); return; }
+    promptPresets.push({ name: name, text: text });
+    showToast('Preset saved — ' + name);
+  }
+  presetSave(); closePresetDialog(); renderPresets(); updatePresetAddBtn();
+}
+function applyPreset(i) {
+  const p = promptPresets[i];
+  if (!p) return;
+  histSetInput(p.text);                     // same value/caret/autosize path the history buttons use
+  showToast('Preset loaded — ' + p.name);
+}
+function deletePreset(i) {
+  const p = promptPresets[i];
+  if (!p) return;
+  promptPresets.splice(i, 1); presetSave(); renderPresets(); updatePresetAddBtn();
+  showToast('Preset deleted — ' + p.name);
+}
+
 function updateHistBtns() {
   const up = document.getElementById('histUpBtn');
   const dn = document.getElementById('histDownBtn');
@@ -5970,6 +6078,7 @@ async function sendMessage() {
   input.value = '';
   input.style.height = 'auto';
   if (typeof _syncJumpStackOffset === 'function') _syncJumpStackOffset();   // box back to one line → pair drops back
+  if (typeof updatePresetAddBtn === 'function') updatePresetAddBtn();       // empty box → + Add Preset hides
   pushPromptHistory(text);   // shell-like history for the up/down buttons (2026-09-24)
   document.getElementById('emptyState')?.remove();
   const userAttachments = attachments;
@@ -9540,6 +9649,7 @@ document.addEventListener('click', (e) => {
 });
 document.getElementById('settingsModal').addEventListener('click', (e) => { if (e.target === document.getElementById('settingsModal')) closeSettings(); });
 document.getElementById('renameModal').addEventListener('click', (e) => { if (e.target === document.getElementById('renameModal')) closeRename(); });
+document.getElementById('presetModal').addEventListener('click', (e) => { if (e.target === document.getElementById('presetModal')) closePresetDialog(); });
 document.getElementById('exportModal').addEventListener('click', (e) => { if (e.target === document.getElementById('exportModal')) closeExportModal(); });
 document.getElementById('importModal').addEventListener('click', (e) => { if (e.target === document.getElementById('importModal')) closeImportModal(); });
 applyTheme(localStorage.getItem('chat_theme')||'teal', false);   // sync theme swatch active state (head already painted it)
