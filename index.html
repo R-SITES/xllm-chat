@@ -645,6 +645,13 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
 .mv-kind-audio{display:flex;align-items:center;gap:10px;padding:10px 14px;line-height:1.2;cursor:pointer;max-width:min(100%,420px)}
 .mv-kind-audio:hover{border-color:var(--accent);background:var(--accentBg)}
 .mva-ico{color:var(--accent);font-size:12px;flex-shrink:0}
+/* Already-previewed tracks (2026-09-24, David's ask: he could not keep track of which takes he had
+   auditioned). The ▶ keeps its shape and just moves to an alternate theme-aware colour — the theme's
+   own purple mixed toward its dim tone, so it reads as "used" in every theme (mixing toward --dim is
+   what makes it distinguishable even in the themes where --purple IS a green).
+   50% → 22% purple on 2026-09-24 after David: "after a preview the play icon simply dims a bit.. can we
+   have it dim a bit more?" — the knob is this percentage; lower = dimmer. */
+.bubble-media-item.mv-played .mva-ico{color:color-mix(in srgb, var(--purple) 22%, var(--dim))}
 .mva-name{font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #mediaViewer{background:rgba(2,4,6,.94);backdrop-filter:blur(2px)}
 .mv-box{position:relative;width:100%;height:100%;display:flex;flex-direction:column}
@@ -660,6 +667,20 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
 .mv-stage img,.mv-stage video{max-width:calc(100vw - 160px);max-height:calc(100vh - 120px);border-radius:8px;background:#000;box-shadow:0 8px 34px rgba(0,0,0,.55);object-fit:contain}
 .mv-stage video{max-width:calc(100vw - 120px)}
 .mv-stage audio{width:min(600px,84vw)}
+/* ── Themed audio player for the viewer (2026-09-24): shows exactly TWO states — the accent-played
+   fill and the dim remainder. No buffer segment, so the fill can never be mistaken for anything else
+   (the browser control's dark "buffered" shade was what David flagged as sitting 30s+ ahead). ── */
+.mv-audio{display:flex;align-items:center;gap:12px;width:min(560px,84vw);padding:13px 16px;border-radius:12px;border:1px solid var(--border);background:var(--bg3);box-shadow:0 8px 30px rgba(0,0,0,.45)}
+.mva-btn{flex-shrink:0;border:1px solid var(--border);background:var(--bg2);color:var(--dim);border-radius:8px;cursor:pointer;font-family:var(--font);transition:all .15s;padding:0;display:flex;align-items:center;justify-content:center}
+.mva-play{width:40px;height:40px;border-radius:50%;background:var(--accent);border-color:var(--accent);color:#fff;padding-left:1px}
+.mva-play:hover{opacity:.86}
+.mva-jump{height:28px;min-width:38px;padding:0 8px;font-size:11px}
+.mva-jump:hover{color:var(--accent);border-color:var(--accentLine)}
+.mva-seek{position:relative;flex:1;height:24px;display:flex;align-items:center;cursor:pointer;touch-action:none;min-width:80px}
+.mva-track{position:absolute;left:0;right:0;height:6px;border-radius:999px;background:var(--bg);border:1px solid var(--border);overflow:hidden}
+.mva-fill{height:100%;width:0;background:var(--accent);border-radius:999px}
+.mva-knob{position:absolute;width:12px;height:12px;border-radius:50%;background:var(--accent);left:0;transform:translateX(-50%);box-shadow:0 0 0 2px var(--bg3);pointer-events:none}
+.mva-time{flex-shrink:0;font-family:var(--mono);font-size:11px;color:var(--dim);min-width:96px;text-align:right;white-space:nowrap}
 .mv-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;border:1px solid var(--border);background:rgba(16,20,26,.85);color:var(--text);font-size:24px;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:5;line-height:1;padding:0 0 3px}
 .mv-nav:hover{color:var(--accent);border-color:var(--accent)}
 .mv-prev{left:18px}.mv-next{right:18px}
@@ -685,7 +706,7 @@ function applyTheme(key,persist){
   if(persist!==false)localStorage.setItem('chat_theme',key);
   document.querySelectorAll('#themeRow .theme-swatch').forEach(b=>b.classList.toggle('active',b.dataset.theme===key));
 }
-applyTheme(localStorage.getItem('chat_theme')||'blue',false);
+applyTheme(localStorage.getItem('chat_theme')||'teal',false);
 // Chat bubble font family + size — applied pre-paint with the theme (no flash).
 // BUBBLE_FONTS = Google Fonts for chat response bubbles (user AND assistant
 // text, same targets as the size slider). key '' = app default (Inter).
@@ -717,7 +738,12 @@ const BUBBLE_FONTS=[
 ];
 function bubbleFontStack(key){for(var i=0;i<BUBBLE_FONTS.length;i++){if(BUBBLE_FONTS[i].key===key)return BUBBLE_FONTS[i].stack;}return '';}
 function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');if(old)old.remove();if(!key)return;var f=null;for(var i=0;i<BUBBLE_FONTS.length;i++){if(BUBBLE_FONTS[i].key===key){f=BUBBLE_FONTS[i];break;}}if(!f||!f.css)return;var l=document.createElement('link');l.id='gfBubbleFont';l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family='+encodeURIComponent(f.css)+'&display=swap';document.head.appendChild(l);}
-(function(){try{var f=parseInt(localStorage.getItem('chat_font_size')||'14',10);if(f>=12&&f<=26)document.documentElement.style.setProperty('--bubbleFs',f+'px');var fam=localStorage.getItem('chat_bubble_font');if(fam){var st=bubbleFontStack(fam);if(st){document.documentElement.style.setProperty('--bubbleFont',st);loadBubbleFontCss(fam);}}}catch(e){}})();
+// STARTER LOOK, fonts half (2026-09-24): same idea as BG_DEFAULTS — a brand-new install opens on
+// David's own bubble font/size instead of the placeholder. Absent key = starter, explicit '' = the
+// user picked "Default (Inter)", so choosing Default must be stored as '' (NOT removed) or it would
+// snap back to the starter on the next load.
+var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
+(function(){try{var f=parseInt(localStorage.getItem('chat_font_size')||String(STARTER_FONT_SIZE),10);if(f>=12&&f<=26)document.documentElement.style.setProperty('--bubbleFs',f+'px');var famRaw=localStorage.getItem('chat_bubble_font');var fam=(famRaw===null)?STARTER_BUBBLE_FONT:famRaw;if(fam){var st=bubbleFontStack(fam);if(st){document.documentElement.style.setProperty('--bubbleFont',st);loadBubbleFontCss(fam);}}}catch(e){}})();
 </script>
 </head>
 <body>
@@ -754,7 +780,7 @@ function loadBubbleFontCss(key){var old=document.getElementById('gfBubbleFont');
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.3.8</span>
+    <span class="footer-version">xLLM Chat v3.3.9</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -3191,7 +3217,7 @@ function healLocalModelPin(name) {
 }
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.3.8';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.3.9';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -4530,8 +4556,7 @@ function setChatFontSize(v) {
 // the size slider — user + assistant bubble text — via --bubbleFont (head
 // script pre-applies the stored family + loads its stylesheet before paint).
 function setChatFontFamily(v) {
-  if (v) localStorage.setItem('chat_bubble_font', v);
-  else localStorage.removeItem('chat_bubble_font');
+  localStorage.setItem('chat_bubble_font', v || '');   // '' = explicit "Default (Inter)", see STARTER_BUBBLE_FONT
   const st = bubbleFontStack(v);
   const s = document.documentElement.style;
   if (st) s.setProperty('--bubbleFont', st);
@@ -4548,7 +4573,7 @@ function renderBubbleFontSel() {
     o.textContent = f.label;
     sel.appendChild(o);
   }
-  sel.value = localStorage.getItem('chat_bubble_font') || '';
+  sel.value = (function(){ const v = localStorage.getItem('chat_bubble_font'); return (v === null ? STARTER_BUBBLE_FONT : v); })();
 }
 function openSettings() {
   document.getElementById('setApiUrl').value = API_URL;
@@ -4564,17 +4589,18 @@ function openSettings() {
   document.getElementById('setMaxTokens').value = MAX_TOKENS;
   document.getElementById('setTemp').value = TEMPERATURE;
   document.getElementById('setTopP').value = TOP_P;
-  // bubble font slider mirrors the stored size
-  const fs = parseInt(localStorage.getItem('chat_font_size') || '14', 10);
+  // bubble font slider mirrors the stored size (absent = the STARTER_FONT_SIZE the app ships with)
+  const fs = parseInt(localStorage.getItem('chat_font_size') || String(STARTER_FONT_SIZE), 10);
   const fsEl = document.getElementById('chatFontSize');
-  if (fsEl) fsEl.value = (fs >= 12 && fs <= 26) ? fs : 14;
+  if (fsEl) fsEl.value = (fs >= 12 && fs <= 26) ? fs : STARTER_FONT_SIZE;
   const fsV = document.getElementById('fontSizeVal');
-  if (fsV) fsV.textContent = ((fs >= 12 && fs <= 26) ? fs : 14) + 'px';
+  if (fsV) fsV.textContent = ((fs >= 12 && fs <= 26) ? fs : STARTER_FONT_SIZE) + 'px';
   // bubble font family dropdown mirrors the stored family (populate once)
   const famEl = document.getElementById('chatFontSel');
   if (famEl) {
     if (famEl.options.length < 2) renderBubbleFontSel();
-    famEl.value = localStorage.getItem('chat_bubble_font') || '';
+    const famStored = localStorage.getItem('chat_bubble_font');
+    famEl.value = (famStored === null ? STARTER_BUBBLE_FONT : famStored);
   }
   updateBgSettingsUI();
   loadVoices();   // refresh qwen3 availability + voice list each open
@@ -4712,7 +4738,15 @@ function saveSettings() {
 // 2026-09-05: the Image type is now a multi-image SLIDESHOW — frames stored in IndexedDB
 // (hi-res dataURLs blow localStorage), transitions picked per frame (Random/Crossfade/Slide/Zoom),
 // per-slide dwell set by the timer input (slideSec seconds).
-const BG_DEFAULTS = { type: 'none', image: null, url: '', yt: '', color: '#0d1117', colorAlpha: 0, overlayOn: false, ov1: '#000000', ov2: '#000000', ovAlpha: 35, vidOvOn: false, vOv1: '#000000', vOv2: '#000000', vOvAlpha: 35, glassOn: false, glassVal: 40, transition: 'fade', slideSec: 5 };
+// ── STARTER LOOK (2026-09-24) ─────────────────────────────────────────────────────────────
+// These ARE the shipped defaults a brand-new install sees: David's own maxed-out background setup,
+// read straight out of his live browser profile, so the first run shows what the background engine can
+// do instead of a flat placeholder. Every BG key is read as `chat_bg_<key>` with these values as the
+// fallback, so anything a user changes is written to localStorage and wins from then on — the starter
+// is just a starting point they can freely change or switch off (type: 'none').
+//   youtube visualiser + two-tone video scrim (orange→blue @36%) + glass panels at 82,
+//   warm ember #8d260c for Color mode, fade transition, 10s slideshow dwell.
+const BG_DEFAULTS = { type: 'youtube', image: null, url: '', yt: 'https://www.youtube.com/watch?v=hOgVAYpHPCc', color: '#8d260c', colorAlpha: 100, overlayOn: false, ov1: '#000000', ov2: '#000000', ovAlpha: 0, vidOvOn: true, vOv1: '#a85100', vOv2: '#0053fa', vOvAlpha: 36, glassOn: true, glassVal: 82, transition: 'fade', slideSec: 10 };
 let BG = Object.assign({}, BG_DEFAULTS);
 BG.slides = [];                    // slideshow frames [{name,data}] — IndexedDB-backed, NOT in BG_DEFAULTS/localStorage
 let bgSlidesLoaded = false;        // true once IndexedDB frames are hydrated (legacy chat_bg_image is the fallback until then)
@@ -5082,8 +5116,25 @@ function applyBgYoutube() {
   saveBgState(); applyChatBg(); updateBgSettingsUI();
 }
 // ── YouTube background presets (2026-08-30): save/load/delete pills like the launchers ──
+// STARTER SET (2026-09-24): David's own saved ambience presets ship as the defaults so a new install
+// has something to click straight away. They are SEEDED once into localStorage on first run (not
+// fallback-number defaults) precisely so a user can delete them and have that stick.
 const YT_PRESETS_KEY = 'chat_yt_presets';
-function getYtPresets() { try { return JSON.parse(localStorage.getItem(YT_PRESETS_KEY)) || []; } catch (e) { return []; } }
+const DEFAULT_YT_PRESETS = [
+  { name: 'earth',       url: 'https://www.youtube.com/watch?v=WZFIo4yj17c' },
+  { name: "jelly's",     url: 'https://www.youtube.com/watch?v=82D2IzOcmO0' },
+  { name: 'Music',       url: 'https://www.youtube.com/watch?v=Te2_vfEjaD0&list=RDTe2_vfEjaD0&start_radio=1' },
+  { name: 'liquid flow', url: 'https://www.youtube.com/watch?v=hOgVAYpHPCc' }
+];
+function getYtPresets() {
+  let raw = null;
+  try { raw = localStorage.getItem(YT_PRESETS_KEY); } catch (e) {}
+  if (raw === null) {                                  // first run → seed the starter pills (deletable)
+    try { localStorage.setItem(YT_PRESETS_KEY, JSON.stringify(DEFAULT_YT_PRESETS)); } catch (e) {}
+    return DEFAULT_YT_PRESETS.slice();
+  }
+  try { return JSON.parse(raw) || []; } catch (e) { return []; }
+}
 function setYtPresets(list) { localStorage.setItem(YT_PRESETS_KEY, JSON.stringify(list)); }
 function ytPresetName(url) {
   const vm = url.match(/[?&]v=([\w-]{6,})/);
@@ -5873,6 +5924,16 @@ function histOnTyped() {
   if (histIdx !== -1) resetHistBrowse();
   else updateHistBtns();
 }
+// Ctrl+↑ / Ctrl+↓ walk the prompt history from the keyboard (2026-09-24, David's ask: the bare
+// arrows stay free for caret movement, the modifier is the opt-in). Mirrors the two buttons
+// exactly — same park-the-draft behaviour, same bounds — and the button tooltips advertise it.
+function histKeydown(e) {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return false;
+  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return false;
+  e.preventDefault();                      // stop the browser's paragraph jump — this IS the feature
+  if (e.key === 'ArrowUp') histPrev(); else histNext();
+  return true;
+}
 function updateHistBtns() {
   const up = document.getElementById('histUpBtn');
   const dn = document.getElementById('histDownBtn');
@@ -5884,8 +5945,9 @@ function updateHistBtns() {
   up.classList.toggle('hist-off', !canUp);
   dn.classList.toggle('hist-off', !canDn);
   const pos = histIdx === -1 ? 'newest' : (histIdx + 1) + ' of ' + n;
-  up.title = n ? `Older prompt — ${pos}` : 'Older prompt — nothing sent yet';
-  dn.title = canDn ? 'Newer prompt — click past the newest to get your draft back' : 'Newer prompt';
+  up.title = n ? `Older prompt — Ctrl+↑ also steps back (${pos})` : 'Older prompt — Ctrl+↑ (nothing sent yet)';
+  dn.title = canDn ? 'Newer prompt — Ctrl+↓ also steps forward; click past the newest to get your draft back'
+                   : 'Newer prompt — Ctrl+↓';
 }
 
 async function sendMessage() {
@@ -8123,6 +8185,42 @@ function stripMediaPathTokens(text) {
   return out.join('');
 }
 
+// ── "Already previewed" marks on the music cards (2026-09-24) ──
+// Which takes have been opened in the media viewer, so the chat does not become a wall of
+// identical-looking tracks. Identity is the media PATH (the ?path= value), not the full URL,
+// so the marks survive a different host/port and a reload. Rendered at tile-build time and
+// repainted live for tiles already on screen when something new is previewed.
+const PREVIEW_KEY = 'xllm_media_previewed';
+const PREVIEW_MAX = 400;
+let previewedMedia = (() => {
+  try { const v = JSON.parse(localStorage.getItem(PREVIEW_KEY) || '[]'); return new Set(Array.isArray(v) ? v : []); }
+  catch (e) { return new Set(); }
+})();
+function mediaKeyOf(href) {
+  try {
+    const u = new URL(href, location.href);
+    const p = u.searchParams.get('path');
+    return p ? decodeURIComponent(p) : u.pathname.split('/').pop() || String(href);
+  } catch (e) { return String(href); }
+}
+function mediaPreviewed(href) { return previewedMedia.has(mediaKeyOf(href)); }
+function markMediaPreviewed(href) {
+  const k = mediaKeyOf(href);
+  if (!k || previewedMedia.has(k)) return;      // already marked → nothing to do (no repaint churn)
+  previewedMedia.add(k);
+  const arr = Array.from(previewedMedia);
+  if (arr.length > PREVIEW_MAX) arr.splice(0, arr.length - PREVIEW_MAX);
+  try { localStorage.setItem(PREVIEW_KEY, JSON.stringify(arr)); } catch (e) {}
+  paintPreviewedTiles();
+}
+function paintPreviewedTiles() {
+  document.querySelectorAll('.bubble-media-item.mv-kind-audio').forEach(a => {
+    const on = mediaPreviewed(a.href);
+    a.classList.toggle('mv-played', on);
+    a.title = (a.title || '').replace(/ \(previewed\)$/, '') + (on ? ' (previewed)' : '');
+  });
+}
+
 function mediaItemHTML(tok) {
   const href = mediaApiUrl(tok);
   const kind = mediaKindOf(tok);
@@ -8131,7 +8229,10 @@ function mediaItemHTML(tok) {
     return `<a class="bubble-media-item mv-kind-video" href="${href}" title="${escAttr(title)}"><video muted playsinline preload="metadata" src="${href}"></video></a>`;
   }
   if (kind === 'audio') {
-    return `<a class="bubble-media-item mv-kind-audio" href="${href}" title="${escAttr(title)}"><span class="mva-ico">▶</span><span class="mva-name">${escHtml(mediaBaseName(tok))}</span></a>`;
+    const played = mediaPreviewed(href);
+    const cls = 'bubble-media-item mv-kind-audio' + (played ? ' mv-played' : '');
+    const ttl = title + (played ? ' (previewed)' : '');
+    return `<a class="${cls}" href="${href}" title="${escAttr(ttl)}"><span class="mva-ico">▶</span><span class="mva-name">${escHtml(mediaBaseName(tok))}</span></a>`;
   }
   return `<a class="bubble-media-item mv-kind-image" href="${href}" title="${escAttr(title)}"><img loading="lazy" src="${href}" alt="" onerror="this.closest('.bubble-media-item').remove()"></a>`;
 }
@@ -8159,6 +8260,7 @@ function mvBaseNameFromHref(href) {
 }
 function mvBuildStage() {
   const stage = document.getElementById('mvStage');
+  mvAudioTeardown();                       // stop the old player's animation frame first
   stage.innerHTML = '';
   const src = _mvItems[_mvIdx];
   if (!src) return;
@@ -8169,15 +8271,25 @@ function mvBuildStage() {
     el.src = src; el.controls = true; el.autoplay = true; el.playsInline = true;
   } else if (kind === 'audio') {
     el = document.createElement('audio');
-    el.src = src; el.controls = true; el.autoplay = true;
+    el.src = src; el.autoplay = true; el.preload = 'auto';
+    // Themed player instead of the browser's control — see mvBuildAudioPlayer (2026-09-24).
+    stage.appendChild(mvBuildAudioPlayer(el));
+    el = null;
   } else {
     el = document.createElement('img');
     el.src = src; el.alt = '';
   }
-  stage.appendChild(el);
+  if (el) stage.appendChild(el);
+  if (kind === 'audio') markMediaPreviewed(src);   // this take has now been auditioned (2026-09-24)
   document.getElementById('mvName').textContent = mvBaseNameFromHref(src);
   document.getElementById('mvCount').textContent = _mvItems.length > 1 ? (_mvIdx + 1) + ' / ' + _mvItems.length : '';
-  document.getElementById('mvDl').href = src;
+  // The download must carry the REAL file name. A bare `download` attribute makes the browser name the
+  // saved file after the URL path — /api/media → "media" + the extension from the Content-Type — so
+  // every take saved as "media.mp3" (David 2026-09-24). mvBaseNameFromHref decodes the ?path= value.
+  const dl = document.getElementById('mvDl');
+  dl.href = src;
+  const dlName = mvBaseNameFromHref(src);
+  dl.setAttribute('download', (dlName && !/[/\\?]/.test(dlName)) ? dlName : 'download');
   document.getElementById('mediaViewer').querySelector('.mv-box').classList.toggle('has-nav', _mvItems.length > 1);
   document.getElementById('mvPrev').style.visibility = _mvIdx > 0 ? 'visible' : 'hidden';
   document.getElementById('mvNext').style.visibility = _mvIdx < _mvItems.length - 1 ? 'visible' : 'hidden';
@@ -8191,12 +8303,17 @@ function mvOpen(idx) {
 }
 function mvClose() {
   document.getElementById('mediaViewer').classList.remove('show');
+  mvAudioTeardown();
   document.getElementById('mvStage').innerHTML = '';   // stops video/audio playback
   document.removeEventListener('keydown', mvKey);
 }
 function mvKey(e) {
   if (!mvOpenState()) return;
   if (e.key === 'Escape') { e.preventDefault(); mvClose(); }
+  else if (e.key === ' ' || e.key === 'Spacebar') {          // Space = play/pause, like the old control
+    const m = mvStageMedia();
+    if (m) { e.preventDefault(); if (m.paused) m.play().catch(() => {}); else m.pause(); }
+  }
   else if (e.key === 'ArrowRight') {
     e.preventDefault();
     if (e.shiftKey) { if (_mvItems.length > 1) mvStep(1); return; }   // Shift+arrow keeps the old walk
@@ -8218,21 +8335,107 @@ function mvKey(e) {
 // at 0s. Seeking on the live element instead leaves the track playing where it is.
 const MV_SEEK_STEP = 10;   // seconds per arrow press
 function mvStageMedia() {
+  // Audio lives inside its themed player wrapper now, video is still a direct child (2026-09-24).
   const stage = document.getElementById('mvStage');
-  const el = stage && stage.firstElementChild;
-  return (el && (el.tagName === 'AUDIO' || el.tagName === 'VIDEO')) ? el : null;
+  return stage ? stage.querySelector('audio, video') : null;
 }
-function mvSeek(delta) {
-  const m = mvStageMedia();
+// ── Themed audio player for the media viewer (2026-09-24) ─────────────────────────────
+// David: "the dark shade of the player is not showing at the right time stamp ... it's like 30 seconds
+// ahead". MEASURED cause: Chromium's own control draws the BUFFERED region as a dark shade, and since
+// chat-server streams the whole file in one go, the buffer was already at 140s while the play head was at
+// 4s on a 236s take — so "played" and "buffered" were both dark and only the tail looked different. This
+// player deliberately shows exactly TWO states: the accent-coloured PLAYED fill and the dim remainder.
+// No buffer segment, so the fill IS the play position.
+let _mvRaf = 0;
+function mvAudioTeardown() {
+  if (_mvRaf) { cancelAnimationFrame(_mvRaf); _mvRaf = 0; }
+}
+function fmtMediaTime(t) {
+  if (!isFinite(t) || t < 0) return '--:--';
+  t = Math.floor(t);
+  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : String(m)) + ':' + String(s).padStart(2, '0');
+}
+const MV_ICON_PLAY = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>';
+const MV_ICON_PAUSE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><rect x="7" y="5" width="3.5" height="14" rx="1"/><rect x="13.5" y="5" width="3.5" height="14" rx="1"/></svg>';
+function mvBuildAudioPlayer(el) {
+  const wrap = document.createElement('div');
+  wrap.className = 'mv-audio';
+  wrap.innerHTML =
+      '<button class="mva-btn mva-play" type="button" title="Play / pause (Space)">' + MV_ICON_PLAY + '</button>'
+    + '<div class="mva-seek" title="Click or drag to seek"><div class="mva-track"><div class="mva-fill"></div></div>'
+    + '<div class="mva-knob"></div></div>'
+    + '<span class="mva-time">--:-- / --:--</span>'
+    + '<button class="mva-btn mva-jump" type="button" data-d="-10" title="Back 10 seconds (←)">−10</button>'
+    + '<button class="mva-btn mva-jump" type="button" data-d="10" title="Forward 10 seconds (→)">+10</button>';
+  el.controls = false;               // the engine is hidden; the UI above IS the player
+  el.style.display = 'none';
+  wrap.appendChild(el);
+  const playBtn = wrap.querySelector('.mva-play');
+  const seek = wrap.querySelector('.mva-seek');
+  const fill = wrap.querySelector('.mva-fill');
+  const knob = wrap.querySelector('.mva-knob');
+  const timeEl = wrap.querySelector('.mva-time');
+  const sync = () => {
+    const d = el.duration, t = el.currentTime || 0;
+    const pct = (isFinite(d) && d > 0) ? Math.min(100, Math.max(0, (t / d) * 100)) : 0;
+    fill.style.width = pct + '%';
+    knob.style.left = pct + '%';
+    timeEl.textContent = fmtMediaTime(t) + ' / ' + fmtMediaTime(d);
+  };
+  const playPause = () => { if (el.paused) el.play().catch(() => {}); else el.pause(); };
+  const seekToX = (clientX) => {
+    const d = el.duration;
+    if (!isFinite(d) || d <= 0) return;
+    const r = seek.getBoundingClientRect();
+    if (!r.width) return;
+    const frac = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    el.currentTime = frac * d;
+    sync();
+  };
+  playBtn.addEventListener('click', (e) => { e.stopPropagation(); playPause(); });
+  wrap.querySelectorAll('.mva-jump').forEach(b => b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    mvSeekTo(el, Number(b.dataset.d));
+  }));
+  seek.addEventListener('pointerdown', (e) => {
+    e.stopPropagation(); e.preventDefault();
+    try { seek.setPointerCapture(e.pointerId); } catch (_) {}
+    seekToX(e.clientX);
+  });
+  seek.addEventListener('pointermove', (e) => {
+    let held = false;
+    try { held = seek.hasPointerCapture(e.pointerId); } catch (_) {}
+    if (held) { e.stopPropagation(); seekToX(e.clientX); }
+  });
+  seek.addEventListener('pointerup', (e) => { try { seek.releasePointerCapture(e.pointerId); } catch (_) {} });
+  const tick = () => {
+    sync();
+    _mvRaf = el.paused ? 0 : requestAnimationFrame(tick);   // self-stopping; teardown cancels a live one
+  };
+  el.addEventListener('loadedmetadata', sync);
+  el.addEventListener('durationchange', sync);
+  el.addEventListener('timeupdate', sync);      // keeps the bar right while paused/seeking
+  el.addEventListener('seeking', sync);
+  el.addEventListener('play', () => { playBtn.innerHTML = MV_ICON_PAUSE; if (!_mvRaf) _mvRaf = requestAnimationFrame(tick); });
+  el.addEventListener('pause', () => { playBtn.innerHTML = MV_ICON_PLAY; sync(); });
+  el.addEventListener('ended', () => { playBtn.innerHTML = MV_ICON_PLAY; sync(); });
+  el.addEventListener('error', () => { timeEl.textContent = 'cannot play this file'; });
+  wrap.addEventListener('click', (e) => e.stopPropagation());   // clicks inside the player never close the viewer
+  setTimeout(sync, 0);
+  return wrap;
+}
+function mvSeekTo(m, delta) {
   if (!m) return false;
   const dur = m.duration;
-  const target = (m.currentTime || 0) + delta * MV_SEEK_STEP;
+  const target = (m.currentTime || 0) + delta;
   // clamp into [0, duration-0.25]; a stream with no known duration just clamps at 0
   const max = (typeof dur === 'number' && isFinite(dur) && dur > 0) ? Math.max(dur - 0.25, 0) : Infinity;
   const t = Math.min(Math.max(target, 0), max);
   try { m.currentTime = t; } catch (err) { return false; }
   return true;
 }
+function mvSeek(delta) { return mvSeekTo(mvStageMedia(), delta * MV_SEEK_STEP); }
 function openMediaViewerFrom(itemEl) {
   const wrap = itemEl.closest('.bubble-media');
   if (!wrap) return;
@@ -8391,7 +8594,7 @@ function closePreview() {
 function escHtml(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
 function escAttr(s) { return escHtml(s); }
 
-function handleKey(e) { if (pasteAttachKeydown(e)) return; if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+function handleKey(e) { if (pasteAttachKeydown(e)) return; if (histKeydown(e)) return; if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
 
 // ── Message walk (up/down chevrons, 2026-08-18; viewport-anchored 2026-09-06) ──
 // First click targets the message currently in context at the viewport top;
@@ -9339,7 +9542,7 @@ document.getElementById('settingsModal').addEventListener('click', (e) => { if (
 document.getElementById('renameModal').addEventListener('click', (e) => { if (e.target === document.getElementById('renameModal')) closeRename(); });
 document.getElementById('exportModal').addEventListener('click', (e) => { if (e.target === document.getElementById('exportModal')) closeExportModal(); });
 document.getElementById('importModal').addEventListener('click', (e) => { if (e.target === document.getElementById('importModal')) closeImportModal(); });
-applyTheme(localStorage.getItem('chat_theme')||'blue', false);   // sync theme swatch active state (head already painted it)
+applyTheme(localStorage.getItem('chat_theme')||'teal', false);   // sync theme swatch active state (head already painted it)
 updateSysPromptBar(); updateTokenBar();
 (function initSidebarPin() {
   if (!sidebarPinned) return;
