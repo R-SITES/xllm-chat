@@ -6,3 +6,4 @@ server.log
 .chat-client.pid
 .chat-client.log
 .agent-keys.json
+.models-dev-cache.json

@@ -894,7 +894,7 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.4.3</span>
+    <span class="footer-version">xLLM Chat v3.4.4</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -1104,6 +1104,12 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
       <input type="text" id="agentUrl" placeholder="http://host:port — OpenAI-compatible base URL">
       <label>API Key<span class="agent-key-hint" id="agentKeyHint"></span></label>
       <input type="password" id="agentKey" placeholder="optional" autocomplete="off">
+      <label style="margin-top:12px">Context window <span class="conn-sub">— the window of the model this agent runs, in tokens; 0 = detect it from the agent</span></label>
+      <div class="voice-row">
+        <input type="number" id="agentCtx" min="0" step="1000" placeholder="0 = auto" style="flex:0 0 130px;width:130px;margin:0">
+        <button class="bg-btn" id="agentCtxBtn" onclick="detectAgentContextUI()">Detect</button>
+        <span class="conn-sub" id="agentCtxState" style="flex:1">not detected yet</span>
+      </div>
       <label style="margin-top:12px">Agent Avatar <span class="conn-sub">— shown beside the agent's replies; animated GIF, JPG or PNG</span></label>
       <div class="avatar-row">
         <img id="agentAvatarPreview" class="avatar-preview" alt="" hidden>
@@ -3361,7 +3367,7 @@ function healLocalModelPin(name) {
 }
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.4.3';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.4.4';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -4044,16 +4050,136 @@ function customCloudModel(provider) {
   }
   pickCloud(provider, m);
 }
-// Agent-mode context for the token bar: an agent's context is the MODEL Hermes is
-// using (deepseek default 200k per hermes agent models_dev), NOT the local API
-// URL's server. Optional per-agent override: AGENTS[id].context (tokens).
-const AGENT_CTX_DEFAULT = 200000;
+// ── Agent-mode context for the token bar (2026-09-25) ──────────────────────────────
+// An agent's window is the window of the MODEL IT IS RUNNING — Hermes on
+// deepseek-v4-flash is 1M tokens, not the 200k this used to hardcode. The model +
+// provider come from the agent ITSELF through the proxy (Hermes: /api/model/options =
+// server truth, a per-session /model override included) and the window from the public
+// models.dev catalog — the same source Hermes resolves its own context lengths from.
+// Resolution order: AGENTS[id].context (manual override, Settings → Connect Agent) →
+// detected window → AGENT_CTX_DEFAULT. Per-agent results persist in `chat_agent_info`.
+const AGENT_CTX_DEFAULT = 200000;            // last resort: a model we could not identify
+const AGENT_INFO_MAX_AGE = 6 * 3600 * 1000;  // re-detect a stale model/window at most this often
+function loadAgentInfo() {
+  try { return JSON.parse(localStorage.getItem('chat_agent_info') || '{}') || {}; } catch (e) { return {}; }
+}
+let AGENT_INFO = loadAgentInfo();            // agent id -> {model, provider, ctx, source, at}
+function saveAgentInfo() { try { localStorage.setItem('chat_agent_info', JSON.stringify(AGENT_INFO)); } catch (e) {} }
+function agentCtxLimit(id) {
+  const own = parseInt(String((AGENTS[id] && AGENTS[id].context) || ''), 10);
+  if (own > 0) return own;
+  const info = AGENT_INFO[id] || {};
+  return (info.ctx > 0) ? info.ctx : AGENT_CTX_DEFAULT;
+}
+let agentInfoBusy = {};                      // id -> in-flight detect promise (dedupe)
+// Settings → Connect Agent "Context window" field: >0 = manual override, blank/0 = auto
+function parseAgentCtxInput() {
+  const el = document.getElementById('agentCtx');
+  const v = el ? parseInt(String(el.value || '').trim(), 10) : NaN;
+  return (v > 0) ? v : '';
+}
+// Ask the agent which model it runs and how big that model's window is. `extra`
+// ({model, provider}) resolves a window for the model a RUN reported — no agent probe.
+function detectAgentContext(id, extra) {
+  const a = AGENTS[id];
+  if (!a || !(a.url || '').trim()) return Promise.resolve(null);
+  if (agentInfoBusy[id]) return agentInfoBusy[id];
+  const body = Object.assign({ id: id, url: (a.url || '').trim(), key: a.key || '' }, extra || {});
+  const p = fetch('/api/agent/modelinfo', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  }).then(r => r.json()).then(d => {
+    if (d && d.ok && d.model) {
+      const prev = AGENT_INFO[id] || {};
+      AGENT_INFO[id] = {
+        model: d.model, provider: d.provider || '',
+        ctx: (d.ctx > 0) ? d.ctx : (prev.ctx || 0),   // keep the last good window when unknown
+        source: d.source || '', at: Date.now()
+      };
+      saveAgentInfo();
+      if (activeAgent() && activeAgent().id === id) { syncSourceContext(); updateTokenBar(); }
+    }
+    updateAgentCtxState(id);
+    return AGENT_INFO[id] || null;
+  }).catch(() => null).finally(() => { if (agentInfoBusy[id] === p) agentInfoBusy[id] = false; });
+  agentInfoBusy[id] = p;
+  return p;
+}
+// One-line status under the Settings → Connect Agent context field
+function updateAgentCtxState(id) {
+  const el = document.getElementById('agentCtxState');
+  if (!el) return;
+  const info = AGENT_INFO[id] || {};
+  const parts = [];
+  if (info.model) parts.push(info.model + (info.provider ? ' (' + info.provider + ')' : ''));
+  if (info.ctx > 0) parts.push(info.ctx.toLocaleString() + ' tokens');
+  el.textContent = parts.length ? parts.join(' — ') : 'not detected yet';
+}
+// ── MEASURED agent context (2026-09-25) ───────────────────────────────────────────
+// The transcript estimate only sees the VISIBLE messages, while the agent also sends its
+// system prompt, memory, skills and tool schemas — Hermes measured ~100k tokens/turn on a
+// 1M deepseek-v4-flash session vs ~64k the transcript alone suggested. The gateway keeps
+// real per-session token totals (GET /api/sessions/{id}: input + cache-read + cache-write,
+// api_call_count), so every finished agent run reads them through the proxy and stores the
+// per-turn context (that turn's prompt total ÷ its API calls) on the thread as `agentCtx`.
+// The value ALSO lives in AGENT_MEASURED (declared up here on purpose): updateTokenBar runs
+// during page boot, long before `chatStore` exists, and reaching into that store from here
+// throws "Cannot access 'chatStore' before initialization" — which killed the whole app
+// script on any agent-mode cold boot (hit live 2026-09-25).
+let AGENT_MEASURED = {};          // threadId -> measured agent context tokens
+let AGENT_MEASURED_READY = false; // hydrated from the chat store once it exists
+function agentMeasuredTokens() {
+  if (!currentChatId || !AGENT_MEASURED_READY) return 0;
+  return AGENT_MEASURED[currentChatId] || 0;
+}
+function hydrateAgentMeasured() {
+  const map = {};
+  try {
+    for (const c of chatStore) {
+      const m = c && c.agentCtx;
+      if (m && m.used > 0) map[c.id] = m.used;
+    }
+  } catch (e) {}
+  AGENT_MEASURED = map;
+  AGENT_MEASURED_READY = true;
+}
+function measureAgentContext(threadId, agentId, sessionId) {
+  if (!threadId || !agentId || !sessionId) return;
+  const ag = AGENTS[agentId];
+  if (!ag || !(ag.url || '').trim()) return;
+  fetch('/api/agent/session', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: agentId, url: (ag.url || '').trim(), key: ag.key || '', session_id: sessionId })
+  }).then(r => r.json()).then(d => {
+    if (!d || !d.ok || !d.session) return;
+    const s = d.session;
+    const total = (s.input_tokens || 0) + (s.cache_read_tokens || 0) + (s.cache_write_tokens || 0);
+    const calls = s.api_call_count || 0;
+    if (!(total > 0) || !(calls > 0)) return;
+    const chat = chatStore.find(x => x.id === threadId);
+    if (!chat) return;
+    const prev = chat.agentCtx || null;
+    // first read, a rotated session (compression), or counters that went backwards = the
+    // totals ARE this turn; otherwise the DELTA since the previous run is this turn.
+    const fresh = !prev || prev.sessionId !== sessionId || calls <= (prev.calls || 0);
+    const dTotal = fresh ? total : total - (prev.total || 0);
+    const dCalls = fresh ? calls : calls - (prev.calls || 0);
+    chat.agentCtx = {
+      sessionId: sessionId, total: total, calls: calls,
+      used: Math.max(0, Math.round(dTotal / Math.max(1, dCalls))),
+      model: s.model || (AGENT_INFO[agentId] || {}).model || '', at: Date.now()
+    };
+    AGENT_MEASURED[threadId] = chat.agentCtx.used;
+    AGENT_MEASURED_READY = true;
+    chatStoreWrite(threadId);
+    if (threadId === currentChatId) updateTokenBar();
+  }).catch(() => {});
+}
 function syncSourceContext() {
   const ag = activeAgent();
   const cl = activeCloud();
   let want;
   if (ag) {
-    want = parseInt(String((AGENTS[ag.id] && AGENTS[ag.id].context) || ''), 10) || AGENT_CTX_DEFAULT;
+    want = agentCtxLimit(ag.id);
   } else if (cl) {
     // cloud: the model's own context window when the registry knows it, else the
     // provider default (DeepSeek/OpenRouter models run 128k+; local is separate)
@@ -4084,6 +4210,12 @@ function pingAgent(id) {
     body: JSON.stringify(body)
   }).then(r => r.json()).then(d => {
     agentState[id] = { connected: !!d.ok, error: d.ok ? '' : (d.error || ('HTTP ' + (d.status || '?'))) };
+    // a reachable AGENT also tells us which model it runs -> the token bar's window
+    // (only when the cached answer is missing or stale; detection dedupes per id)
+    if (d.ok && AGENTS[id] && (AGENTS[id].url || '').trim()) {
+      const info = AGENT_INFO[id] || {};
+      if (!info.model || (Date.now() - (info.at || 0)) > AGENT_INFO_MAX_AGE) detectAgentContext(id);
+    }
     if ((activeAgent() && activeAgent().id === id) || (activeCloud() && activeCloud().id === id)) refreshStatusPill();
     if (cfgAgentId === id) updateAgentStatusLine();
     if (!document.getElementById('sourceMenu').hidden) renderSourceMenu();
@@ -4117,10 +4249,34 @@ function fillAgentFields(id) {
   const a = AGENTS[id];
   document.getElementById('agentUrl').value = (a && a.url) || '';
   document.getElementById('agentKey').value = (a && a.key) || '';
+  const ctxEl = document.getElementById('agentCtx');
+  if (ctxEl) ctxEl.value = (a && a.context) ? String(a.context) : '';
+  updateAgentCtxState(id);
   document.getElementById('agentKeyHint').textContent = id === 'hermes'
     ? '— blank = this machine\u2019s gateway key (stored in .agent-keys.json)'
     : (id === 'custom' ? '— required if your server needs one' : '— required if the agent needs one');
   updateAgentStatusLine();
+}
+// Settings → Connect Agent → Detect: ask the agent (against what's TYPED, like Reconnect)
+function detectAgentContextUI() {
+  const id = cfgAgentId;
+  const url = document.getElementById('agentUrl').value.trim();
+  const btn = document.getElementById('agentCtxBtn');
+  if (!url) { showToast('Enter the agent server URL first'); return; }
+  AGENTS[id].url = url; AGENTS[id].key = document.getElementById('agentKey').value;
+  saveAgents();
+  if (btn) { btn.disabled = true; btn.textContent = 'Detecting…'; }
+  detectAgentContext(id).then(info => {
+    if (btn) { btn.disabled = false; btn.textContent = 'Detect'; }
+    updateAgentCtxState(id);
+    if (info && info.ctx > 0) {
+      showToast((AGENTS[id].name || id) + ' — ' + info.model + ' · ' + info.ctx.toLocaleString() + ' tokens', 3000);
+    } else if (info && info.model) {
+      showToast('Model ' + info.model + ' — window unknown; set it manually', 3000);
+    } else {
+      showToast('Could not read the agent\u2019s model — is the server reachable?', 3000);
+    }
+  });
 }
 function agentSelectChanged(id) {
   cfgAgentId = id;
@@ -4183,9 +4339,12 @@ async function reconnectAgent() {
     if (d.ok) {
       // apply typed config so Reconnect alone is enough (Save optional)
       AGENTS[id].url = url; AGENTS[id].key = key;
+      AGENTS[id].context = parseAgentCtxInput();   // '' = auto-detect
       saveAgents();
       agentState[id] = { connected: true, error: '' };
       agentSessionId(id, true);              // reconnect always starts a FRESH session for this thread
+      detectAgentContext(id);                // refresh the model + window for the token bar
+      if (activeAgent() && activeAgent().id === id) { syncSourceContext(); updateTokenBar(); }
       st.className = 'agent-status ok';
       st.querySelector('.status-dot').className = 'status-dot ok';
       st.querySelector('span:last-child').textContent = 'Connected';
@@ -5263,7 +5422,12 @@ function updateTokenBar() {
   if (!bar || !tip) return;
   const input = document.getElementById('chatInput');
   const direct = input ? Math.ceil((input.value || '').length / 4) : 0;
-  const history = historyTokensEstimate();
+  // Agent mode: the agent's own measured context (its transcript is only part of what it
+  // sends) wins over the local transcript estimate when we have one for this thread.
+  const agentAct = activeAgent();
+  const measured = agentAct ? agentMeasuredTokens() : 0;
+  let history = historyTokensEstimate();
+  if (measured > history) history = measured;
   const responseMax = MAX_TOKENS; // 0 = unlimited (max_tokens omitted)
   const limit = contextLimit;
   if (!(limit > 0) || (!direct && !history && !responseMax)) {
@@ -5301,8 +5465,17 @@ function updateTokenBar() {
   msg += `▶ ${Math.abs(remaining).toLocaleString()} ${remaining >= 0 ? 'available' : 'excess'} message tokens\n\n`;
   msg += ` = Model max tokens: ${al(limit.toLocaleString())}\n`;
   msg += `     - This message: ${al(direct.toLocaleString())}\n`;
-  msg += `          - History: ${al(history.toLocaleString())}\n`;
+  msg += `          - History: ${al(history.toLocaleString())}${measured ? ' (measured)' : ''}\n`;
   msg += `     - Max response: ${responseMax > 0 ? al(responseMax.toLocaleString()) : 'unlimited'}`;
+  if (agentAct) {
+    // Agent mode: say WHOSE window this is — the agent's own model, never a local server
+    // — and admit it when the window could not be detected (instead of silently using
+    // the last-resort default this card used to show for a 1M model).
+    const info = AGENT_INFO[agentAct.id] || {};
+    const own = parseInt(String((AGENTS[agentAct.id] && AGENTS[agentAct.id].context) || ''), 10);
+    msg += `\n     - Agent: ${(agentAct.name || agentAct.id)}${info.model ? ' — ' + info.model : ''}`;
+    if (!(own > 0) && !(info.ctx > 0)) msg += ' (window not detected — set it in Settings → Connect Agent)';
+  }
   tip.textContent = msg;
   const color = (limit && remaining < 0) ? 'tp-danger' : (remaining < limit / 4 ? 'tp-warn' : '');
   const wasShown = tip.classList.contains('show'); // hover state is owned by wireTokenTip — don't force-show
@@ -5536,9 +5709,10 @@ function saveSettings() {
     const urlChanged = AGENTS[cfgAgentId].url !== cfgUrl || AGENTS[cfgAgentId].key !== cfgKey;
     AGENTS[cfgAgentId].url = cfgUrl;
     AGENTS[cfgAgentId].key = cfgKey;
+    AGENTS[cfgAgentId].context = parseAgentCtxInput();   // '' = auto-detect the window
     saveAgents();
     if (urlChanged && cfgUrl) pingAgent(cfgAgentId);   // re-check reachability after a change
-    if (activeAgent() && activeAgent().id === cfgAgentId) refreshStatusPill();
+    if (activeAgent() && activeAgent().id === cfgAgentId) { syncSourceContext(); updateTokenBar(); refreshStatusPill(); }
   }
   if (currentChatId) saveCurrentChat();   // settings prompt edits stick to this thread
   updateSysPromptBar(); updateTokenBar();
@@ -6431,6 +6605,7 @@ function loadConversation(chatId) {
   conversationHistory = JSON.parse(JSON.stringify(chat.messages || []));
   musicThreadChanged();   // capture THIS thread's music, drop the previous thread's playback
   chatAgentSessions = (chat.agentSessions && typeof chat.agentSessions === 'object') ? chat.agentSessions : {};
+  hydrateAgentMeasured();   // this thread's measured agent context (agentCtx) + every other thread's
   updateTokenBar();
   // Per-thread system prompt: the thread's own if it has one, else last-known.
   // The global always tracks the ACTIVE thread so a new chat inherits it.
@@ -7879,7 +8054,12 @@ async function agentRunTurn() {
   let usage = null;
   let steerNoteSeen = false;
 
-  const finishRun = (ended, err) => { runEnded = ended; runErr = err || ''; };
+  let completedSessionId = '';   // effective session id the run reported (compression can rotate it)
+  const finishRun = (ended, err) => {
+    runEnded = ended; runErr = err || '';
+    // the agent's OWN token totals for this turn -> measured context (async, never blocks)
+    measureAgentContext(streamChatId, ag.id, completedSessionId || sessId);
+  };
   const renderContent = () => {
     const el = agentContentEl(liveBubble());
     if (!el) return;
@@ -8024,7 +8204,18 @@ async function agentRunTurn() {
         try { ev = JSON.parse(data); } catch (e) { continue; }
         agentWake();
         const evt = ev.event || '';
-        if (evt === 'message.delta') {
+        if (evt === 'run.started') {
+          // The run reports the runtime it ACTUALLY used (provider + model) — that can
+          // differ from the last detection (per-session /model override), so resolve the
+          // window for THIS model through the proxy without probing the agent again.
+          const rt = ev.runtime || {};
+          const known = AGENT_INFO[ag.id] || {};
+          if (rt.model && known.model !== rt.model) {
+            AGENT_INFO[ag.id] = Object.assign({}, known, { provider: rt.provider || '', model: rt.model });
+            saveAgentInfo();
+            detectAgentContext(ag.id, { model: rt.model, provider: rt.provider || '' });
+          }
+        } else if (evt === 'message.delta') {
           const d = ev.delta;
           if (!d) continue;
           if (thinkingStarted && inThinking) { inThinking = false; thinkingStarted = false; }
@@ -8070,6 +8261,7 @@ async function agentRunTurn() {
           if (!steerNoteSeen) { addActivityNote('steer accepted'); steerNoteSeen = true; }
         } else if (evt === 'run.completed') {
           usage = ev.usage || null;
+          if (ev.session_id) completedSessionId = String(ev.session_id);
           if (!fullText && ev.output) { fullText = ev.output; }
           finishRun('done', '');
           finalizeRun();
