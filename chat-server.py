@@ -7,7 +7,7 @@ import re
 import time
 import urllib.request
 import urllib.error
-from urllib.parse import unquote
+from urllib.parse import unquote, quote
 
 PORT = 3001
 MAX_UPLOAD = 50 * 1024 * 1024      # 50 MB body cap
@@ -36,6 +36,21 @@ AGENT_MODELS_TIMEOUT = 20  # /models pull cap — OpenRouter's catalog is ~736KB
 MAX_MODELS_BYTES = 8 * 1024 * 1024   # sanity guard on a catalog body (was a hard 400KB read)
 AGENT_CHAT_TIMEOUT = None  # no cap — agent tasks can run 30+ minutes
 _MODEL_CACHE = {}          # base url -> (model_id, fetched_ts) — default model resolution
+
+# ── Agent context window + usage (2026-09-25): the token bar needs the window of the
+#    model the AGENT is actually running (Hermes on deepseek-v4-flash = 1M, not the
+#    200k the client used to assume). Two pieces, both over the agent's own HTTP API:
+#      /api/model/options → the agent's live provider+model (Hermes)
+#      /api/sessions/{id} → that session's real token totals (per-turn context)
+#    and the window itself from models.dev — the same public catalog Hermes resolves
+#    its own context lengths from, so the number matches without any API key.
+AGENT_INFO_TIMEOUT = 20    # /api/model/options + /api/sessions pull cap
+MODELS_DEV_URL = "https://models.dev/api.json"
+MODELS_DEV_TIMEOUT = 30    # ~5 MB catalog (measured)
+MODELS_DEV_TTL = 7 * 24 * 3600
+MODELS_DEV_UA = "xllm-chat (+https://github.com/R-SITES/xllm-chat)"   # models.dev 403s a bare python-urllib UA
+MODELS_DEV_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".models-dev-cache.json")
+_MODELS_DEV = {"data": None, "ts": 0.0, "error": ""}
 # Runs protocol (2026-09-05): agent mode chats via POST /v1/runs — the gateway
 # returns a run_id immediately, then GET /v1/runs/{id}/events streams typed
 # lifecycle events (message.delta, tool.started/completed, reasoning.available,
@@ -297,6 +312,88 @@ def agent_open(url, key, method="GET", body=None, headers=None, timeout=None):
         hdrs["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
     return urllib.request.urlopen(req, timeout=timeout)
+
+
+def _models_dev_catalog():
+    """The public models.dev catalog as {provider: {"models": {...}}} — cached in memory
+    for MODELS_DEV_TTL and on disk (so a restart or an offline moment keeps the last
+    known windows). Same source Hermes resolves context lengths from; no key needed."""
+    now = time.time()
+    if _MODELS_DEV["data"] and (now - _MODELS_DEV["ts"]) < MODELS_DEV_TTL:
+        return _MODELS_DEV["data"]
+    stale = None
+    try:
+        with open(MODELS_DEV_CACHE, "r", encoding="utf-8") as f:
+            blob = json.load(f)
+        if isinstance(blob, dict) and isinstance(blob.get("catalog"), dict) and blob["catalog"]:
+            stale = blob["catalog"]
+            ts = float(blob.get("ts") or 0)
+            if (now - ts) < MODELS_DEV_TTL:
+                _MODELS_DEV["data"], _MODELS_DEV["ts"] = stale, ts
+                return stale
+    except Exception:
+        pass
+    try:
+        with agent_open(MODELS_DEV_URL, "", headers={"User-Agent": MODELS_DEV_UA,
+                                                     "Accept": "application/json"},
+                        timeout=MODELS_DEV_TIMEOUT) as r:
+            fresh = json.loads(r.read().decode("utf-8"))
+        if isinstance(fresh, dict) and fresh:
+            _MODELS_DEV["data"], _MODELS_DEV["ts"] = fresh, now
+            _MODELS_DEV["error"] = ""
+            try:
+                with open(MODELS_DEV_CACHE, "w", encoding="utf-8") as f:
+                    json.dump({"ts": now, "catalog": fresh}, f)
+            except Exception:
+                pass
+            return fresh
+        _MODELS_DEV["error"] = "empty catalog"
+    except urllib.error.HTTPError as e:
+        _MODELS_DEV["error"] = f"HTTP {e.code}"
+    except Exception as e:
+        _MODELS_DEV["error"] = str(e)[:120]
+    if stale:
+        _MODELS_DEV["data"], _MODELS_DEV["ts"] = stale, now
+        return stale
+    return {}
+
+
+def _ctx_from_entry(entry):
+    try:
+        ctx = int(((entry or {}).get("limit") or {}).get("context") or 0)
+    except (TypeError, ValueError):
+        ctx = 0
+    return ctx if ctx > 0 else 0
+
+
+def _models_dev_ctx(catalog, provider, model):
+    """Context window for (provider, model) -> (ctx, matched_catalog_id).
+    provider+model first, then the id as an OpenRouter-style id, then any provider
+    carrying the exact id, then a suffix match (dated/variant ids)."""
+    def _models(pid):
+        return (catalog.get(pid) or {}).get("models") or {}
+    if provider:
+        ctx = _ctx_from_entry(_models(provider).get(model))
+        if ctx:
+            return ctx, provider + "/" + model
+    if "/" in model:
+        ctx = _ctx_from_entry(_models("openrouter").get(model))
+        if ctx:
+            return ctx, "openrouter/" + model
+    for pid, pr in catalog.items():
+        ms = pr.get("models") or {}
+        if model in ms:
+            ctx = _ctx_from_entry(ms[model])
+            if ctx:
+                return ctx, pid + "/" + model
+    tail = model.rsplit("/", 1)[-1]
+    for pid, pr in catalog.items():
+        for mid, entry in (pr.get("models") or {}).items():
+            if mid == tail or mid.rsplit("/", 1)[-1] == tail:
+                ctx = _ctx_from_entry(entry)
+                if ctx:
+                    return ctx, pid + "/" + mid
+    return 0, ""
 
 
 def extract_text(filename, data):
@@ -638,6 +735,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if path == "/api/agent/models":
             self._handle_agent_models()
             return
+        if path == "/api/agent/modelinfo":
+            self._handle_agent_modelinfo()
+            return
+        if path == "/api/agent/session":
+            self._handle_agent_session()
+            return
         if path == "/api/agent/chat":
             self._handle_agent_chat()
             return
@@ -825,6 +928,95 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         "error": (detail or f"HTTP {e.code}")[:300]})
         except Exception as e:
             self._json({"ok": False, "error": str(e)[:200]})
+
+    def _handle_agent_modelinfo(self):
+        """The agent's LIVE model + that model's context window (the token-bar limit).
+
+        Hermes reports its active provider/model on GET /api/model/options (server
+        truth — a per-session /model override included); the window comes from the
+        public models.dev catalog. Agents that don't speak that route answer 404/405
+        -> {ok:false} and the client keeps its per-agent override / default.
+        Body: {id, url, key, model?, provider?} — model/provider given = resolve a
+        window for a model the RUN reported (no agent probe). -> {ok, model, provider, ctx, source}"""
+        req, err = self._read_json_body()
+        if err:
+            self._json(err[0], err[1])
+            return
+        assert req is not None
+        agent_id = (req.get("id") or "").strip()
+        base = (req.get("url") or "").strip()
+        key = agent_secret(agent_id, (req.get("key") or "").strip())
+        model = str(req.get("model") or "").strip()
+        provider = str(req.get("provider") or "").strip()
+        probed = False
+        if not model:
+            if not base:
+                self._json({"ok": False, "error": "no server URL configured"})
+                return
+            info_url = agent_api_base(base) + "/api/model/options"
+            probed = True
+            try:
+                with agent_open(info_url, key, timeout=AGENT_INFO_TIMEOUT) as r:
+                    if r.status != 200:
+                        self._json({"ok": False, "status": r.status,
+                                    "error": f"agent does not report its model (HTTP {r.status})"})
+                        return
+                    info = json.loads(r.read(MAX_MODELS_BYTES).decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                self._json({"ok": False, "status": e.code,
+                            "error": f"agent does not report its model (HTTP {e.code})"})
+                return
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)[:200]})
+                return
+            info = info if isinstance(info, dict) else {}
+            model = str(info.get("model") or "").strip()
+            provider = str(info.get("provider") or "").strip() or provider
+        if not model:
+            self._json({"ok": False, "error": "agent reported no model"})
+            return
+        catalog = _models_dev_catalog()
+        ctx, source = _models_dev_ctx(catalog, provider, model)
+        self._json({"ok": True, "model": model, "provider": provider, "ctx": ctx,
+                    "source": source, "probed": probed, "catalog": bool(catalog),
+                    "catalog_error": _MODELS_DEV["error"]})
+
+    def _handle_agent_session(self):
+        """The agent's OWN record for a client thread's session — Hermes keeps real token
+        totals per session (input / cache-read / cache-write / api_call_count) on
+        GET /api/sessions/{id}. The client reads the per-turn DELTA to show how full the
+        model's context really is (its own transcript estimate only sees the visible
+        messages). Body: {id, url, key, session_id} -> {ok, session:{...}}"""
+        req, err = self._read_json_body()
+        if err:
+            self._json(err[0], err[1])
+            return
+        assert req is not None
+        agent_id = (req.get("id") or "").strip()
+        base = (req.get("url") or "").strip()
+        sid = (req.get("session_id") or "").strip()
+        if not base or not sid:
+            self._json({"ok": False, "error": "no server URL / session id"})
+            return
+        key = agent_secret(agent_id, (req.get("key") or "").strip())
+        url = agent_api_base(base) + "/api/sessions/" + quote(sid, safe="")
+        try:
+            with agent_open(url, key, timeout=AGENT_INFO_TIMEOUT) as r:
+                if r.status != 200:
+                    self._json({"ok": False, "status": r.status,
+                                "error": f"session lookup HTTP {r.status}"})
+                    return
+                blob = json.loads(r.read(MAX_MODELS_BYTES).decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            self._json({"ok": False, "status": e.code, "error": f"session lookup HTTP {e.code}"})
+            return
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)[:200]})
+            return
+        s = ((blob or {}).get("session") or {}) if isinstance(blob, dict) else {}
+        keys = ("id", "model", "input_tokens", "output_tokens", "cache_read_tokens",
+                "cache_write_tokens", "reasoning_tokens", "api_call_count", "message_count")
+        self._json({"ok": True, "session": {k: s.get(k) for k in keys}})
 
     def _handle_agent_chat(self):
         """Stream an OpenAI-compatible agent chat (SSE) back to the browser.
