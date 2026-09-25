@@ -797,7 +797,7 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.4.0</span>
+    <span class="footer-version">xLLM Chat v3.4.1</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -3249,7 +3249,7 @@ function healLocalModelPin(name) {
 }
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.4.0';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.4.1';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -6006,7 +6006,7 @@ function presetSuggestedName(text) {
 function openPresetDialog() {
   const input = document.getElementById('chatInput');
   const text = ((input && input.value) || '').trim();
-  if (!text) { showToast('Nothing to save — type or load a prompt first'); return; }
+  if (!text) return;                     // the button only shows with text in the box; nothing to announce
   _presetDraft = text;
   const nameEl = document.getElementById('presetNameInput');
   nameEl.value = presetSuggestedName(text);
@@ -6021,11 +6021,10 @@ function savePresetDialog() {
   if (!text) { closePresetDialog(); return; }
   const name = (document.getElementById('presetNameInput').value || '').trim() || presetSuggestedName(text);
   const at = promptPresets.findIndex(p => String(p.name).toLowerCase() === name.toLowerCase());
-  if (at >= 0) { promptPresets[at].text = text; showToast('Preset updated — ' + name); }
+  if (at >= 0) { promptPresets[at].text = text; }        // same name → update in place (no toast: the pill is the feedback)
   else {
     if (promptPresets.length >= PRESET_MAX) { showToast('Preset limit reached (' + PRESET_MAX + ') — delete one first'); closePresetDialog(); return; }
     promptPresets.push({ name: name, text: text });
-    showToast('Preset saved — ' + name);
   }
   presetSave(); closePresetDialog(); renderPresets(); updatePresetAddBtn();
 }
@@ -6033,13 +6032,11 @@ function applyPreset(i) {
   const p = promptPresets[i];
   if (!p) return;
   histSetInput(p.text);                     // same value/caret/autosize path the history buttons use
-  showToast('Preset loaded — ' + p.name);
 }
 function deletePreset(i) {
   const p = promptPresets[i];
   if (!p) return;
   promptPresets.splice(i, 1); presetSave(); renderPresets(); updatePresetAddBtn();
-  showToast('Preset deleted — ' + p.name);
 }
 
 function updateHistBtns() {
