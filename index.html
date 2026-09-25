@@ -50,6 +50,9 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .conn-pane{animation:connFade .12s ease}
 @keyframes connFade{from{opacity:.4}to{opacity:1}}
 .conn-sub{font-size:11px;color:var(--dim);font-weight:400}
+/* Agent avatar (2026-09-24): a user-picked GIF/JPG/PNG for the agent's bubble; preview in the pane. */
+.avatar-row{display:flex;align-items:center;gap:8px;margin-top:6px}
+.avatar-preview{width:44px;height:44px;border-radius:50%;object-fit:cover;border:1px solid var(--border);background:var(--bg3);flex-shrink:0}
 .source-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:900;min-width:260px;max-width:min(430px,calc(100vw - 32px));background:var(--bg2);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.35);padding:6px;max-height:min(60vh,420px);overflow-y:auto}
 .source-menu[hidden]{display:none}
 .src-group-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);opacity:.85;padding:7px 10px 3px}
@@ -506,6 +509,9 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
 .msg.agent .avatar{background:var(--accentBg);color:var(--accent)}
 .agent-head{display:flex;align-items:center;gap:6px;margin:0 0 8px;padding-bottom:6px;border-bottom:1px solid color-mix(in srgb,var(--accent) 25%,var(--border));font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent);user-select:none;line-height:1;white-space:nowrap;overflow:hidden;max-width:100%}
 .agent-head svg{width:44px;height:47px;flex-shrink:0;opacity:.95;margin:0 0 0 -16px}
+/* Picked agent avatar (2026-09-24): a circle to the LEFT of the agent name, thin theme-aware ring.
+   20px → 30px (too small to read a dark GIF, David 2026-09-25) → 40px ("even larger, a bit larger"). */
+.agent-head-av{width:40px;height:40px;border-radius:50%;object-fit:cover;border:1px solid var(--accentLine);flex-shrink:0;display:block;margin-right:1px}
 .bubble-content{min-width:0}
 .agent-activity{display:flex;flex-direction:column;gap:2px;margin:10px 0 -2px;padding:8px 10px 2px;border-top:1px solid color-mix(in srgb,var(--accent) 30%,var(--border));background:color-mix(in srgb,var(--accent) 5%,transparent);font-family:ui-monospace,Consolas,Menlo,monospace;font-size:11px;line-height:1.55;max-height:150px;overflow-y:auto;scrollbar-width:thin}
 .agent-activity:empty{display:none}
@@ -681,7 +687,11 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
 .mv-close{background:none;border:none;color:var(--dim);font-size:15px;cursor:pointer;padding:5px 9px;border-radius:8px;flex-shrink:0}
 .mv-close:hover{color:#fff;background:var(--red)}
 .mv-stage{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:14px}
-.mv-stage img,.mv-stage video{max-width:calc(100vw - 160px);max-height:calc(100vh - 120px);border-radius:8px;background:#000;box-shadow:0 8px 34px rgba(0,0,0,.55);object-fit:contain}
+.mv-stage img{max-width:calc(100vw - 160px);max-height:calc(100vh - 120px);border-radius:8px;background:#000;box-shadow:0 8px 34px rgba(0,0,0,.55);object-fit:contain}
+/* Image zoom (2026-09-25): the wheel zooms the picture under the cursor, drag pans while zoomed. */
+.mv-stage img{cursor:zoom-in;touch-action:none;transition:transform .06s linear}
+.mv-stage img.mv-zoomed{cursor:grab}
+.mv-stage img.mv-dragging{cursor:grabbing;transition:none}
 .mv-stage video{max-width:calc(100vw - 120px)}
 .mv-stage audio{width:min(600px,84vw)}
 /* ── Themed audio player for the viewer (2026-09-24): shows exactly TWO states — the accent-played
@@ -797,7 +807,7 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.4.1</span>
+    <span class="footer-version">xLLM Chat v3.4.2</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -1004,9 +1014,21 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
       <input type="text" id="agentUrl" placeholder="http://host:port — OpenAI-compatible base URL">
       <label>API Key<span class="agent-key-hint" id="agentKeyHint"></span></label>
       <input type="password" id="agentKey" placeholder="optional" autocomplete="off">
+      <label style="margin-top:12px">Agent Avatar <span class="conn-sub">— shown beside the agent's replies; animated GIF, JPG or PNG</span></label>
+      <div class="avatar-row">
+        <img id="agentAvatarPreview" class="avatar-preview" alt="" hidden>
+        <button class="bg-btn" onclick="document.getElementById('agentAvatarInput').click()">Browse…</button>
+        <button class="bg-btn" id="agentAvatarClearBtn" onclick="clearAgentAvatar()" hidden>Remove</button>
+        <input type="file" id="agentAvatarInput" accept="image/gif,image/jpeg,image/png,.gif,.jpg,.jpeg,.png" style="display:none" onchange="agentAvatarPicked(this)">
+      </div>
       <div class="voice-row">
         <span class="agent-status" id="agentStatus"><span class="status-dot"></span><span>Not connected</span></span>
         <button class="bg-btn" id="agentReconnectBtn" onclick="reconnectAgent()">Reconnect</button>
+      </div>
+      <label style="margin-top:12px">Yolo <span class="conn-sub">— auto-answer approval prompts for you</span></label>
+      <div class="voice-row">
+        <span class="voice-label" id="yoloState">Off — approvals wait for you</span>
+        <label class="switch" title="Auto-click Allow once on every approval prompt"><input type="checkbox" id="yoloToggle" onchange="setYolo(this.checked)"><span class="slider"></span></label>
       </div>
       <div class="bg-note">Each chat thread keeps its own live agent session automatically — returning to a thread resumes the same conversation, and multiple turns continue it. Reconnect tests the server and starts a fresh session for this thread. Local model mode uses the API URL on the General tab.</div>
     </div>
@@ -3249,7 +3271,7 @@ function healLocalModelPin(name) {
 }
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.4.1';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.4.2';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -4446,6 +4468,8 @@ document.addEventListener('DOMContentLoaded', () => {
   renderPresets();   // prompt presets: saved pills + the + Add Preset button state (2026-09-24)
   updateTokenBar();
   loadVoices();   // voice read-aloud: availability + cloned voice list
+  loadAgentAvatar();   // Connect Agent → the agent's avatar image, if one has been picked (2026-09-24)
+  renderYoloUI();      // Connect Agent → Yolo switch reflects the stored setting (2026-09-24)
   renderBubbleFontSel();   // Settings → Theme: populate the Google Fonts dropdown
 });
 
@@ -4637,6 +4661,8 @@ function openSettings() {
   }
   updateBgSettingsUI();
   loadVoices();   // refresh qwen3 availability + voice list each open
+  renderAgentAvatarUI();   // Connect Agent → Agent Avatar preview/Remove state (2026-09-24)
+  renderYoloUI();          // Connect Agent → Yolo switch state (2026-09-24)
   populateAgentPane();   // Connect Agent: fill fields from stored config (agent tab default-hidden; fields kept live)
   // LLM Connections tab follows the ACTIVE thread's conn (Local / DeepSeek / OpenRouter)
   connTab(activeConn.kind === 'cloud' ? activeConn.provider : 'local');
@@ -6551,8 +6577,8 @@ function agentMarkSVG(sz) {
   return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="' + sz + '" height="' + sz + '" fill="currentColor" aria-hidden="true"><text x="12" y="17.6" font-size="16" text-anchor="middle" font-family="DejaVu Sans, Noto Sans Symbols2, system-ui, sans-serif">⚕</text></svg>';
 }
 function agentHeadHTML(name) {
-  // Header row INSIDE the response card: agent label with the ⚕ mark to its right.
-  return '<div class="agent-head">' + escHtml(name) + agentMarkSVG(13) + '</div>';
+  // Header row INSIDE the response card: (optional avatar) agent label with the ⚕ mark to its right.
+  return '<div class="agent-head">' + agentHeadAvatarHTML() + escHtml(name) + agentMarkSVG(13) + '</div>';
 }
 // Turn a freshly created assistant message into an AGENT response card: mark
 // avatar, agent class (off-color tint), and INSIDE the bubble — head at top +
@@ -6598,6 +6624,85 @@ function rebindAgentRunUI() {
   }
   // 4. repoint the live-writer refs at the fresh nodes
   currentStreamingEl = bubble;
+}
+// ── Agent avatar (2026-09-24, David's ask): pick a GIF (animated is welcome), JPG or PNG in
+//    Settings → Connect Agent and it replaces the little agent mark on the agent's bubbles. The file is
+//    stored as a data URL in the SAME IndexedDB kv store the background slides use — localStorage would
+//    start fighting its 5 MB origin cap the moment someone picks an animated GIF.
+const AGENT_AVATAR_KEY = 'agent_avatar';
+const AGENT_AVATAR_MAX = 30 * 1024 * 1024;   // a Blob in IndexedDB costs its real size, so big animated GIFs are fine
+// `agentAvatar` holds a SHORT blob: object URL, never a base64 data URL. A 4.5 MB GIF is a 6 MB data URL, and
+// inlining that as the src of every agent card (34 of them in David's thread) put ~200 MB of attribute text in
+// the DOM — the reason this is a Blob + createObjectURL. The Blob itself lives in IndexedDB.
+let agentAvatar = null;
+function agentAvatarRelease() {
+  if (agentAvatar && agentAvatar.indexOf('blob:') === 0) { try { URL.revokeObjectURL(agentAvatar); } catch (e) {} }
+  agentAvatar = null;
+}
+function agentAvatarUseBlob(blob) {
+  agentAvatarRelease();
+  agentAvatar = URL.createObjectURL(blob);
+  renderAgentAvatarUI();
+  agentAvatarRepaint();
+}
+// The avatar rides in the response HEAD, to the left of the agent name: (avatar) HERMES (mark) — David's
+// ask, 2026-09-24. The message-row circle keeps the app's own agent mark so the face appears once.
+function agentHeadAvatarHTML() {
+  return agentAvatar ? '<img class="agent-head-av" src="' + agentAvatar + '" alt="">' : '';
+}
+function renderAgentAvatarUI() {
+  const img = document.getElementById('agentAvatarPreview');
+  const clr = document.getElementById('agentAvatarClearBtn');
+  if (!img) return;
+  if (agentAvatar) { img.src = agentAvatar; img.hidden = false; }
+  else { img.removeAttribute('src'); img.hidden = true; }
+  if (clr) clr.hidden = !agentAvatar;
+}
+function agentAvatarRepaint() {   // heads already on screen pick it up without reloading the thread
+  document.querySelectorAll('.msg.agent .agent-head').forEach(h => {
+    const existing = h.querySelector('.agent-head-av');
+    if (agentAvatar) {
+      if (existing) existing.src = agentAvatar;
+      else h.insertAdjacentHTML('afterbegin', agentHeadAvatarHTML());
+    } else if (existing) {
+      existing.remove();
+    }
+  });
+}
+function agentAvatarPicked(input) {
+  const f = input && input.files && input.files[0];
+  if (input) input.value = '';
+  if (!f) return;
+  const okType = /^image\/(gif|jpeg|png)$/i.test(f.type || '') || /\.(gif|jpe?g|png)$/i.test(f.name || '');
+  if (!okType) { showToast('Avatar must be a GIF, JPG or PNG'); return; }
+  if (f.size > AGENT_AVATAR_MAX) { showToast('Avatar is too big — keep it under 30 MB'); return; }
+  // Straight to a Blob — no base64 round-trip, so the file keeps its real size and the DOM gets a short URL.
+  agentAvatarRelease();
+  agentAvatar = URL.createObjectURL(f);
+  bgDbSet(AGENT_AVATAR_KEY, f).catch(() => {});
+  renderAgentAvatarUI();
+  agentAvatarRepaint();
+}
+function clearAgentAvatar() {
+  agentAvatarRelease();
+  bgDbSet(AGENT_AVATAR_KEY, null).catch(() => {});
+  renderAgentAvatarUI();
+  agentAvatarRepaint();
+}
+function loadAgentAvatar() {
+  return bgDbGet(AGENT_AVATAR_KEY)
+    .then(v => {
+      if (!v) return;
+      if (typeof v === 'string') {
+        // legacy: the first build stored a base64 data URL — migrate it to a Blob once
+        return fetch(v).then(r => r.blob()).then(b => {
+          bgDbSet(AGENT_AVATAR_KEY, b).catch(() => {});
+          agentAvatarUseBlob(b);
+        }).catch(() => {});
+      }
+      agentAvatarUseBlob(v);
+    })
+    .catch(() => {});
 }
 function agentDecorateMsg(div, name) {
   if (!div) return;
@@ -6809,6 +6914,44 @@ function agentPostRunAction(action, extra) {
   }).then(r => r.json()).catch(() => null);
 }
 
+// ── YOLO switch (2026-09-24, David's ask) ────────────────────────────────────────────────────────────
+// We CANNOT turn on the gateway's own HERMES_YOLO_MODE from the browser — that is a server-side env var
+// the chat client has no reach into. This is the client-side equivalent he asked for: with the switch on,
+// every approval prompt that appears is answered for him by clicking the least-permissive ALLOW choice on
+// offer (Allow once → Allow this session → Always allow — never Deny), through the very same button handler
+// a manual click runs. A prompt with no allow choice at all is left alone for him to answer.
+const YOLO_KEY = 'chat_yolo';
+function yoloOn() { try { return localStorage.getItem(YOLO_KEY) === '1'; } catch (e) { return false; } }
+function setYolo(on) {
+  try { localStorage.setItem(YOLO_KEY, on ? '1' : '0'); } catch (e) {}
+  renderYoloUI();
+}
+function renderYoloUI() {
+  const t = document.getElementById('yoloToggle');
+  const s = document.getElementById('yoloState');
+  const on = yoloOn();
+  if (t) t.checked = on;
+  if (s) s.textContent = on ? 'On — approvals are auto-allowed' : 'Off — approvals wait for you';
+}
+function yoloAnswerApproval(choices, LABELS, actions, resolve) {
+  if (!yoloOn()) return false;
+  const pick = ['once', 'session', 'always'].find(c => choices.indexOf(c) !== -1);
+  if (!pick) return false;
+  const label = (LABELS[pick] || { label: pick }).label;
+  // a beat before clicking, so the prompt is really shown (and logged) instead of flashing past unseen
+  setTimeout(() => {
+    addActivityNote('YOLO — auto-answered: ' + label);
+    const btn = Array.from(actions.querySelectorAll('button')).find(b => b.textContent === label);
+    if (btn && btn.isConnected) { btn.click(); return; }
+    if (_agentApprovalPending) {   // fallback: resolve exactly like the button would
+      _agentApprovalPending = false; _agentApprovalResolve = null;
+      document.getElementById('approvalModal').classList.remove('show');
+      resolve(pick);
+    }
+  }, 300);
+  return true;
+}
+
 // ── Approval modal (Allow once / Allow this session / Always allow / Deny) ──
 function showApprovalModal(data) {
   return new Promise((resolve) => {
@@ -6840,6 +6983,7 @@ function showApprovalModal(data) {
     note.style.display = 'none';
     addActivityNote('Hermes needs approval — ' + shortTxt(text, 80));
     document.getElementById('approvalModal').classList.add('show');
+    yoloAnswerApproval(choices, LABELS, actions, resolve);   // the Yolo switch answers it for him (2026-09-24)
   });
 }
 
@@ -8384,6 +8528,8 @@ function mvBuildStage() {
   } else {
     el = document.createElement('img');
     el.src = src; el.alt = '';
+    mvZoomReset(null);
+    mvWireImageZoom(el);
   }
   if (el) stage.appendChild(el);
   if (kind === 'audio') markMediaPreviewed(src);   // this take has now been auditioned (2026-09-24)
@@ -8410,6 +8556,7 @@ function mvOpen(idx) {
 function mvClose() {
   document.getElementById('mediaViewer').classList.remove('show');
   mvAudioTeardown();
+  mvZoomReset(null);
   document.getElementById('mvStage').innerHTML = '';   // stops video/audio playback
   document.removeEventListener('keydown', mvKey);
 }
@@ -8542,6 +8689,85 @@ function mvSeekTo(m, delta) {
   return true;
 }
 function mvSeek(delta) { return mvSeekTo(mvStageMedia(), delta * MV_SEEK_STEP); }
+// ── Image zoom in the viewer (David's ask, 2026-09-25): "if the user uses the wheel of their mouse it
+//    zooms in/out with location point of the zoom where the mouse is located". The picture is scaled about
+//    the pointer, so whatever sits under the cursor stays under it while the wheel turns; drag pans while
+//    zoomed. IMAGES ONLY — video and audio keep their normal wheel behaviour. Zoom state is per shown item
+//    and resets whenever the stage is rebuilt (open, step, close).
+const MV_ZOOM_MIN = 1, MV_ZOOM_MAX = 8, MV_ZOOM_STEP = 1.15;
+let _mvZoom = 1, _mvTx = 0, _mvTy = 0, _mvDrag = null;
+function mvZoomReset(el) {
+  _mvZoom = 1; _mvTx = 0; _mvTy = 0; _mvDrag = null;
+  if (el) { el.style.transform = ''; el.classList.remove('mv-zoomed', 'mv-dragging'); }
+}
+function mvApplyZoom(el) {
+  el.style.transform = (_mvZoom === 1 && !_mvTx && !_mvTy) ? ''
+    : 'translate(' + _mvTx + 'px,' + _mvTy + 'px) scale(' + _mvZoom + ')';
+}
+// Zooming all the way back out SNAPS the picture back to its centred fit position (no leftover pan), which
+// is what a viewer is expected to do when the wheel brings it home.
+function mvZoomHome(el) {
+  if (_mvZoom > MV_ZOOM_MIN + 1e-4) return;
+  _mvZoom = MV_ZOOM_MIN; _mvTx = 0; _mvTy = 0;
+  el.style.transform = '';
+  el.classList.remove('mv-zoomed', 'mv-dragging');
+}
+// Keep at least the stage's centre covered by the picture, so it can never be flung out of sight.
+function mvClampPan(box) {
+  const st = document.getElementById('mvStage').getBoundingClientRect();
+  const cx = st.left + st.width / 2 - box.left, cy = st.top + st.height / 2 - box.top;
+  _mvTx = Math.max(cx - box.w * _mvZoom, Math.min(cx, _mvTx));
+  _mvTy = Math.max(cy - box.h * _mvZoom, Math.min(cy, _mvTy));
+}
+function mvWireImageZoom(el) {
+  el.style.transformOrigin = '0 0';     // translate() then scale() about the top-left: simple pointer math
+  el.style.willChange = 'transform';
+  // The UNTRANSFORMED layout box (getBoundingClientRect() moves with our own transform, so undo it).
+  const layoutBox = () => {
+    const r = el.getBoundingClientRect();
+    return { left: r.left - _mvTx, top: r.top - _mvTy, w: r.width / _mvZoom, h: r.height / _mvZoom };
+  };
+  el.addEventListener('wheel', (e) => {
+    e.preventDefault();                  // the picture zooms, the page does not scroll
+    const box = layoutBox();
+    // Where the cursor is inside the picture, as a 0..1 fraction (this is the point that must not move).
+    const u = (e.clientX - box.left - _mvTx) / (box.w * _mvZoom);
+    const v = (e.clientY - box.top - _mvTy) / (box.h * _mvZoom);
+    const next = Math.min(MV_ZOOM_MAX, Math.max(MV_ZOOM_MIN, _mvZoom * (e.deltaY < 0 ? MV_ZOOM_STEP : 1 / MV_ZOOM_STEP)));
+    if (Math.abs(next - _mvZoom) < 1e-4) return;                       // already at a limit
+    _mvZoom = next;
+    _mvTx = (e.clientX - box.left) - u * box.w * _mvZoom;              // put the SAME point back under the cursor
+    _mvTy = (e.clientY - box.top) - v * box.h * _mvZoom;
+    mvClampPan(box);
+    mvApplyZoom(el);
+    mvZoomHome(el);
+    el.classList.toggle('mv-zoomed', _mvZoom > 1.001);
+  }, { passive: false });
+  el.addEventListener('pointerdown', (e) => {
+    if (_mvZoom <= 1.001) return;        // at fit the image is not draggable (clicks still close the viewer)
+    e.stopPropagation(); e.preventDefault();
+    _mvDrag = { x: e.clientX, y: e.clientY, tx: _mvTx, ty: _mvTy };
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    el.classList.add('mv-dragging');
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!_mvDrag) return;
+    e.stopPropagation();
+    const box = layoutBox();
+    _mvTx = _mvDrag.tx + (e.clientX - _mvDrag.x);
+    _mvTy = _mvDrag.ty + (e.clientY - _mvDrag.y);
+    mvClampPan(box);
+    mvApplyZoom(el);
+  });
+  const endDrag = (e) => {
+    if (!_mvDrag) return;
+    _mvDrag = null;
+    el.classList.remove('mv-dragging');
+    try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+  };
+  el.addEventListener('pointerup', endDrag);
+  el.addEventListener('pointercancel', endDrag);
+}
 function openMediaViewerFrom(itemEl) {
   const wrap = itemEl.closest('.bubble-media');
   if (!wrap) return;
