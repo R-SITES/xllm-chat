@@ -71,28 +71,173 @@ MEDIA_BASE_PATHS = [                # relative refs resolve against these, in or
 
 
 def resolve_media_path(raw):
-    """Resolve a media token to a real local file, or None.
+    """Resolve a media token to a real local file.
 
     Mirrors r1-ws-server.resolve_image_path(): strip a MEDIA: prefix, try the
     absolute path, then the token (minus any leading .//) against each base root.
     Strips trailing prose punctuation so 'x.png.' and 'x.png)' still resolve.
+
+    Returns (path, match, candidates): 'exact' when the token resolved as written,
+    'basename'/'normalized' when a name search found it instead (the chat can name a
+    take that has since moved, been renamed, or lost its album folder — 2026-09-25),
+    and (None, None, [closest names]) when nothing on disk matches at all.
     """
     if not raw:
-        return None
+        return None, None, []
     path = raw.strip().strip(".,;:!?)]}>\"'")
     if path.lower().startswith(("http://", "https://", "data:", "file:", "blob:", "ftp://")):
-        return None
+        return None, None, []
     if path[:6].upper() == "MEDIA:":
         path = path[6:]
     path = os.path.expanduser(path)
-    if not os.path.isabs(path):
+    if os.path.isabs(path):
+        if os.path.isfile(path):
+            return path, 'exact', []
+    else:
         clean = re.sub(r"^\.?[/\\]", "", path)
         for base in MEDIA_BASE_PATHS:
             cand = os.path.join(base, clean)
             if os.path.isfile(cand):
-                return cand
-        return None
-    return path if os.path.isfile(path) else None
+                return cand, 'exact', []
+    found, kind, cands = resolve_by_name(path)
+    return found, kind, cands
+
+
+# ── "The chat named a take that has moved" (2026-09-25, David: "still doesn't play .. rebuild it") ──
+# Resolution used to be exact-path-or-404, so the floating player answered "media not found" for a take
+# that WAS on the box — just under another root/name. A miss now falls back to a name search across the
+# media roots: exact basename (case-insensitive) first, then a normalized comparison (lowercase, all
+# punctuation stripped). Every media response carries X-Media-Path / X-Media-Match so the client can show
+# what was really served, and a true miss answers 404 with the closest names for "did you mean …".
+MUSIC_SEARCH_ROOTS = [
+    os.path.expanduser("~/Music"),
+    os.path.expanduser("~/Downloads"),
+    os.path.expanduser("~/song-factory"),
+    os.path.expanduser("~/flac-archive"),
+    os.path.expanduser("~/ComfyUI/output"),
+]
+AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac", ".opus"}
+# Stems live beside the songs in the ACE-Step folders (vocals.wav, drums.wav …) — the LIBRARY view skips
+# them so "the last songs" reads like songs; resolution still serves them when a chat names one.
+STEM_NAMES = {"vocals", "no_vocals", "novocals", "instrumental", "inst", "other", "bass", "drums",
+              "drum", "piano", "guitar", "lead", "synth", "acapella", "acappella", "backing", "mix"}
+MEDIA_INDEX_TTL = 30          # seconds — one walk serves every lookup in that window
+_index_cache = {"ts": 0.0, "files": []}
+
+
+def media_index():
+    """[(path, mtime)] for every media file under the roots, newest first.
+
+    Walked at most once per MEDIA_INDEX_TTL seconds (album folders are 4 levels deep,
+    hidden dirs skipped) — cheap enough to run inside a request.
+    """
+    now = time.time()
+    if _index_cache["files"] and now - _index_cache["ts"] < MEDIA_INDEX_TTL:
+        return _index_cache["files"]
+    out = []
+    for root in MUSIC_SEARCH_ROOTS:
+        if not os.path.isdir(root):
+            continue
+        depth0 = root.rstrip(os.sep).count(os.sep)
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if not d.startswith('.')]
+            if dirpath.count(os.sep) - depth0 >= 4:
+                dirnames[:] = []
+            for fn in filenames:
+                if os.path.splitext(fn)[1].lower() not in MEDIA_EXTS:
+                    continue
+                full = os.path.join(dirpath, fn)
+                try:
+                    out.append((full, os.path.getmtime(full)))
+                except OSError:
+                    continue
+    out.sort(key=lambda p: p[1], reverse=True)
+    _index_cache["files"] = out
+    _index_cache["ts"] = now
+    return out
+
+
+def norm_media_name(s):
+    """Comparison key: lowercase, punctuation/space/underscore-free."""
+    return re.sub(r'[^a-z0-9]', '', str(s).lower())
+
+
+def resolve_by_name(token):
+    """Name search for a token whose exact path is gone. (path, kind, closest_names)."""
+    base = os.path.basename(str(token).replace("\\", "/")).strip()
+    if not base:
+        return None, None, []
+    files = media_index()
+    want_base = base.lower()
+    for p, _ in files:                                   # 1. same basename, any folder
+        if os.path.basename(p).lower() == want_base:
+            return p, 'basename', []
+    want = norm_media_name(base)
+    if want:
+        for p, _ in files:                               # 2. same name once normalized
+            if norm_media_name(os.path.basename(p)) == want:
+                return p, 'normalized', []
+    import difflib                                      # 3. nothing — offer the closest names
+    index = [(os.path.basename(p), norm_media_name(os.path.basename(p))) for p, _ in files]
+    cands = []
+    for hit in difflib.get_close_matches(want, [n for _, n in index], n=60, cutoff=0.62):
+        for name, n in index:
+            if n == hit and name not in cands:
+                cands.append(name)
+                break
+        if len(cands) >= 5:
+            break
+    return None, None, cands
+
+
+# ── Attachment spooler (2026-09-25): AGENT mode sends IMAGE PATHS, not pixels.
+#    A browser File object carries no real path, so an image attachment is POSTed
+#    here once, written under ATTACH_DIR and referenced onward as
+#    MEDIA:/abs/path — the convention both this client and the Hermes gateway
+#    already speak, and a path the agent can open itself. The bytes never ride the
+#    agent request. ~/ + env only: this file ships to the public repo.
+ATTACH_DIR = os.environ.get("XLLM_ATTACH_DIR", os.path.expanduser("~/xllm-attachments"))
+ATTACH_IMG_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
+ATTACH_MAX_BYTES = 20 * 1024 * 1024      # per-image cap
+ATTACH_KEEP = 500                        # newest N kept; older pruned on write
+
+
+def safe_attach_name(raw):
+    base = os.path.basename((raw or "image").replace("\\", "/")).strip() or "image"
+    base = re.sub(r"[^A-Za-z0-9._-]+", "_", base)[:80].strip("._-")
+    return base or "image"
+
+
+def prune_attachments(keep=ATTACH_KEEP):
+    try:
+        files = [os.path.join(ATTACH_DIR, n) for n in os.listdir(ATTACH_DIR)]
+        files = [f for f in files if os.path.isfile(f)]
+        if len(files) <= keep:
+            return
+        files.sort(key=lambda f: os.path.getmtime(f))
+        for f in files[: len(files) - keep]:
+            try:
+                os.remove(f)
+            except OSError:
+                pass
+    except OSError:
+        pass
+
+
+def store_attachment(filename, data):
+    """Write `data` under ATTACH_DIR (stamp-prefixed, never overwriting) → absolute path."""
+    os.makedirs(ATTACH_DIR, exist_ok=True)
+    name = time.strftime("%Y%m%d-%H%M%S") + "-" + safe_attach_name(filename)
+    stem, ext = os.path.splitext(name)
+    path = os.path.join(ATTACH_DIR, name)
+    n = 1
+    while os.path.exists(path):
+        n += 1
+        path = os.path.join(ATTACH_DIR, f"{stem}-{n}{ext}")
+    with open(path, "wb") as f:
+        f.write(data)
+    prune_attachments()
+    return path
 
 
 def _load_agent_keys():
@@ -319,6 +464,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if self.path.split("?")[0] == "/api/media":
             self._handle_media()
             return
+        if self.path.split("?")[0] == "/api/music/recent":
+            self._handle_music_recent()
+            return
         if self.path.split("?")[0] == "/api/voices":
             available = q3_health()
             items = [{"name": n,
@@ -346,9 +494,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 if "=" in kv:
                     k, v = kv.split("=", 1)
                     params[k] = unquote(v)
-        resolved = resolve_media_path((params.get("path") or "").strip())
+        resolved, match, cands = resolve_media_path((params.get("path") or "").strip())
         if not resolved:
-            self._json({"error": "media not found"}, 404)
+            err = {"error": "media not found", "path": (params.get("path") or "")}
+            if cands:
+                err["candidates"] = cands          # the player shows "did you mean …"
+            self._json(err, 404)
             return
         ext = os.path.splitext(resolved)[1].lower()
         if ext not in MEDIA_EXTS:
@@ -387,6 +538,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_response(206 if partial else 200)
         self.send_header("Content-Type", ctype)
         self.send_header("Accept-Ranges", "bytes")
+        # What was ACTUALLY served + how it was found (2026-09-25) — the client shows a
+        # name-matched take as "(found as …)" instead of pretending the chat's path was right.
+        self.send_header("X-Media-Path", resolved)
+        self.send_header("X-Media-Match", match or 'exact')
         self.send_header("Content-Length", str(length))
         if partial:
             self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
@@ -410,6 +565,68 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             except Exception:
                 pass
 
+    def _handle_music_recent(self):
+        """The newest audio files across the media roots — the floating player's LIBRARY source.
+
+        2026-09-25, David: "still doesn't play .. rebuild it" — with this, "play our last songs"
+        never depends on a chat naming a path exactly. ?limit=N (default 30, max 200), ?offset=N.
+        """
+        limit, offset = 30, 0
+        qs = self.path.split("?", 1)
+        if len(qs) > 1:
+            for kv in qs[1].split("&"):
+                k, _, v = kv.partition("=")
+                try:
+                    if k == "limit":
+                        limit = max(1, min(200, int(v)))
+                    elif k == "offset":
+                        offset = max(0, int(v))
+                except ValueError:
+                    pass
+        items = []
+        for p, t in media_index():
+            if os.path.splitext(p)[1].lower() not in AUDIO_EXTS:
+                continue
+            low = p.lower()
+            if '/htdemucs/' in low or '/stems' in low:   # separator output, not a song
+                continue
+            stem = os.path.splitext(os.path.basename(p))[0].lower()
+            if stem in STEM_NAMES:               # vocals.wav / drums.wav … not a song
+                continue
+            try:
+                size = os.path.getsize(p)
+            except OSError:
+                size = 0
+            items.append({"path": p, "name": os.path.basename(p),
+                          "folder": os.path.basename(os.path.dirname(p)),
+                          "mtime": int(t), "size": size})
+        self._json({"total": len(items), "offset": offset, "items": items[offset:offset + limit]})
+
+    def _handle_attach(self):
+        """Spool one image attachment and answer with its ABSOLUTE path.
+
+        The body IS the image bytes (same protocol as /api/extract: raw body +
+        X-Filename). Agent mode references the returned path as MEDIA:<path>, so
+        the pixels never travel in the agent request. See ATTACH_DIR.
+        """
+        length = int(self.headers.get("Content-Length", 0) or 0)
+        if length <= 0 or length > ATTACH_MAX_BYTES:
+            self._json({"error": f"body must be 1..{ATTACH_MAX_BYTES} bytes"},
+                       413 if length > ATTACH_MAX_BYTES else 400)
+            return
+        filename = self.headers.get("X-Filename", "image.png")
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in ATTACH_IMG_EXTS:
+            self._json({"error": f"unsupported image type: {ext or '(none)'}"}, 415)
+            return
+        data = self.rfile.read(length)
+        try:
+            path = store_attachment(filename, data)
+        except OSError as e:
+            self._json({"error": f"could not store attachment: {e}"}, 500)
+            return
+        self._json({"path": path, "name": os.path.basename(path), "bytes": len(data)})
+
     def do_POST(self):
         path = self.path.split("?")[0]
         if path == "/api/tts":
@@ -432,6 +649,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return
         if path == "/api/agent/runaction":
             self._handle_agent_runaction()
+            return
+        if path == "/api/attach":
+            self._handle_attach()
             return
         if path != "/api/extract":
             self._json({"error": "not found"}, 404)

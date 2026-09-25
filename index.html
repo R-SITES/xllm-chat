@@ -52,7 +52,7 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .conn-sub{font-size:11px;color:var(--dim);font-weight:400}
 /* Agent avatar (2026-09-24): a user-picked GIF/JPG/PNG for the agent's bubble; preview in the pane. */
 .avatar-row{display:flex;align-items:center;gap:8px;margin-top:6px}
-.avatar-preview{width:44px;height:44px;border-radius:50%;object-fit:cover;border:1px solid var(--border);background:var(--bg3);flex-shrink:0}
+.avatar-preview{width:44px;height:44px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 1px var(--border);background:var(--bg3);flex-shrink:0;transform:translateZ(0);backface-visibility:hidden}
 .source-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:900;min-width:260px;max-width:min(430px,calc(100vw - 32px));background:var(--bg2);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.35);padding:6px;max-height:min(60vh,420px);overflow-y:auto}
 .source-menu[hidden]{display:none}
 .src-group-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);opacity:.85;padding:7px 10px 3px}
@@ -465,7 +465,7 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 /* Chat area shows the background nearly clean (no blur — bubbles are opaque so text stays
    readable); only the chrome surfaces (header/sidebar/input) keep a frost for their own text. */
 body.has-bg .chat-area{background:color-mix(in srgb,var(--bg) 38%,transparent)}
-body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-bg .input-container,body.has-bg .attach-bar{background:color-mix(in srgb,var(--bg) 72%,transparent);backdrop-filter:blur(5px)}
+body.has-bg #musicPanel,body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-bg .input-container,body.has-bg .attach-bar{background:color-mix(in srgb,var(--bg) 72%,transparent);backdrop-filter:blur(5px)}
 .bg-unmute-btn{position:fixed;right:14px;bottom:88px;z-index:1200;width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:rgba(0,0,0,.55);color:#fff;cursor:pointer;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);transition:background .15s}
 .bg-unmute-btn:hover{background:rgba(0,0,0,.8)}
 .bg-type-row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
@@ -508,10 +508,24 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
 .msg.agent .msg-stats{background:color-mix(in srgb,var(--accent) 7%,var(--asstBg));border-radius:0 0 12px 12px}
 .msg.agent .avatar{background:var(--accentBg);color:var(--accent)}
 .agent-head{display:flex;align-items:center;gap:6px;margin:0 0 8px;padding-bottom:6px;border-bottom:1px solid color-mix(in srgb,var(--accent) 25%,var(--border));font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent);user-select:none;line-height:1;white-space:nowrap;overflow:hidden;max-width:100%}
-.agent-head svg{width:44px;height:47px;flex-shrink:0;opacity:.95;margin:0 0 0 -16px}
+.agent-head svg{width:44px;height:46px;flex-shrink:0;opacity:.95;margin:0 0 0 -16px}
 /* Picked agent avatar (2026-09-24): a circle to the LEFT of the agent name, thin theme-aware ring.
-   20px → 30px (too small to read a dark GIF, David 2026-09-25) → 40px ("even larger, a bit larger"). */
-.agent-head-av{width:40px;height:40px;border-radius:50%;object-fit:cover;border:1px solid var(--accentLine);flex-shrink:0;display:block;margin-right:1px}
+   20px → 30px (too small to read a dark GIF, David 2026-09-25) → 40px ("even larger, a bit larger").
+   FLICKER FIX (2026-09-25, David: "weird distracting flickering pixels on the outside of the avatar at
+   the edge of the themed border … shows up sporadically"): the animated GIF used to BE the ringed
+   element, so its own antialiased edge sat flush against the 1px translucent ring and every frame
+   re-blended that boundary — MEASURED on a colour-cycling GIF: the pixel column at the ring's inner
+   edge took 10 different colours across 12 frames. Now the picture is a child, overscanned 1px and
+   clipped by the circle, and the ring is a box-shadow OUTSIDE that clip, so no pixel is ever a mix of
+   picture and ring and a frame update cannot repaint the ring at all. translateZ(0) keeps the whole
+   thing on one stable composited layer. The mark svg is 46px (not 47) so the row's content height is
+   EVEN and flex centering lands this 40px circle on whole pixels instead of y+0.5 — a half-pixel ring
+   is what made the shimmer visible on his 2560x1440 screen. */
+.agent-head-av{width:40px;height:40px;flex-shrink:0;display:block;position:relative;border-radius:50%;overflow:hidden;box-shadow:0 0 0 1px var(--accentLine);transform:translateZ(0);backface-visibility:hidden;margin:0 0 0 1px}
+/* the 1px left margin is load-bearing: .agent-head is overflow:hidden, so a ring drawn OUTSIDE this box
+   needs a pixel of room inside the head or the shadow is clipped away on the avatar's left edge. The
+   right margin went with it, keeping the agent name at the same x it had before (gap 6px). */
+.agent-head-av img{position:absolute;top:-1px;left:-1px;width:calc(100% + 2px);height:calc(100% + 2px);object-fit:cover;display:block;border:0}
 .bubble-content{min-width:0}
 .agent-activity{display:flex;flex-direction:column;gap:2px;margin:10px 0 -2px;padding:8px 10px 2px;border-top:1px solid color-mix(in srgb,var(--accent) 30%,var(--border));background:color-mix(in srgb,var(--accent) 5%,transparent);font-family:ui-monospace,Consolas,Menlo,monospace;font-size:11px;line-height:1.55;max-height:150px;overflow-y:auto;scrollbar-width:thin}
 .agent-activity:empty{display:none}
@@ -712,6 +726,79 @@ body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-b
 .mv-nav:hover{color:var(--accent);border-color:var(--accent)}
 .mv-prev{left:18px}.mv-next{right:18px}
 .mv-box.has-nav .mv-nav{display:flex}
+
+/* ── Session music player + captured playlist (2026-09-25, David's ask) ────────────────────────
+   "if there is music present in the chat flow we should have a session music player with captured
+   session playlist" — a theme-aware floating player + playlist that parks in the empty gutter
+   beside the 820px chat column: drag it by the head, resize it from the corner grip, close the
+   player or just its playlist section. The header icon only appears once the thread has music;
+   while the history panel is open it shifts right, clear of that panel's 280px edge, so it can
+   never be hidden behind it. */
+.music-toggle{display:none}
+.music-toggle.has-music{display:flex}
+.music-toggle.active{background:var(--accentBg);color:var(--accent);border-color:var(--accentLine)}
+.music-toggle.playing{color:var(--accent)}
+/* The history panel is fixed over the header's left end — while it is open the icon rides to its right
+   edge instead of disappearing underneath. MEASURED: the icon's resting left is 109px (burger 16-50,
+   logo 62-97, then the 12px header gap), so +188 lands it at 297 — 17px clear of the panel's 280px edge. */
+body.sidebar-open .music-toggle{transform:translateX(188px)}
+#musicPanel{position:fixed;left:24px;top:112px;width:320px;height:292px;z-index:90;display:none;flex-direction:column;min-width:250px;min-height:220px;border:1px solid var(--border);border-radius:12px;background:var(--bg2);box-shadow:0 10px 34px rgba(0,0,0,.45);overflow:hidden}
+#musicPanel.show{display:flex}
+.mp-head{display:flex;align-items:center;gap:7px;padding:7px 9px;background:var(--bg3);border-bottom:1px solid var(--border);cursor:move;user-select:none;flex-shrink:0;touch-action:none}
+.mp-ico{display:flex;color:var(--accent);flex-shrink:0}
+.mp-ico svg{width:14px;height:14px}
+.mp-title{font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp-count{font-size:10px;color:var(--dim);background:var(--bg2);border:1px solid var(--border);border-radius:999px;padding:1px 7px;flex-shrink:0}
+.mp-hbtn{display:flex;align-items:center;justify-content:center;width:20px;height:20px;flex-shrink:0;padding:0;border:none;background:none;color:var(--dim);border-radius:6px;cursor:pointer;font-size:12px;line-height:1;font-family:var(--font);transition:all .15s}
+.mp-hbtn:hover{color:var(--accent);background:var(--accentBg)}
+.mp-hbtn svg{width:13px;height:13px}
+.mp-hbtn.off{opacity:.85;border:1px dashed var(--accentLine);color:var(--accent)}   /* reads as "a panel is hidden here" */
+.mp-body{display:flex;flex-direction:column;flex:1;min-height:0}
+.mp-nowrow{display:flex;align-items:baseline;gap:8px;padding:8px 10px 0;flex-shrink:0}
+.mp-now{flex:1;min-width:0;font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
+.mp-now.idle{color:var(--dim)}
+.mp-now.err{color:var(--red)}
+.mp-nowrow .mva-time{min-width:0;font-size:10.5px;flex-shrink:0;text-align:left}
+.mp-player{display:flex;align-items:center;gap:8px;padding:6px 10px 9px;flex-shrink:0}
+.mp-step{width:26px;height:26px;border-radius:7px}
+.mp-play{width:32px;height:32px;border-radius:50%;background:var(--accent);border-color:var(--accent);color:#fff;padding-left:1px}
+.mp-play:hover{opacity:.86}
+.mp-pl{display:flex;flex-direction:column;flex:1;min-height:0;border-top:1px solid var(--border)}
+.mp-pl.off{display:none}
+.mp-pl-head{display:flex;align-items:center;gap:6px;padding:4px 6px 4px 9px;font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);flex-shrink:0}
+.mp-pl-t{flex:1}
+.mp-list{flex:1;overflow-y:auto;min-height:84px;padding:0 5px 6px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+/* min-height on BOTH the list and the panel (2026-09-25): David's panel was resized down to 149px tall,
+   so the header + now-line + transport ate every pixel and the queue rendered as a blank band while the
+   count pill still said 201 — "there's NOTHING in the playlist". The floor keeps ~3 rows on screen. */
+.mp-list::-webkit-scrollbar{width:8px}
+.mp-list::-webkit-scrollbar-track{background:transparent}
+.mp-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.mp-row{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:7px;font-size:12px;color:var(--text);cursor:pointer;line-height:1.3}
+.mp-row:hover{background:var(--accentSoft)}
+.mp-row.on{background:var(--accentBg);color:var(--accent)}
+/* A take whose path the chat got wrong (2026-09-25): marked BEFORE it is clicked, with the server's own
+   reason in the tooltip, so the player never has to say the useless "cannot play this file" first. */
+.mp-row.bad .mp-n{color:var(--red);opacity:.85}
+.mp-row.bad .mp-i{color:var(--red)}
+.mp-row.bad:hover{background:color-mix(in srgb,var(--red) 12%,transparent)}
+/* A take the server had to FIND by name (2026-09-25): the chat's path was stale, the file is on disk
+   under another root/name — the row plays, and the ≈ + tooltip say how it was found. */
+.mp-row.found .mp-i{color:var(--accent)}
+.mp-row.lib .mp-f{font-size:10px;color:var(--dim);flex-shrink:0;max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mp-empty{font-size:11px;color:var(--dim);padding:8px 10px}
+.mp-hbtn.active{color:var(--accent);background:var(--accentBg)}
+.mp-i{width:13px;text-align:center;color:var(--dim);font-size:10px;flex-shrink:0}
+.mp-row.on .mp-i{color:var(--accent)}
+.mp-n{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp-grip{position:absolute;right:2px;bottom:2px;width:14px;height:14px;cursor:nwse-resize;touch-action:none;color:var(--dim);opacity:.5;display:flex;align-items:center;justify-content:center}
+.mp-grip:hover{opacity:1;color:var(--accent)}
+/* Playlist hidden (2026-09-25, David: "the mp3 play bottom resize should slide up to the player and not
+   leave the empty space where the playlist used to be"): the panel stops honouring the stored/stretched
+   height and hugs the player row, so its bottom edge — and the grip — ride up with it. The grip goes with
+   it (there is no vertical room left to drag); re-opening the playlist restores the user's own height. */
+#musicPanel.pl-off{height:auto;min-height:0}
+#musicPanel.pl-off .mp-grip{display:none}
 </style>
 <script>
 /* ── Theme engine — head: applies the stored theme BEFORE first paint (no flash). THEMES keys double as localStorage 'chat_theme' values; each key maps 1:1 to CSS custom props (minus 'name'). ── */
@@ -807,7 +894,7 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.4.2</span>
+    <span class="footer-version">xLLM Chat v3.4.3</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -818,6 +905,9 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
   <div class="header-left">
     <button class="sidebar-toggle" onclick="toggleSidebar()" title="Chat History">☰</button>
     <h1><img src="favicon-48.png" alt="xLLM" width="35" height="35"></h1>
+    <button class="icon-btn music-toggle" id="musicToggle" onclick="musicTogglePanel()" title="Session music" aria-label="Session music">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    </button>
   </div>
   <div class="header-center">
     <span class="stat-item" id="statTokSec" style="display:none">
@@ -3271,7 +3361,7 @@ function healLocalModelPin(name) {
 }
 let currentChatId = localStorage.getItem('chat_current_id') || null;
 let conversationHistory = [];
-const APP_VERSION = '3.4.2';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.4.3';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -4446,6 +4536,673 @@ function updateMsgStatsLive() {
   msgStatsEl.innerHTML = statsBarHTML(tokens, elapsed, tps, true, displayModelBadge());
 }
 
+
+// ── Session music player + captured playlist (2026-09-25, David's ask) ─────────────────────────
+// "if there is music present in the chat flow we should have a session music player with captured
+// session playlist" — every audio token the chat already renders as a tile (ACE-Step takes, any
+// mp3/wav path an agent emits) is ALSO a track here, in one floating panel that parks in the empty
+// gutter beside the 820px chat column: drag it by its head, resize it from the corner grip, close
+// it, or close just its playlist section — the icon in the header bar appears the moment the thread
+// has music and toggles the whole thing back. The playlist is CAPTURED, not curated: it re-reads
+// the thread (plus the text still streaming) on every render, so a take that lands mid-run joins
+// the list by itself. Theme-aware through the same custom props as everything else.
+const MUSIC_AUDIO_RE = /\.(?:mp3|wav|m4a|aac|ogg|flac|opus)\b/i;
+const MUSIC_POS_KEY = 'xllm_music_pos';
+const MUSIC_PL_LEGACY_KEY = 'xllm_music_pl';   // only read once, to clear a stale hide flag (2026-09-25)
+const MUSIC_MIN_W = 250, MUSIC_MIN_H = 220;   // tall enough for the header + transport + ~3 queue rows
+const MUSIC_ICON = {
+  note: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+  list: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+  play: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>',
+  pause: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><rect x="7" y="5" width="3.5" height="14" rx="1"/><rect x="13.5" y="5" width="3.5" height="14" rx="1"/></svg>',
+  back: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M11 12l8.5-7v14zM5.5 5h2.2v14H5.5z"/></svg>',
+  fwd: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M13 12L4.5 5v14zM16.3 5h2.2v14h-2.2z"/></svg>',
+  grip: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M9 2.2 2.2 9M9 6.4 6.4 9"/></svg>',
+  lib: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h3.4v16H4zM9.4 4h3.4v16H9.4zM16 4.9l3.7 1-4.3 15.1-3.7-1z"/></svg>'
+};
+let _musicTracks = [];        // [{path, name, url}] in session order (first appearance wins)
+let _musicIdx = -1;           // index of the track loaded in the engine (-1 = nothing loaded)
+let _musicPath = null;        // that track's identity (the resolved ?path= value)
+let _musicLiveText = '';      // text of the message still streaming (not yet in conversationHistory)
+let _musicScanTimer = 0, _musicRaf = 0, _musicEl = null;
+let _musicBox = { l: 0, t: 112, w: 320, h: 292 };
+let _musicHealth = {};          // path -> {ok, reason} — which takes really resolve on disk
+let _musicProbed = new Set();   // paths already asked about (so a rescan never re-probes)
+let _musicExtra = [];           // takes picked from the LIBRARY — they must survive a session rescan
+let _musicSource = 'session';   // 'session' (captured from the chat) | 'library' (newest on disk)
+let _musicPlOn = true;          // playlist section visible — NOT persisted (David 2026-09-25: "i see no
+                                // playlist items" after a refresh, because an old hide flag outlived the load)
+let _musicLib = null;           // {items:[{path,name,folder,mtime,size}], total} from /api/music/recent
+
+// ── "Is this take really there?" (2026-09-25, David: "i see cannot play this file message in the floating
+//    mp3 player lmao") — MEASURED cause in his Good Times thread: the chat's MEDIA: line had run past its
+//    line break, so ONE playlist row held five paths at once; /api/media answered 404 "media not found" and
+//    the player could only say "cannot play this file". Now every new take is probed once with a 2-byte
+//    Range GET: bad paths are marked in the list in red BEFORE they are clicked, the tooltip carries the
+//    server's own words ("media not found", "media too large (…)"), and a failed play names the take.
+function musicProbe(track) {
+  return fetch(track.url, { headers: { Range: 'bytes=0-1' } })
+    .then(async (r) => {
+      const out = { ok: !!(r.ok || r.status === 206), reason: '', match: '', resolved: '', candidates: [] };
+      try {
+        out.match = r.headers.get('X-Media-Match') || '';
+        out.resolved = r.headers.get('X-Media-Path') || '';
+      } catch (e) {}
+      if (out.ok && out.match && out.match !== 'exact' && out.resolved) {
+        // The server served a DIFFERENT file than the chat named (moved / renamed / other root). Show the
+        // real name in the list — the row can play, it was just filed under another name (2026-09-25).
+        const real = String(out.resolved).split('/').pop();
+        if (real && real !== track.name) { track.matchedFrom = track.name; track.name = real; }
+        out.matchedFrom = track.matchedFrom || '';
+      }
+      if (!out.ok) {
+        let why = '';
+        try {
+          const j = await r.json();
+          why = (j && j.error) ? String(j.error) : '';
+          out.candidates = (j && j.candidates) ? j.candidates : [];
+        } catch (e) {}
+        out.reason = why || ('HTTP ' + r.status);
+      }
+      _musicHealth[track.path] = out;
+      musicPaintList();
+      const cur = _musicTracks[_musicIdx];
+      const now = document.getElementById('mpNow');
+      if (cur && cur.path === track.path && now) {
+        if (!out.ok) {
+          now.textContent = 'cannot play ' + track.name + (out.reason ? ' — ' + out.reason : '')
+                          + (out.candidates.length ? ' — closest: ' + out.candidates.slice(0, 3).join(', ') : '');
+          now.title = track.path;
+          now.classList.remove('idle');
+          now.classList.add('err');
+        } else {
+          musicPaintNow();
+        }
+      }
+      return out;
+    })
+    .catch(() => {
+      // Server unreachable is NOT a verdict — leave the take unmarked and let the next scan ask again.
+      _musicProbed.delete(track.path);
+    });
+}
+function musicProbeMissing() {
+  _musicTracks.forEach(t => {
+    if (_musicHealth[t.path] || _musicProbed.has(t.path)) return;
+    _musicProbed.add(t.path);
+    musicProbe(t);
+  });
+}
+
+function musicHiddenKey() { return 'xllm_music_hidden_' + (currentChatId || 'draft'); }
+function musicIsHidden() { try { return localStorage.getItem(musicHiddenKey()) === '1'; } catch (e) { return false; } }
+function musicShown() { const p = document.getElementById('musicPanel'); return !!p && p.classList.contains('show'); }
+
+// ── capture: the session's audio tokens, in order ──────────────────────────────────────────────
+function musicCollectTracks() {
+  const out = [], seen = new Set();
+  const add = (text) => {
+    if (!text || !MUSIC_AUDIO_RE.test(text)) return;
+    let toks = [];
+    try { toks = mediaTokensIn(text); } catch (e) { return; }
+    for (const tok of toks) {
+      if (mediaKindOf(tok) !== 'audio') continue;
+      const path = mediaKeyOf(mediaApiUrl(tok));
+      if (!path || seen.has(path)) continue;
+      seen.add(path);
+      out.push({ path: path, name: mediaBaseName(tok), url: mediaApiUrl(tok) });
+    }
+  };
+  (conversationHistory || []).forEach(m => add(m && m.content));
+  add(_musicLiveText);      // the run in flight — a take joins the list as it lands
+  return out;
+}
+function musicAllTracks(sessionTracks) {
+  // The queue = what the thread captured + any take picked from the LIBRARY (extras survive a rescan,
+  // which is what keeps "play our last songs" working in a thread whose chat names nothing useful).
+  const out = (sessionTracks || []).slice();
+  _musicExtra.forEach(e => { if (!out.some(t => t.path === e.path)) out.push(e); });
+  return out;
+}
+function musicSessionScan() {
+  const tracks = musicAllTracks(musicCollectTracks());
+  const same = tracks.length === _musicTracks.length && tracks.every((t, i) => t.path === _musicTracks[i].path);
+  if (same) {
+    // "same" also covers an empty queue — a silent thread must still take the panel away.
+    if (!tracks.length) musicSetShown(false, false);
+    musicPaintToggle();
+    return;
+  }
+  const first = _musicTracks.length === 0;
+  _musicTracks = tracks;
+  if (_musicPath) {
+    const i = tracks.findIndex(t => t.path === _musicPath);
+    if (i < 0) musicStop();                       // the take it was playing left the thread
+    else _musicIdx = i;
+  } else if (_musicIdx >= tracks.length) {
+    _musicIdx = -1;
+  }
+  musicPaintList(); musicPaintNow(); musicPaintToggle();
+  musicProbeMissing();          // mark takes whose path does not resolve, before he clicks them
+  if (!tracks.length) { musicSetShown(false, false); return; }   // nothing to play here → panel goes
+  if (!musicShown() && (first || !musicIsHidden())) musicSetShown(true, false);
+}
+function musicScheduleScan() {
+  if (_musicScanTimer) clearTimeout(_musicScanTimer);
+  _musicScanTimer = setTimeout(() => { _musicScanTimer = 0; musicSessionScan(); }, 450);
+}
+// A thread switch must NOT carry the old thread's queue or playback.
+function musicThreadChanged() {
+  musicStop();
+  _musicLiveText = '';
+  _musicTracks = []; _musicIdx = -1;
+  _musicHealth = {}; _musicProbed = new Set();   // verdicts belong to the thread they came from
+  _musicExtra = [];                              // library picks too — a queue belongs to its thread
+  try { localStorage.removeItem('xllm_music_hidden_draft'); } catch (e) {}
+  musicPaintList(); musicPaintNow(); musicPaintToggle();
+  musicSessionScan();
+}
+
+// ── the engine (one hidden <audio> that keeps playing while the panel is closed) ───────────────
+function musicEngine() {
+  if (_musicEl) return _musicEl;
+  const el = document.createElement('audio');
+  el.preload = 'metadata';
+  el.style.display = 'none';
+  const host = document.getElementById('musicPanel') || document.body;
+  host.appendChild(el);
+  el.addEventListener('ended', () => {
+    if (_musicIdx >= 0 && _musicIdx < _musicTracks.length - 1) musicStep(1);   // steps over missing takes
+    else musicSync();                              // last take: the bar settles at the end
+  });
+  el.addEventListener('error', () => {
+    const now = document.getElementById('mpNow');
+    const t = _musicTracks[_musicIdx];
+    const why = musicMediaErrorReason(el);
+    // An AUTOMATIC pick that dies (a take the chat named that is not on disk) hops to the next playable
+    // take instead of stopping the music — pressing play must make sound (2026-09-25).
+    if (_musicAuto && t) {
+      const next = musicPickPlayable(_musicIdx + 1);
+      if (next >= 0 && next !== _musicIdx) {
+        delete _musicHealth[t.path];
+        _musicProbed.delete(t.path);
+        musicProbe(t);                     // keep the red mark on the row itself honest
+        musicPlay(next, { auto: true });
+        return;
+      }
+    }
+    if (!t) {
+      if (now) { now.textContent = 'cannot play this file — ' + why; now.classList.add('err'); }
+      return;
+    }
+    // Name the take and ask the server WHY (2026-09-25) — "cannot play this file" alone sent David hunting.
+    delete _musicHealth[t.path];
+    _musicProbed.delete(t.path);
+    if (now) {
+      now.textContent = 'cannot play ' + t.name + ' — ' + why;
+      now.title = t.path;
+      now.classList.remove('idle');
+      now.classList.add('err');
+    }
+    musicProbe(t);
+  });
+  el.addEventListener('play', () => { musicPaintNow(); musicPaintTransport(); musicPaintList(); musicPaintToggle(); musicTick(); });
+  el.addEventListener('pause', () => {
+    _musicPlayToken++;                                   // a pause is deliberate: cancel the stall check
+    if (_musicStartTimer) { clearTimeout(_musicStartTimer); _musicStartTimer = 0; }
+    musicPaintTransport(); musicPaintList(); musicPaintToggle(); musicSync();
+  });
+  el.addEventListener('loadedmetadata', musicSync);
+  el.addEventListener('durationchange', musicSync);
+  el.addEventListener('timeupdate', musicSync);
+  el.addEventListener('seeking', musicSync);
+  _musicEl = el;
+  return el;
+}
+function musicTick() {
+  if (_musicRaf) return;
+  const step = () => {
+    musicSync();
+    _musicRaf = (_musicEl && !_musicEl.paused) ? requestAnimationFrame(step) : 0;
+  };
+  _musicRaf = requestAnimationFrame(step);
+}
+function musicSync() {
+  const el = _musicEl;
+  if (!el) return;
+  const fill = document.getElementById('mpFill'), knob = document.getElementById('mpKnob'), t = document.getElementById('mpTime');
+  const d = el.duration, cur = el.currentTime || 0;
+  const pct = (isFinite(d) && d > 0) ? Math.min(100, Math.max(0, cur / d * 100)) : 0;
+  if (fill) fill.style.width = pct + '%';
+  if (knob) knob.style.left = pct + '%';
+  if (t) t.textContent = fmtMediaTime(cur) + ' / ' + fmtMediaTime(d);
+}
+function musicResetBar() {
+  const fill = document.getElementById('mpFill'), knob = document.getElementById('mpKnob'), t = document.getElementById('mpTime');
+  if (fill) fill.style.width = '0%';
+  if (knob) knob.style.left = '0%';
+  if (t) t.textContent = '--:-- / --:--';
+}
+function musicPlay(i, opts) {
+  if (i < 0 || i >= _musicTracks.length) return;
+  const track = _musicTracks[i], el = musicEngine();
+  _musicAuto = !!(opts && opts.auto);      // an automatic pick may hop over a dead take (see the error handler)
+  _musicIdx = i;
+  const now = document.getElementById('mpNow');
+  if (now) { now.classList.remove('err'); now.classList.add('idle'); }
+  if (_musicPath !== track.path) { _musicPath = track.path; el.src = track.url; musicResetBar(); }
+  musicPaintNow(); musicPaintList(); musicPaintTransport(); musicPaintToggle();
+  musicAttemptPlay(el, track);
+}
+// Which take should play when the user just hits play? The first one that is not KNOWN to be missing
+// (2026-09-25 — David's recycled thread listed a dead take FIRST, so play/next kept walking into the one
+// red row and the button looked broken). Every take is still clickable; only the automatic pick steps over.
+function musicPickPlayable(from) {
+  const n = _musicTracks.length;
+  if (!n) return -1;
+  const start = (from == null || from < 0) ? 0 : ((from % n) + n) % n;
+  for (let k = 0; k < n; k++) {
+    const i = (start + k) % n;
+    const h = _musicHealth[_musicTracks[i].path];
+    if (!(h && h.ok === false)) return i;
+  }
+  return start;   // everything is flagged — try it anyway and let the message speak
+}
+function musicTogglePlay() {
+  const el = musicEngine();
+  if (_musicIdx < 0 || !_musicPath) {
+    // Nothing loaded: play the first row of whatever the panel is SHOWING — the library included, so the
+    // round button is never a dead end (2026-09-25).
+    if (_musicSource === 'library' && _musicLib && _musicLib.items && _musicLib.items.length) {
+      const it = _musicLib.items[0];
+      musicPlayPath(it.path, it.name);
+      return;
+    }
+    const pick = musicPickPlayable(0);
+    if (pick >= 0) musicPlay(pick, { auto: true });
+    return;
+  }
+  if (el.paused) musicAttemptPlay(el, _musicTracks[_musicIdx]);
+  else el.pause();
+}
+function musicStep(d) {
+  if (!_musicTracks.length) return;
+  if (_musicIdx < 0) { const p = musicPickPlayable(0); if (p >= 0) musicPlay(p, { auto: true }); return; }
+  const n = _musicTracks.length;
+  let i = _musicIdx;
+  for (let k = 0; k < n; k++) {
+    i = (((i + d) % n) + n) % n;
+    const h = _musicHealth[_musicTracks[i].path];
+    if (!(h && h.ok === false)) { musicPlay(i, { auto: true }); return; }
+  }
+  musicPlay(i, { auto: true });   // nothing healthy to step to — play the last one tried
+}
+function musicPrev() {
+  const el = _musicEl;
+  if (el && !el.paused && (el.currentTime || 0) > 3) { el.currentTime = 0; return; }   // restart the take
+  musicStep(-1);
+}
+function musicStop() {
+  if (_musicEl) {
+    try { _musicEl.pause(); } catch (e) {}
+    try { _musicEl.removeAttribute('src'); _musicEl.load(); } catch (e) {}
+  }
+  _musicPath = null; _musicIdx = -1;
+  musicResetBar(); musicPaintNow(); musicPaintList(); musicPaintTransport(); musicPaintToggle();
+}
+// Two takes at once is chaos — the floating player yields to the media viewer's audition.
+function musicPauseForViewer() { if (_musicEl && !_musicEl.paused) _musicEl.pause(); }
+
+// ── Never fail silently (2026-09-25, David: "when i hit the play button NOTHING happens"). Every way a
+//    play attempt can die now says so in the now-line: a rejected play() promise names the browser's
+//    reason (NotAllowedError = the page is blocked from playing sound), a media element error reports
+//    its code, and a play() that resolves but never starts reports that too.
+let _musicPlayToken = 0, _musicStartTimer = 0, _musicAuto = false;
+function musicPlayFailed(track, why) {
+  const now = document.getElementById('mpNow');
+  if (now) {
+    now.textContent = 'cannot play ' + (track ? track.name : 'this file') + ' — ' + why;
+    if (track) now.title = track.path;
+    now.classList.remove('idle');
+    now.classList.add('err');
+  }
+  musicPaintToggle();
+}
+function musicPlayRejectReason(err) {
+  const n = (err && err.name) || 'Error';
+  if (n === 'NotAllowedError') return 'the browser blocked sound for this page (allow audio for this site)';
+  if (n === 'NotSupportedError') return 'this browser cannot play that format';
+  if (n === 'AbortError') return 'playback was interrupted';
+  return n + (err && err.message ? ': ' + err.message : '');
+}
+function musicMediaErrorReason(el) {
+  const c = el && el.error ? el.error.code : 0;
+  return { 1: 'loading aborted', 2: 'network error reading the file', 3: 'decode error in the file',
+           4: 'this browser cannot play that format', 0: 'the file could not be loaded' }[c]
+         || 'the file could not be loaded';
+}
+function musicAttemptPlay(el, track) {
+  const token = ++_musicPlayToken;
+  let p = null;
+  try { p = el.play(); } catch (e) { musicPlayFailed(track, musicPlayRejectReason(e)); return; }
+  if (p && p.catch) p.catch(err => { if (token === _musicPlayToken) musicPlayFailed(track, musicPlayRejectReason(err)); });
+  if (_musicStartTimer) clearTimeout(_musicStartTimer);
+  _musicStartTimer = setTimeout(() => {
+    if (token !== _musicPlayToken) return;
+    const a = _musicEl;
+    if (!a) return;
+    if (a.paused && !a.error) musicPlayFailed(track, 'playback did not start (the browser may be holding it back)');
+    else if (a.error) musicPlayFailed(track, musicMediaErrorReason(a));
+  }, 2500);
+}
+function musicSetCount(n) { const c = document.getElementById('mpCount'); if (c) c.textContent = String(n); }
+function musicPaintList() {
+  const list = document.getElementById('mpList');
+  if (!list) return;
+  if (_musicSource === 'library') { musicPaintLibrary(); return; }
+  if (!_musicTracks.length) { list.innerHTML = '<div class="mp-empty">No music in this session</div>'; musicSetCount(0); return; }
+  const playing = !!( _musicEl && !_musicEl.paused);
+  list.innerHTML = _musicTracks.map((t, i) => {
+    const on = i === _musicIdx;
+    const h = _musicHealth[t.path];
+    const bad = !!(h && h.ok === false);
+    const found = !!(h && h.ok && h.match && h.match !== 'exact');
+    let tip = t.name;
+    if (found && t.matchedFrom) tip += ' — found on disk by name (the chat said ' + t.matchedFrom + ')';
+    if (bad) tip += ' — ' + (h.reason || 'unplayable')
+                 + ((h.candidates && h.candidates.length) ? ' — closest: ' + h.candidates.join(', ') : '');
+    const marker = bad ? '!' : (found ? '&#8776;' : ((on && playing) ? '&#9654;' : (i + 1)));
+    return '<div class="mp-row' + (on ? ' on' : '') + (bad ? ' bad' : '') + (found ? ' found' : '') + '" data-i="' + i + '" title="' + escAttr(tip) + '">'
+         + '<span class="mp-i">' + marker + '</span>'
+         + '<span class="mp-n">' + escHtml(t.name) + '</span>'
+         + '</div>';
+  }).join('');
+  musicSetCount(_musicTracks.length);
+}
+// ── LIBRARY source (2026-09-25, David: "still doesn't play .. rebuild it") ────────────────────────
+// "Play our last songs" no longer depends on the CHAT naming a path exactly: the same panel can list the
+// newest audio files the server finds under the media roots (/api/music/recent walks ~/Music, ~/Downloads,
+// ~/song-factory… newest first). A pick joins the queue as an extra take, so prev/next/seek work on it.
+function musicPaintLibrary() {
+  const list = document.getElementById('mpList');
+  if (!list) return;
+  if (!_musicLib) { list.innerHTML = '<div class="mp-empty">Reading the library…</div>'; return; }
+  const items = _musicLib.items || [];
+  if (!items.length) { list.innerHTML = '<div class="mp-empty">No music found on disk</div>'; musicSetCount(0); return; }
+  const playing = !!(_musicEl && !_musicEl.paused);
+  list.innerHTML = items.map((it, i) => {
+    const on = _musicPath === it.path;
+    return '<div class="mp-row lib' + (on ? ' on' : '') + '" data-lib="' + i + '" title="' + escAttr(it.path) + '">'
+         + '<span class="mp-i">' + ((on && playing) ? '&#9654;' : (i + 1)) + '</span>'
+         + '<span class="mp-n">' + escHtml(it.name) + '</span>'
+         + (it.folder ? '<span class="mp-f">' + escHtml(it.folder) + '</span>' : '')
+         + '</div>';
+  }).join('');
+  musicSetCount(items.length);
+}
+function musicLoadLibrary(force) {
+  if (_musicLib && !force) { musicPaintList(); return Promise.resolve(_musicLib); }
+  return fetch('/api/music/recent?limit=60')
+    .then(r => r.json())
+    .then(j => { _musicLib = { items: (j && j.items) || [], total: (j && j.total) || 0 }; musicPaintList(); return _musicLib; })
+    .catch(() => { _musicLib = { items: [], total: 0 }; musicPaintList(); return _musicLib; });
+}
+function musicSetSource(src, explicit) {
+  _musicSource = (src === 'library') ? 'library' : 'session';
+  const t = document.getElementById('mpPlT');
+  if (t) t.textContent = (_musicSource === 'library') ? 'Library — newest first' : 'Playlist';
+  const b = document.getElementById('mpLibBtn');
+  if (b) {
+    b.classList.toggle('active', _musicSource === 'library');
+    b.title = (_musicSource === 'library') ? 'Back to this session\u2019s playlist' : 'Library \u2014 the newest files on disk';
+  }
+  if (_musicSource === 'library') musicLoadLibrary(false); else musicPaintList();
+  if (explicit) { try { localStorage.setItem('xllm_music_src', _musicSource); } catch (e) {} }
+}
+function musicPlayPath(path, name) {
+  let i = _musicTracks.findIndex(t => t.path === path);
+  if (i < 0) {
+    _musicExtra.push({ path: path, name: name || String(path).split('/').pop(),
+                       url: '/api/media?path=' + encodeURIComponent(path) });
+    _musicTracks = musicAllTracks(musicCollectTracks());
+    i = _musicTracks.findIndex(t => t.path === path);
+  }
+  if (i < 0) return;
+  musicPlay(i);
+  musicPaintList();
+}
+function musicPaintNow() {
+  const now = document.getElementById('mpNow');
+  if (!now) return;
+  now.classList.remove('err');
+  const t = _musicTracks[_musicIdx];
+  if (t) {
+    now.textContent = t.name;
+    now.title = t.matchedFrom ? (t.matchedFrom + ' \u2192 ' + t.name) : t.name;
+    now.classList.remove('idle');
+  } else {
+    now.textContent = _musicTracks.length ? 'Pick a take' : 'No music in this session';
+    now.removeAttribute('title');
+    now.classList.add('idle');
+  }
+}
+function musicPaintTransport() {
+  const b = document.getElementById('mpPlay');
+  if (!b) return;
+  const playing = !!(_musicEl && !_musicEl.paused);
+  b.innerHTML = playing ? MUSIC_ICON.pause : MUSIC_ICON.play;
+  b.title = playing ? 'Pause' : 'Play';
+}
+function musicPaintToggle() {
+  const b = document.getElementById('musicToggle');
+  if (!b) return;
+  const n = _musicTracks.length;
+  b.classList.toggle('has-music', n > 0);
+  b.classList.toggle('active', n > 0 && musicShown());
+  b.classList.toggle('playing', !!(_musicEl && !_musicEl.paused));
+  b.title = n
+    ? 'Session music — ' + n + ' track' + (n > 1 ? 's' : '') + (musicShown() ? ' (hide the player)' : ' (show the player)')
+    : 'Session music';
+}
+
+// ── show / hide / geometry ────────────────────────────────────────────────────────────────────
+function musicSetShown(on, explicit) {
+  const p = document.getElementById('musicPanel');
+  if (!p) return;
+  p.classList.toggle('show', !!on);
+  if (explicit) { try { on ? localStorage.removeItem(musicHiddenKey()) : localStorage.setItem(musicHiddenKey(), '1'); } catch (e) {} }
+  if (on) musicApplyBox(_musicBox.l, _musicBox.t, _musicBox.w, _musicBox.h, false);
+  musicPaintToggle();
+}
+function musicTogglePanel() {
+  if (!_musicTracks.length) return;
+  musicSetShown(!musicShown(), true);
+}
+function musicSaveBox() { try { localStorage.setItem(MUSIC_POS_KEY, JSON.stringify(_musicBox)); } catch (e) {} }
+function musicApplyBox(l, t, w, h, save) {
+  const p = document.getElementById('musicPanel');
+  if (!p) return;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  if (w != null || h != null) {
+    _musicBox.w = Math.min(Math.max(w != null ? w : _musicBox.w, MUSIC_MIN_W), Math.max(MUSIC_MIN_W, vw - 24));
+    _musicBox.h = Math.min(Math.max(h != null ? h : _musicBox.h, MUSIC_MIN_H), Math.max(MUSIC_MIN_H, vh - 24));
+  }
+  if (l != null || t != null) {
+    _musicBox.l = Math.min(Math.max(l != null ? l : _musicBox.l, -_musicBox.w + 110), Math.max(8, vw - 56));
+    _musicBox.t = Math.min(Math.max(t != null ? t : _musicBox.t, 8), Math.max(8, vh - 46));
+  }
+  p.style.width = _musicBox.w + 'px';
+  if (!p.classList.contains('pl-off')) p.style.height = _musicBox.h + 'px';   // hidden playlist → hug the player
+  p.style.left = Math.round(_musicBox.l) + 'px';
+  p.style.top = Math.round(_musicBox.t) + 'px';
+  if (save) musicSaveBox();
+}
+function musicSetPlaylist(on, explicit) {
+  const pl = document.getElementById('mpPl'), btn = document.getElementById('mpPlBtn');
+  const p = document.getElementById('musicPanel');
+  if (pl) pl.classList.toggle('off', !on);
+  if (p) {
+    // Hidden playlist = the panel hugs the player: clear the inline height so #musicPanel.pl-off's
+    // `height:auto` wins, and put the user's own height back the moment it returns (2026-09-25).
+    p.classList.toggle('pl-off', !on);
+    if (on) p.style.height = _musicBox.h + 'px';
+    else p.style.height = '';
+  }
+  if (btn) { btn.classList.toggle('off', !on); btn.title = on ? 'Hide the playlist' : 'Show the playlist'; }
+  _musicPlOn = !!on;
+  if (explicit) { try { localStorage.removeItem(MUSIC_PL_LEGACY_KEY); } catch (e) {} }
+}
+// The history panel is fixed over the header's left end — while it is open the icon rides to its
+// right edge instead of disappearing underneath it.
+function musicSyncPanelOffset() {
+  const sb = document.getElementById('sidebar');
+  document.body.classList.toggle('sidebar-open', !!(sb && sb.classList.contains('open')));
+}
+
+// ── build + wire (runs at parse time; every node it touches is already in the DOM) ────────────
+function musicInit() {
+  if (document.getElementById('musicPanel')) return;
+  const p = document.createElement('div');
+  p.id = 'musicPanel';
+  p.innerHTML =
+      '<div class="mp-head" id="mpHead">'
+    +   '<span class="mp-ico">' + MUSIC_ICON.note + '</span>'
+    +   '<span class="mp-title">Session Music</span>'
+    +   '<span class="mp-count" id="mpCount">0</span>'
+    +   '<button class="mp-hbtn" id="mpLibBtn" title="Library — the newest files on disk">' + MUSIC_ICON.lib + '</button>'
+    +   '<button class="mp-hbtn" id="mpPlBtn" title="Hide the playlist">' + MUSIC_ICON.list + '</button>'
+    +   '<button class="mp-hbtn" id="mpClose" title="Close the player — playback keeps going">&#10005;</button>'
+    + '</div>'
+    + '<div class="mp-body">'
+    +   '<div class="mp-nowrow"><span class="mp-now idle" id="mpNow">No music in this session</span><span class="mva-time" id="mpTime">--:-- / --:--</span></div>'
+    +   '<div class="mp-player">'
+    +     '<button class="mva-btn mp-step" id="mpPrev" title="Previous take">' + MUSIC_ICON.back + '</button>'
+    +     '<button class="mva-btn mp-play" id="mpPlay" title="Play / pause">' + MUSIC_ICON.play + '</button>'
+    +     '<button class="mva-btn mp-step" id="mpNext" title="Next take">' + MUSIC_ICON.fwd + '</button>'
+    +     '<div class="mva-seek" id="mpSeek" title="Click or drag to seek"><div class="mva-track"><div class="mva-fill" id="mpFill"></div></div><div class="mva-knob" id="mpKnob"></div></div>'
+    +   '</div>'
+    +   '<div class="mp-pl" id="mpPl">'
+    +   '<div class="mp-pl-head"><span class="mp-pl-t" id="mpPlT">Playlist</span><button class="mp-hbtn" id="mpPlClose" title="Close the playlist">&#10005;</button></div>'
+    +     '<div class="mp-list" id="mpList"></div>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="mp-grip" id="mpGrip" title="Drag to resize">' + MUSIC_ICON.grip + '</div>';
+  document.body.appendChild(p);
+
+  let geo = null;
+  try { geo = JSON.parse(localStorage.getItem(MUSIC_POS_KEY) || 'null'); } catch (e) {}
+  if (geo && typeof geo === 'object') {
+    _musicBox.w = geo.w || _musicBox.w; _musicBox.h = geo.h || _musicBox.h;
+    _musicBox.l = (typeof geo.l === 'number') ? geo.l : Math.max(16, window.innerWidth - _musicBox.w - 24);
+    _musicBox.t = (typeof geo.t === 'number') ? geo.t : _musicBox.t;
+  } else {
+    _musicBox.l = Math.max(16, window.innerWidth - _musicBox.w - 24);   // park in the right gutter
+  }
+  musicApplyBox(_musicBox.l, _musicBox.t, _musicBox.w, _musicBox.h, false);
+
+  try { localStorage.removeItem(MUSIC_PL_LEGACY_KEY); } catch (e) {}   // a stale "playlist hidden" flag
+  musicSetPlaylist(_musicPlOn, false);   // page-lifetime state: every load starts with the list VISIBLE
+  let src = 'session';
+  try { src = localStorage.getItem('xllm_music_src') || 'session'; } catch (e) {}
+  if (src === 'library') musicSetSource('library', false);   // he left it on the library last time
+
+  document.getElementById('mpPlay').addEventListener('click', musicTogglePlay);
+  document.getElementById('mpNext').addEventListener('click', () => musicStep(1));
+  document.getElementById('mpPrev').addEventListener('click', musicPrev);
+  document.getElementById('mpList').addEventListener('click', (e) => {
+    const row = e.target.closest('.mp-row');
+    if (!row) return;
+    if (row.dataset.lib !== undefined) {          // LIBRARY source: play straight off disk
+      const it = (_musicLib && _musicLib.items && _musicLib.items[parseInt(row.dataset.lib, 10)]) || null;
+      if (it) musicPlayPath(it.path, it.name);
+      return;
+    }
+    const i = parseInt(row.dataset.i, 10);
+    // A row flagged as missing still plays on click — the file may have appeared since, and the server
+    // now falls back to a name search before it gives up — but the old verdict is dropped first
+    // so the mark cannot lie (2026-09-25).
+    if (row.classList.contains('bad') && _musicTracks[i]) {
+      delete _musicHealth[_musicTracks[i].path];
+      _musicProbed.delete(_musicTracks[i].path);
+      musicPaintList();
+    }
+    musicPlay(i);
+  });
+  document.getElementById('mpLibBtn').addEventListener('click', () => {
+    musicSetSource(_musicSource === 'library' ? 'session' : 'library', true);
+  });
+  document.getElementById('mpClose').addEventListener('click', () => { musicSetShown(false, true); musicSaveBox(); });
+  document.getElementById('mpPlClose').addEventListener('click', () => musicSetPlaylist(false, true));
+  document.getElementById('mpPlBtn').addEventListener('click', () => {
+    const pl = document.getElementById('mpPl');
+    musicSetPlaylist(!!(pl && pl.classList.contains('off')), true);
+  });
+  // seek: click or drag anywhere on the bar (the fill IS the play position, never a buffer shade)
+  const seek = document.getElementById('mpSeek');
+  const seekToX = (clientX) => {
+    const el = _musicEl, d = el && el.duration;
+    if (!el || !isFinite(d) || d <= 0) return;
+    const r = seek.getBoundingClientRect();
+    if (!r.width) return;
+    el.currentTime = Math.min(1, Math.max(0, (clientX - r.left) / r.width)) * d;
+    musicSync();
+  };
+  seek.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    try { seek.setPointerCapture(e.pointerId); } catch (_) {}
+    seekToX(e.clientX);
+  });
+  seek.addEventListener('pointermove', (e) => {
+    let held = false;
+    try { held = seek.hasPointerCapture(e.pointerId); } catch (_) {}
+    if (held) seekToX(e.clientX);
+  });
+  seek.addEventListener('pointerup', (e) => { try { seek.releasePointerCapture(e.pointerId); } catch (_) {} });
+
+  // drag by the head (buttons in it stay clickable), resize from the corner grip
+  const head = document.getElementById('mpHead');
+  head.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button')) return;
+    e.preventDefault();
+    const offX = e.clientX - _musicBox.l, offY = e.clientY - _musicBox.t;
+    try { head.setPointerCapture(e.pointerId); } catch (_) {}
+    const move = (ev) => musicApplyBox(ev.clientX - offX, ev.clientY - offY, null, null, false);
+    const up = (ev) => {
+      head.removeEventListener('pointermove', move);
+      head.removeEventListener('pointerup', up);
+      head.removeEventListener('pointercancel', up);
+      try { head.releasePointerCapture(ev.pointerId); } catch (_) {}
+      musicSaveBox();
+    };
+    head.addEventListener('pointermove', move);
+    head.addEventListener('pointerup', up);
+    head.addEventListener('pointercancel', up);
+  });
+  const grip = document.getElementById('mpGrip');
+  grip.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const x0 = e.clientX, y0 = e.clientY, w0 = _musicBox.w, h0 = _musicBox.h;
+    try { grip.setPointerCapture(e.pointerId); } catch (_) {}
+    const move = (ev) => musicApplyBox(null, null, w0 + (ev.clientX - x0), h0 + (ev.clientY - y0), false);
+    const up = (ev) => {
+      grip.removeEventListener('pointermove', move);
+      grip.removeEventListener('pointerup', up);
+      grip.removeEventListener('pointercancel', up);
+      try { grip.releasePointerCapture(ev.pointerId); } catch (_) {}
+      musicSaveBox();
+    };
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', up);
+    grip.addEventListener('pointercancel', up);
+  });
+  window.addEventListener('resize', () => musicApplyBox(_musicBox.l, _musicBox.t, null, null, false));
+}
+musicInit();
+musicSyncPanelOffset();
+try {
+  const _sb = document.getElementById('sidebar');
+  if (_sb) new MutationObserver(musicSyncPanelOffset).observe(_sb, { attributes: true, attributeFilter: ['class'] });
+} catch (e) {}
 
 document.addEventListener('DOMContentLoaded', () => {
   const input = document.getElementById('chatInput');
@@ -5631,6 +6388,7 @@ function newChat() {
   currentChatId = null;
   conversationHistory = [];
   chatAgentSessions = {};   // new thread = fresh agent sessions (keep-alive continuity per thread)
+  musicThreadChanged();   // a fresh thread has no queue and no playback (2026-09-25)
   updateTokenBar();
   resetJumpIndex();
   // New threads inherit the last known system prompt (2026-08-18)
@@ -5671,6 +6429,7 @@ function loadConversation(chatId) {
   currentChatId = chatId;
   localStorage.setItem('chat_current_id', chatId);
   conversationHistory = JSON.parse(JSON.stringify(chat.messages || []));
+  musicThreadChanged();   // capture THIS thread's music, drop the previous thread's playback
   chatAgentSessions = (chat.agentSessions && typeof chat.agentSessions === 'object') ? chat.agentSessions : {};
   updateTokenBar();
   // Per-thread system prompt: the thread's own if it has one, else last-known.
@@ -6648,7 +7407,8 @@ function agentAvatarUseBlob(blob) {
 // The avatar rides in the response HEAD, to the left of the agent name: (avatar) HERMES (mark) — David's
 // ask, 2026-09-24. The message-row circle keeps the app's own agent mark so the face appears once.
 function agentHeadAvatarHTML() {
-  return agentAvatar ? '<img class="agent-head-av" src="' + agentAvatar + '" alt="">' : '';
+  // span wrapper so the picture can be clipped 1px inside the ring (see .agent-head-av CSS, 2026-09-25)
+  return agentAvatar ? '<span class="agent-head-av"><img src="' + agentAvatar + '" alt=""></span>' : '';
 }
 function renderAgentAvatarUI() {
   const img = document.getElementById('agentAvatarPreview');
@@ -6661,8 +7421,10 @@ function renderAgentAvatarUI() {
 function agentAvatarRepaint() {   // heads already on screen pick it up without reloading the thread
   document.querySelectorAll('.msg.agent .agent-head').forEach(h => {
     const existing = h.querySelector('.agent-head-av');
+    const pic = existing ? existing.querySelector('img') : null;   // the <img> lives INSIDE the ringed span
     if (agentAvatar) {
-      if (existing) existing.src = agentAvatar;
+      if (pic) pic.src = agentAvatar;
+      else if (existing) h.insertAdjacentHTML('afterbegin', agentHeadAvatarHTML());   // legacy <img> markup on screen
       else h.insertAdjacentHTML('afterbegin', agentHeadAvatarHTML());
     } else if (existing) {
       existing.remove();
@@ -6999,7 +7761,75 @@ function agentHistoryMessages() {
     if (typeof m.content !== 'string' || !m.content.trim()) continue;   // skips the streaming placeholder
     if (m.role === 'user' || m.role === 'assistant') msgs.push({ role: m.role, content: m.content });
   }
+  // Agent mode references attached images by PATH (2026-09-25): the meta block produced by
+  // agentPrepImages() rides the last user turn, so the fallback path sends MEDIA:<path> too.
+  if (_agentImageMeta) {
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === 'user') { msgs[i].content = (msgs[i].content || '') + _agentImageMeta; break; }
+    }
+  }
   return msgs;
+}
+// ── Agent mode image sharing (2026-09-25, David's ask) ────────────────────────────────────────────
+// "can still attach an image card as attachment like it does now … but when sending the image to the
+// agent, don't try to send the image, send the image path as meta instead". Agent turns carry TEXT
+// only (the runs protocol's `input` and the chat-completions fallback both), so an attached image is
+// SPOOLED to the chat server once (`POST /api/attach` → ~/xllm-attachments/<stamp>-<name>), the path
+// is remembered on the attachment itself, and every agent turn from then on references it as
+// `MEDIA:<path>` — the same convention this client renders on the way back, and a path the agent (and
+// its own tools) can open. The attachment card in the bubble is untouched: it still shows the image,
+// because it renders from the data URL. Local/cloud turns keep real vision parts — this is agent-only.
+let _agentImageMeta = '';
+function agentImageAttachments() {
+  for (let i = conversationHistory.length - 1; i >= 0; i--) {
+    const m = conversationHistory[i];
+    if (m && m.role === 'user') return (m.attachments || []).filter(a => a && a.kind === 'image' && a.data);
+  }
+  return [];
+}
+async function agentPrepImages() {
+  _agentImageMeta = '';
+  const imgs = agentImageAttachments();
+  if (!imgs.length) return '';
+  const lines = [];
+  let stored = 0;
+  for (const a of imgs) {
+    if (!a.path) {
+      try {
+        const buf = await (await fetch(a.data)).arrayBuffer();     // data URL → bytes
+        const res = await fetch('/api/attach', {
+          method: 'POST',
+          headers: { 'X-Filename': a.name || 'image.png' },
+          body: buf
+        });
+        const j = await res.json();
+        if (j && j.path) { a.path = j.path; stored++; }
+      } catch (e) { /* reported below — the turn still goes with the text */ }
+    } else stored++;
+    lines.push(a.path
+      ? '[attachment: ' + a.name + ']\nMEDIA:' + a.path
+      : '[attachment: ' + a.name + '] (could not be stored — the agent cannot read this image)');
+  }
+  // Mirror the spooled paths into the STORED thread: conversationHistory is a deep copy of the store
+  // entry, so without this a reload (or a resend of an older branch) would forget the path and spool
+  // the same image a second time.
+  try {
+    const c = currentChatId ? chatStore.find(x => x.id === currentChatId) : null;
+    if (c && Array.isArray(c.messages)) {
+      const src = [...conversationHistory].reverse().find(m => m && m.role === 'user');
+      const dst = [...c.messages].reverse().find(m => m && m.role === 'user');
+      if (src && dst && Array.isArray(dst.attachments)) {
+        (src.attachments || []).forEach((a, i) => { if (dst.attachments[i]) dst.attachments[i].path = a.path; });
+      }
+      chatStoreWrite(currentChatId);
+    }
+  } catch (e) {}
+  _agentImageMeta = '\n\n' + lines.join('\n\n');
+  const shown = imgs.filter(a => a.path).map(a => a.path).join('  ');
+  addActivityNote(stored === imgs.length
+    ? 'image attached as meta — the agent gets the PATH, not the pixels: ' + shown
+    : 'image attachment could not be spooled — this turn goes text-only');
+  return _agentImageMeta;
 }
 async function agentRunTurn() {
   const ag = agentRunAgent();
@@ -7123,7 +7953,7 @@ async function agentRunTurn() {
     if (msgStatsEl) msgStatsEl.innerHTML = statsBarHTML(exactTokens, totalMs, tps, false, displayModelBadge());
   };
 
-  if (agentHasImageAttachments()) addActivityNote('Image attachments are not sent in agent mode yet — text only');
+  await agentPrepImages();   // spool any attached image FIRST — the run input carries its PATH
   const connecting = addActivityNote('connecting to ' + (ag.name || ag.id) + '…');
   agentWake();
   startAgentWaitPulse();
@@ -7135,7 +7965,7 @@ async function agentRunTurn() {
   const body = {
     id: ag.id, url: (ag.url || '').trim(), key: ag.key || '',
     session_id: sessId,
-    input: [{ role: 'user', content: agentLastUserText() }]
+    input: [{ role: 'user', content: agentLastUserText() + _agentImageMeta }]
   };
   if (SYSTEM_PROMPT) body.instructions = SYSTEM_PROMPT;
   const r0 = await fetch('/api/agent/run', {
@@ -7387,8 +8217,8 @@ async function agentChatSimpleTurn(ag, sessId, reuseExisting) {
   let thinkingStarted = false;
   let finishReason = null;
 
+  await agentPrepImages();   // attached images ride the last user turn as MEDIA:<path>
   addActivityNote('connected to ' + (ag.name || ag.id) + ' — chat stream');
-  if (agentHasImageAttachments()) addActivityNote('Image attachments are not sent in agent mode yet — text only');
   agentWake();
   startAgentWaitPulse();
 
@@ -8246,6 +9076,7 @@ function renderAllMessages() {
     if (msg.role === 'user') appendMessage('user', d.content, null, null, i, d.attachments, d.ctx);
     else if (msg.role === 'assistant') appendMessage('assistant', d.content, d.thinking, d.stats, i, null, d.ctx, msg.agentName);
   });
+  musicSessionScan();
 }
 
 // ── Prism syntax highlighting (Big-AGI port 2026-08-22) ──
@@ -8335,7 +9166,10 @@ function highlightCodeBlocks(html) {
 //    syntax, not prose); bare filenames stay visible above their image.
 const MEDIA_EXT_SRC = '(?:png|jpe?g|webp|gif|bmp|mp4|mov|m4v|webm|mp3|wav|m4a|aac|ogg|flac|opus)';
 const MEDIA_TOKEN_RE = new RegExp('(\\S*?\\.' + MEDIA_EXT_SRC + ')\\b', 'gi');
-const MEDIA_PROTO_RE = new RegExp('MEDIA:.+?\\.' + MEDIA_EXT_SRC + '(?=[\\s.,;:!?)\\]>]|$)', 'gi');
+// [^\r\n] instead of . (2026-09-25): a MEDIA: line must never swallow the lines after it. Paths with
+// spaces are still matched; a token that ran past a line break was the bug behind the floating player's
+// "cannot play this file" — one playlist row holding five paths, which resolves to nothing on disk.
+const MEDIA_PROTO_RE = new RegExp('MEDIA:[^\\r\\n]+?\\.' + MEDIA_EXT_SRC + '(?=[\\s.,;:!?)\\]>]|$)', 'gi');
 const MEDIA_BAD_PREFIX = /^(?:https?|data|file|blob|ftp):/i;
 const MEDIA_IMG_RE = /(png|jpe?g|webp|gif|bmp)$/i;
 const MEDIA_VID_RE = /(mp4|mov|m4v|webm)$/i;
@@ -8383,6 +9217,7 @@ function mediaTokenSpans(text) {
   while ((m = proto.exec(text))) {
     const tok = m[0].trim().replace(/[.,;:!?)\]>]+$/, '');
     if (!tok) continue;
+    if (/[\r\n]/.test(tok)) continue;              // a path never spans lines (2026-09-25)
     if (inAnySpan(spans, m.index)) continue;
     if (MEDIA_BAD_PREFIX.test(tok)) continue;
     if (m.index > 0 && /[(\[]/.test(text[m.index - 1])) continue;
@@ -8392,6 +9227,7 @@ function mediaTokenSpans(text) {
   while ((m = bare.exec(text))) {
     const tok = m[1];
     if (!tok) continue;
+    if (/[\r\n]/.test(tok)) continue;              // a path never spans lines (2026-09-25)
     if (!mediaPathQualified(tok)) continue;
     if (inAnySpan(spans, m.index)) continue;
     if (MEDIA_BAD_PREFIX.test(tok)) continue;
@@ -8493,6 +9329,8 @@ function mediaItemsHTML(text) {
 }
 
 function renderAssistantContent(text) {
+  _musicLiveText = text || '';   // the playlist captures takes that are still streaming (2026-09-25)
+  if (MUSIC_AUDIO_RE.test(_musicLiveText)) musicScheduleScan();
   // One choke point for every assistant content render (live finalize, [stopped]
   // partial, history) — stripped markdown text + inline media below it.
   return (text ? escapeAndFormat(stripMediaPathTokens(text)) : '') + mediaItemsHTML(text);
@@ -8515,6 +9353,7 @@ function mvBuildStage() {
   const src = _mvItems[_mvIdx];
   if (!src) return;
   const kind = mediaKindOf(decodeURIComponent(new URL(src, location.href).searchParams.get('path') || src));
+  if (kind === 'audio') musicPauseForViewer();   // the floating session player yields to the viewer
   let el;
   if (kind === 'video') {
     el = document.createElement('video');
