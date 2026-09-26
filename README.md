@@ -2,8 +2,6 @@
 
 ![xLLM Chat — chat with local models and connected agents, and render what they make](screenshot-xllm-chat.gif)
 
-![xLLM Chat](screenshot-xllm-chat.png)
-
 A single-file browser chat window for **local LLMs and connected agents** — llama.cpp, vLLM, or any OpenAI-compatible server, plus live agent sessions with tool-use approvals. One UI that talks to everything. Built to run locally; the front end is a single HTML file with a tiny Python companion server.
 
 ## Full functionality — what to put behind it
