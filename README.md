@@ -1,10 +1,33 @@
 # xLLM Chat
 
-![xLLM Chat](screenshot-xllm-chat.gif)
+![xLLM Chat — chat with local models and connected agents, and render what they make](screenshot-xllm-chat.gif)
 
-![xLLM Chat — chat with local models and connected agents](screenshot-xllm-chat.png)
+![xLLM Chat](screenshot-xllm-chat.png)
 
 A single-file browser chat window for **local LLMs and connected agents** — llama.cpp, vLLM, or any OpenAI-compatible server, plus live agent sessions with tool-use approvals. One UI that talks to everything. Built to run locally; the front end is a single HTML file with a tiny Python companion server.
+
+## Full functionality — what to put behind it
+
+This window is the front end; how far it goes depends on what you run behind it. Each tier stands alone:
+
+| Tier | What you add | What it unlocks |
+|---|---|---|
+| **0 — the window** | Python 3, nothing else | the whole UI: themes, backgrounds, presets, attachments, markdown + sandboxed HTML preview, search, export/import, edit & recycle, token bar |
+| **1 — a local model** | llama.cpp, vLLM, or any OpenAI-compatible server | streaming chat with exact token/s, thinking pill, unlimited output, per-thread models — all on your machine |
+| **2 — cloud** | a DeepSeek or OpenRouter key | frontier models in the same window, same threads, key never in the repo or the page |
+| **3 — a capable agent** | **Hermes** (or any runs-capable agent) on loopback | live agent sessions per thread, real tool use, approval prompts (Allow once / this session / always / Deny), Yolo auto-answer, activity feed, measured context |
+| **4 — the media factory** | local generators (images/video, music, TTS) + the skills that drive them | generated images and video as inline tiles with a full viewer, a floating session music player with a captured playlist, and replies read aloud by a local voice |
+
+Tier 3 is the hinge — the media tiers are your agent invoking local tools, with xLLM Chat rendering the
+result. It never launches or generates anything itself: it shows what your stack produces, on the same
+machine, over loopback.
+
+**`AGENTS.md` is the install guide.** It carries the privacy contract this repo is built on (no keys in the
+tree, loopback only, same-origin proxying, no absolute paths), the agent contract the UI speaks (the
+`/v1/runs` lifecycle, approvals, and the two routes that make the token bar report the agent's real model
+and measured context), the media resolution rules and size caps, a copy-paste install checklist, one-command
+verifications for every tier, and a symptom → cause table for when something doesn't light up. It is written
+to be executed by an AI agent and is just as usable by hand.
 
 ## Features
 
@@ -59,6 +82,24 @@ chat-server.py    # static file server + /api/extract (attachments), agent/voice
 launch.sh         # convenience launcher (starts server, opens browser)
 favicon-*.png     # icons
 ```
+
+## A look around
+
+| Settings → Theme | Settings → Connect Agent |
+|---|---|
+| ![Theme — ten two-colour themes, chat background, bubble font](screenshot-settings-theme.png) | ![Connect Agent — server URL, detected context window, avatar, Yolo](screenshot-settings-agent.png) |
+| Settings → General | Settings → Voice |
+| ![General — LLM connections, system prompt, sampling](screenshot-settings-general.png) | ![Voice — read replies aloud through a local TTS server](screenshot-settings-voice.png) |
+
+| The context card | The media viewer |
+|---|---|
+| ![Token-bar hover card — the agent's real model window and its measured context use](screenshot-context-card.png) | ![Media viewer — images whole and centred, wheel zoom, arrow-key seeking](screenshot-media-viewer.png) |
+| Video in the viewer | An approval prompt |
+| ![Video in the media viewer with its themed player and timeline](screenshot-video-viewer.png) | ![Agent tool-use approval: Allow once / Allow this session / Always allow / Deny](screenshot-approval.png) |
+
+| Session music player |
+|---|
+| ![The floating session music player with its captured playlist](screenshot-session-music.png) |
 
 ## License
 
