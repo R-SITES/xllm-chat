@@ -136,6 +136,11 @@ python3 chat-server.py          # or ./launch.sh  → http://localhost:3001
    `pip install --user --break-system-packages pypdf openpyxl xlrd python-docx`
 3. Model server of choice (tier 1) → Settings → LLM Connections → Local.
 4. Optional cloud keys (tier 2) → Settings → LLM Connections → DeepSeek / OpenRouter → Test.
+   **Remote** in the same pane is the fourth connection: llama.cpp / vLLM / any OpenAI-compatible server
+   running on the machine that hosts this page, addressed **as that machine sees it**
+   (`http://127.0.0.1:8000/v1`, `http://127.0.0.1:8080/v1`, or a LAN address for another box). The request
+   rides this page's own origin, so whatever carries the page (a reverse proxy, a tunnel) also carries the
+   model — nothing extra is exposed and the key can stay blank for a keyless server.
 5. Capable agent (tier 3) → Settings → Connect Agent. Put the gateway key in `.agent-keys.json` or
    `HERMES_API_KEY` if it isn't typed in the pane.
 6. Optional voice (tier 4) → a TTS server on `127.0.0.1:5093`, `VOICES_DIR` if non-default.

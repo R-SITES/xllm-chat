@@ -15,9 +15,9 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
 .header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
-.header-left{display:flex;align-items:center;gap:12px}
+.header-left{display:flex;align-items:center;gap:12px;flex-shrink:0}
 .header-center{display:flex;align-items:center;gap:12px;flex:1;justify-content:center;min-width:0}
-.header-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.header-right{display:flex;align-items:center;gap:6px;flex-shrink:1;min-width:0}
 h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .header-actions{display:flex;gap:8px;align-items:center}
 .header-actions button,.header-actions select{background:var(--bg3);border:1px solid var(--border);color:var(--dim);padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-family:var(--font);transition:all .15s}
@@ -26,14 +26,21 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 
 /* Header right — styled action bar */
 .header-right-wrap{display:flex;align-items:center;gap:6px}
-.model-pill{position:relative;display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;color:var(--dim);cursor:pointer;transition:all .15s;min-width:80px}
+/* Header pill must never push the header wider than the viewport (2026-10-04, user feedback: the
+   DeepSeek + local-model pill "explodes the page" in the R1 Connect WebView). A flex item's
+   default min-width:auto refuses to shrink below its content, so a long provider+model string
+   grew the header to 527px in a 384px viewport and Chrome's shrink-to-fit scaled the whole page
+   down. The pill is now the only shrinkable item and its label ellipsises; the icon buttons and
+   the left cluster keep their size (flex-shrink:0). */
+.header-right .icon-btn{flex-shrink:0}
+.model-pill{position:relative;display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;color:var(--dim);cursor:pointer;transition:all .15s;min-width:80px;max-width:100%;flex-shrink:1}
 .model-pill:hover{border-color:var(--accent);color:var(--accent);background:var(--accentBg)}
 .model-pill .model-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;pointer-events:none}
 .model-pill select{position:absolute;inset:0;width:100%;height:100%;padding:6px 14px;background:transparent;border:none;color:inherit;font-size:12px;font-family:var(--font);cursor:pointer;opacity:0;-webkit-appearance:none;-moz-appearance:none;appearance:none}
 .model-pill select option{background:var(--bg2);color:var(--text)}
 /* Agent source dropdown (2026-09-04): touch the pill to flip between the local
    model and any connected agent (Hermes / Pi / DS Harness / local server). */
-.model-pill .model-name{max-width:210px}
+.model-pill .model-name{max-width:210px;min-width:0}
 .model-pill .pill-chev{font-size:9px;color:var(--dim);opacity:.85;pointer-events:none;transition:transform .15s;flex-shrink:0}
 .model-pill.open .pill-chev{transform:rotate(180deg)}
 .model-pill .pill-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;display:inline-block;margin-right:2px}
@@ -41,7 +48,7 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 /* Cloud threads (2026-09-05): the pill shows provider + model with a soft accent tint */
 .model-pill .pill-dot.cloud{background:var(--purple);box-shadow:0 0 0 2px var(--bg3)}
 .model-pill.cloud-mode{border-color:color-mix(in srgb,var(--purple) 45%,var(--border));color:var(--purple)}
-.model-pill .pill-sub{font-weight:400;color:var(--dim);opacity:.9;max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.model-pill .pill-sub{font-weight:400;color:var(--dim);opacity:.9;max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;margin-left:5px}
 /* LLM Connections tabs inside Settings General (2026-09-05) */
 .conn-tabs{display:flex;gap:6px;margin-bottom:2px}
 .conn-tab{flex:1;padding:6px 0;border:1px solid var(--border);background:var(--bg3);color:var(--dim);border-radius:8px;font-size:12px;cursor:pointer;font-family:var(--font);transition:all .15s}
@@ -53,7 +60,14 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 /* Agent avatar (2026-09-24): a user-picked GIF/JPG/PNG for the agent's bubble; preview in the pane. */
 .avatar-row{display:flex;align-items:center;gap:8px;margin-top:6px}
 .avatar-preview{width:44px;height:44px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 1px var(--border);background:var(--bg3);flex-shrink:0;transform:translateZ(0);backface-visibility:hidden}
-.source-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:900;min-width:260px;max-width:min(430px,calc(100vw - 32px));background:var(--bg2);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.35);padding:6px;max-height:min(60vh,420px);overflow-y:auto}
+/* 2026-10-04: the panel is a BODY-LEVEL fixed element, positioned from the pill's rect by
+   positionSourceMenu(). Two live bugs this fixes: (1) it used to be a child of the pill inside
+   the glass header — body.has-bg gives the header a backdrop-filter, which makes the header a
+   STACKING CONTEXT, so the panel (z-index 900 inside it) painted UNDER the chat bubbles; (2) on
+   a phone the pill is not at the right edge of the header, so a right:0 260px panel hung off the
+   left of the screen. z-index 1300 sits above the bubbles, the sidebar (999) and the bg unmute
+   button (1200), still under the toasts (2000) and the media preview overlay. */
+.source-menu{position:fixed;top:64px;right:16px;z-index:1300;min-width:260px;max-width:min(430px,calc(100vw - 16px));background:var(--bg2);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.35);padding:6px;max-height:min(60vh,420px);overflow-y:auto}
 .source-menu[hidden]{display:none}
 .src-group-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);opacity:.85;padding:7px 10px 3px}
 .src-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;font-size:12px;color:var(--text);cursor:pointer;transition:background .12s;min-width:0}
@@ -116,8 +130,18 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .bubble ul,.bubble ol{margin:1rem 0;padding-left:22px}
 .bubble li{margin:0.25rem 0}
 .bubble ul ul,.bubble ol ol,.bubble ul ol,.bubble ol ul{margin:0.25rem 0}
-.bubble table{border-collapse:collapse;margin:1.5rem 0;font-size:13px;width:100%}
-.bubble th,.bubble td{border:1px solid var(--border);padding:8px 12px;text-align:left}
+/* Wide markdown tables scroll INSIDE the bubble (2026-10-05): a table used to be
+   width:100% with min-content wider than the bubble, so it painted PAST the bubble
+   edge (the user's phone screenshot: the columns bled onto the page background to the
+   right of the response card). Every table is now wrapped in .tbl-wrap — a block
+   the width of the bubble that scrolls horizontally — so the bubble is the hard
+   ceiling and wide tables swipe sideways instead of overflowing. See wrapTables(). */
+.bubble .tbl-wrap{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;margin:1.5rem 0;max-width:100%;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.bubble .tbl-wrap::-webkit-scrollbar{height:6px}
+.bubble .tbl-wrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.bubble .tbl-wrap::-webkit-scrollbar-track{background:transparent}
+.bubble table{border-collapse:collapse;font-size:13px;margin:0;width:auto;min-width:100%}
+.bubble th,.bubble td{border:1px solid var(--border);padding:8px 12px;text-align:left;white-space:normal;word-break:normal}
 .bubble th{background:var(--bg3);font-weight:600}
 .bubble blockquote{border-left:3px solid var(--purple);margin:1.5rem 0;padding:8px 16px;color:var(--dim);background:var(--quoteBg);border-radius:0 8px 8px 0}
 .bubble blockquote p{margin:4px 0}
@@ -248,8 +272,18 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .loop-warn{margin-top:6px;padding:6px 10px;font-size:11px;color:#e36b5b;background:rgba(227,107,91,.1);border:1px solid rgba(227,107,91,.3);border-radius:6px;line-height:1.4;position:relative}
 .preview-overlay{display:none;position:fixed;inset:0;background-color:transparent;z-index:100000}
 .preview-overlay.show{display:block}
+/* The wrap tracks the FRAME's own height (reported up from the sandboxed iframe): a tall page fills
+   the viewport and scrolls inside, a short one ends where the page ends instead of sitting in a well.
+   Height is set inline by _syncPreviewSize(); 100dvh is only the pre-report default. */
 .preview-overlay .preview-frame-wrap{position:fixed;inset:0;top:0!important;left:0!important;width:100dvw;height:100dvh;margin:0;padding:0;border:none;border-radius:0;background-color:transparent;box-shadow:none;display:block;overflow:hidden;transform:none!important;z-index:100001}
-.preview-overlay iframe{display:block;width:100dvw;height:100dvh;border:0}
+.preview-overlay iframe{display:block;width:100%;height:100%;border:0;background:transparent}
+/* Progress bar pinned to the very top of the screen (this app is loaded standalone and inside the
+   R1 Connect WebView alike): it reports the preview load and can be grabbed to swipe the page down.
+   It is the only chrome on screen while a preview is open — the X lives INSIDE the frame. */
+.preview-loading{position:absolute;top:0;left:0;right:0;height:3px;z-index:100003;background:transparent;overflow:hidden;opacity:0;transition:opacity .18s;touch-action:none;pointer-events:none}
+.preview-loading.show{opacity:1;pointer-events:auto}
+.preview-loading::after{content:'';position:absolute;top:0;left:0;height:100%;width:38%;border-radius:2px;background:var(--accent,#4c8bf5);animation:xllm-loading 1.05s ease-in-out infinite}
+@keyframes xllm-loading{0%{left:-40%}100%{left:102%}}
 .preview-overlay .preview-close{position:absolute;top:16px;right:16px;z-index:100002;border:none;background:transparent;color:#fff;opacity:.7;mix-blend-difference;cursor:pointer;width:36px;height:36px;display:flex;align-items:center;justify-content:center;transition:opacity .15s}
 .preview-overlay .preview-close:hover{opacity:1}
 .thinking-block{margin-bottom:10px}
@@ -329,14 +363,14 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .msg-attach img{max-height:120px;border-radius:8px;border:1px solid var(--border)}
 .msg-attach .a-file{font-size:11px;color:var(--dim);background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:2px 8px}
 #chatInput::placeholder{color:var(--dim)}
-.send-btn,.stop-btn{width:42px;height:42px;border-radius:50%;border:none;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.send-btn,.stop-btn{width:42px;height:42px;border-radius:50%;border:none;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;align-self:center;position:relative;top:-3px}   /* centre in the bar like the paperclip, then 3px up (user 2026-10-04) */
 .send-btn{background:var(--accent)}
 .send-btn:hover{opacity:.85;transform:scale(1.05)}
 .send-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .stop-btn{background:var(--red);font-size:16px}
 .stop-btn:hover{opacity:.85;transform:scale(1.05)}
 .jump-stack{position:fixed;bottom:93px;right:max(calc((100vw - 820px)/2),16px);display:flex;flex-direction:column;gap:8px;z-index:50;will-change:transform;transform:translateZ(0)}
-.jump-btn{width:44px;height:44px;border-radius:50%;border:1px solid var(--border);background:var(--bg3);color:var(--dim);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.jump-btn{width:44px;height:44px;border-radius:50%;border:1px solid var(--border);background:var(--bg3);color:var(--dim);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;box-shadow:0 4px 14px rgba(0,0,0,.4);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
 .jump-btn:hover{color:var(--text);border-color:var(--accent);transform:scale(1.05)}
 .jump-btn:disabled{opacity:.4;cursor:default;transform:none;border-color:var(--border)}
 .modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center}
@@ -466,8 +500,13 @@ h1{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
    readable); only the chrome surfaces (header/sidebar/input) keep a frost for their own text. */
 body.has-bg .chat-area{background:color-mix(in srgb,var(--bg) 38%,transparent)}
 body.has-bg #musicPanel,body.has-bg .header,body.has-bg .sidebar,body.has-bg .sys-prompt-area,body.has-bg .input-container,body.has-bg .attach-bar{background:color-mix(in srgb,var(--bg) 72%,transparent);backdrop-filter:blur(5px)}
-.bg-unmute-btn{position:fixed;right:14px;bottom:88px;z-index:1200;width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:rgba(0,0,0,.55);color:#fff;cursor:pointer;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);transition:background .15s}
+.bg-unmute-btn{position:fixed;left:max(calc((100vw - 820px)/2),16px);top:calc(100vh - 190px);z-index:1200;width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:rgba(0,0,0,.55);color:#fff;display:none;pointer-events:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);transition:background .15s,opacity .24s}
 .bg-unmute-btn:hover{background:rgba(0,0,0,.8)}
+/* Mute NOTICE (2026-10-04): the speaker is no longer a control. Tapping the chat background toggles
+   the background video's audio and this flashes for ~1.3s showing the state it just changed to. */
+.bg-unmute-btn.bg-notice-out{opacity:0}
+@keyframes bgNoticePop{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
+.bg-unmute-btn.bg-notice-pop{animation:bgNoticePop .2s ease-out}
 .bg-type-row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
 .bg-type-btn{flex:1;min-width:64px;padding:7px 0;border:1px solid var(--border);background:var(--bg3);color:var(--dim);border-radius:8px;font-size:12px;cursor:pointer;font-family:var(--font);transition:all .15s}
 .bg-type-btn.active{background:var(--accentBg);border-color:var(--accentLine);color:var(--accent)}
@@ -864,7 +903,7 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
 
 <div id="chatBg"></div>
 <div id="chatBgOverlay"><div id="bgOv1"></div><div id="bgOv2"></div></div>
-<button id="bgUnmute" class="bg-unmute-btn" onclick="toggleBgMute()" title="Unmute video"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg></button>
+<button id="bgUnmute" class="bg-unmute-btn" title="Background audio" aria-live="polite"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg></button>
 
 <div class="sidebar" id="sidebar">
   <div class="sidebar-header">
@@ -894,7 +933,7 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.4.5</span>
+    <span class="footer-version">xLLM Chat v3.5.7</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -929,15 +968,6 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
       <span class="pill-chev">▾</span>
       <!-- kept hidden: loadModels() populates it as the model registry -->
       <select id="modelSelect" title="Model" style="display:none" aria-hidden="true" tabindex="-1"></select>
-      <div class="source-menu" id="sourceMenu" hidden>
-        <div class="src-group-label">Local models</div>
-        <div id="srcModelList"></div>
-        <div class="src-group-label" id="srcCloudLabel" hidden>Cloud</div>
-        <div id="srcCloudList"></div>
-        <div class="src-group-label" id="srcAgentLabel" hidden>Connected agents</div>
-        <div id="srcAgentList"></div>
-        <div class="src-empty" id="srcEmpty" hidden>No local models, cloud connections or connected agents — start a local server, add a cloud key in Settings → LLM Connections, or connect an agent in Settings → Connect Agent.</div>
-      </div>
     </div>
     <button class="icon-btn" onclick="openSettings()" title="Settings">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.46.27a2 2 0 0 0-1.54.5l-.2.18a2 2 0 0 1-1.06 2.43l.14.46a2 2 0 0 1 0 1.92l-.14.47a2 2 0 0 1-.18.93l-.52.52a2 2 0 0 0 0 2.82l.52.52a2 2 0 0 1 .18.93l.14.47a2 2 0 0 1 0 1.92l.2.18a2 2 0 0 0 1.54.5l.46.27a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.46-.27a2 2 0 0 0 1.54-.5l.2-.18a2 2 0 0 1 1.06 2.43l.14.46a2 2 0 0 1 0 1.92l.14.47a2 2 0 0 1 .18.93l.52.52a2 2 0 0 0 0 2.82l.52.52a2 2 0 0 1-.18.93l-.14.47a2 2 0 0 1 0 1.92l-.2-.18a2 2 0 0 0-1.54-.5l-.46-.27a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -948,7 +978,7 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
   </div>
 </div>
 
-  <div class="sys-prompt-area">
+  <div class="sys-prompt-area" id="sysPromptArea">
     <div class="sys-prompt-bar" id="sysPromptBar" onclick="toggleSysPrompt()" title="Click to edit the system prompt">
       <span class="sp-label">System Prompt</span>
       <span class="sp-status" id="sysPromptStatus">None</span>
@@ -973,12 +1003,13 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
     </div>
   </div>
 
-  <!-- HTML Preview overlay (llama.cpp DialogCodePreview port) -->
+  <!-- HTML Preview overlay (llama.cpp DialogCodePreview port). The frame fills the screen top-to-bottom
+       (100dvw wide in portrait OR landscape) and its own height drives the wrap, so a tall page scrolls
+       inside it and a short one ends where it ends. The close X is INSIDE the frame (PREVIEW_BOOTSTRAP)
+       because a parent-drawn overlay gets clipped away by the hosted page's stacking context. -->
   <div class="preview-overlay" id="previewOverlay">
+    <div class="preview-loading" id="pvLoading" title="Loading preview"></div>
     <div class="preview-frame-wrap">
-      <button class="preview-close" onclick="closePreview()" aria-label="Close preview">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="28" height="28"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-      </button>
       <iframe id="previewFrame" sandbox="allow-scripts" title="Preview"></iframe>
     </div>
   </div>
@@ -1013,7 +1044,7 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
 </div>
 
 <div class="jump-stack" id="jumpStack">
-  <button class="jump-btn" id="jumpBtn" title="Go to top of this message — click again for the one above">
+  <button class="jump-btn" id="jumpBtn" title="Go to top of this message — click again for the one above, or hold for the top of the chat">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="m18 15-6-6-6 6"/></svg>
   </button>
   <button class="jump-btn" id="jumpDownBtn" title="Go to the next message below">
@@ -1036,6 +1067,7 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
       <button type="button" class="conn-tab active" data-ctab="local" onclick="connTab('local')">Local</button>
       <button type="button" class="conn-tab" data-ctab="deepseek" onclick="connTab('deepseek')">DeepSeek</button>
       <button type="button" class="conn-tab" data-ctab="openrouter" onclick="connTab('openrouter')">OpenRouter</button>
+      <button type="button" class="conn-tab" data-ctab="remote" onclick="connTab('remote')">Remote</button>
     </div>
     <div class="conn-pane" id="ctLocal">
       <label>API URL</label>
@@ -1074,6 +1106,26 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
         <button class="bg-btn" id="orTestBtn" onclick="testCloudConn('openrouter')">Test</button>
       </div>
       <div class="bg-note">OpenRouter's model API — thousands of models incl. Claude / GPT / Gemini. Hit ↻ to pull the catalog: <b>Free Models</b> / <b>Premium Models</b> tabs, sorted by name or by price (per 1M tokens shown on the right) — click a sort chip again to flip it between ascending and descending (the ▲/▼ shows which way it is going). The box under the sort row filters the list live as you type (e.g. <b>open</b> for OpenAI), the Model field's own filter still applies, and Enter applies the typed id for the active OpenRouter thread. Keys stay in this browser only.</div>
+    </div>
+    <div class="conn-pane" id="ctRemote" hidden>
+      <label>Server URL <span class="conn-sub">— the DESKTOP-side address of the model server</span></label>
+      <input type="text" id="rmtUrl" placeholder="http://127.0.0.1:8000/v1" spellcheck="false"
+             oninput="cloudKeyTyped('remote')" onchange="connUrlApply('remote')">
+      <label>API Key <span class="conn-sub">— optional; leave blank for llama.cpp / a keyless server</span></label>
+      <div class="ds-key-row">
+        <input type="password" id="rmtKey" autocomplete="off" placeholder="optional" oninput="cloudKeyTyped('remote')">
+        <button class="ds-refresh" id="rmtRefreshBtn" onclick="refreshCloudModels('remote')" title="Fetch the model list from this server" style="display:none" aria-label="Refresh Remote model list"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
+      </div>
+      <label style="margin-top:12px">Model <span class="conn-sub">— the model id this thread sends</span></label>
+      <input type="text" id="rmtModel" placeholder="e.g. the server's model name" spellcheck="false"
+             oninput="connModelTyped('remote')" onchange="connModelApply('remote')"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();connModelApply('remote',true);}">
+      <div class="ds-model-list" id="rmtModelList"></div>
+      <div class="voice-row">
+        <span class="agent-status" id="rmtStatus"><span class="status-dot"></span><span>Not tested</span></span>
+        <button class="bg-btn" id="rmtTestBtn" onclick="testCloudConn('remote')">Test</button>
+      </div>
+      <div class="bg-note">A model server that is not on this device — llama.cpp / vLLM / any OpenAI-compatible API running on the machine that hosts this page. Put the address <b>as that machine sees it</b> (<b>http://127.0.0.1:8000/v1</b> for vLLM, <b>http://127.0.0.1:8080/v1</b> for llama.cpp, or a LAN address for another box): the request rides this page's own origin, so the tunnel that carries the chat also carries the model, from anywhere — nothing extra is exposed. ↻ pulls the server's model list, clicking a row pins it to this thread. Works the same on a phone as on the desktop.</div>
     </div>
     <label>System Prompt</label>
     <textarea id="setSysPrompt"></textarea>
@@ -1341,6 +1393,20 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
     <button class="mv-nav mv-prev" id="mvPrev" title="Previous (←)">‹</button>
     <button class="mv-nav mv-next" id="mvNext" title="Next (→)">›</button>
   </div>
+</div>
+
+<!-- Chat-source (model list) panel — BODY-LEVEL on purpose: it must not be trapped inside the
+     glass header's stacking context (body.has-bg => header backdrop-filter), which painted it
+     under the chat bubbles. positionSourceMenu() anchors it under the header pill and keeps it
+     inside the viewport at phone widths. -->
+<div class="source-menu" id="sourceMenu" hidden>
+  <div class="src-group-label">Local models</div>
+  <div id="srcModelList"></div>
+  <div class="src-group-label" id="srcCloudLabel" hidden>Cloud</div>
+  <div id="srcCloudList"></div>
+  <div class="src-group-label" id="srcAgentLabel" hidden>Connected agents</div>
+  <div id="srcAgentList"></div>
+  <div class="src-empty" id="srcEmpty" hidden>No local models, cloud connections or connected agents — start a local server, add a cloud key in Settings → LLM Connections, or connect an agent in Settings → Connect Agent.</div>
 </div>
 
 <script>
@@ -3365,9 +3431,16 @@ function healLocalModelPin(name) {
     }
   } catch (e) {}
 }
-let currentChatId = localStorage.getItem('chat_current_id') || null;
+// WHICH thread this WINDOW is showing. A tab's own pointer lives in sessionStorage, not localStorage:
+// every tab's autosave re-asserts the shared 'chat_current_id' key (saveCurrentChat runs on each
+// save, so a tab that is streaming keeps writing it), and two tabs then fight over it — a hard refresh
+// in the second tab jumped to the first tab's thread (reported 2026-10-06). This tab keeps its own
+// pointer across a reload; a FRESH tab still opens the last-used thread by inheriting the shared key
+// once (and pinning it into its own session).
+let currentChatId = sessionStorage.getItem('chat_current_id') || localStorage.getItem('chat_current_id') || null;
+try { if (currentChatId) sessionStorage.setItem('chat_current_id', currentChatId); } catch (_) {}
 let conversationHistory = [];
-const APP_VERSION = '3.4.5';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.5.7';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -3390,14 +3463,43 @@ let agentPingBusy = {};                    // id -> in-flight ping promise (dedu
 //    (activeAgent, pickAgent, loadModels…) keep working unchanged. New threads
 //    inherit the last-known conn from localStorage 'chat_conn_last' (same pattern
 //    as per-thread system prompts).
+const LOCAL_BASE = (API_URL || 'http://127.0.0.1:8080').replace(/\/+$/, '').replace(/\/v1$/, '');
 const CLOUD_PROVIDERS = {
   deepseek:   { name: 'DeepSeek',   url: 'https://api.deepseek.com/v1',  key: '', model: '', ctx: 128000, defaultModel: 'deepseek-chat' },
-  openrouter: { name: 'OpenRouter', url: 'https://openrouter.ai/api/v1', key: '', model: '', ctx: 128000, defaultModel: '' }
+  openrouter: { name: 'OpenRouter', url: 'https://openrouter.ai/api/v1', key: '', model: '', ctx: 128000, defaultModel: '' },
+  // Remote: a model server that is NOT on this device, reached through this page's own origin. The
+  // proxy resolves the URL ON THE DESKTOP (that is the whole point — a phone typing 127.0.0.1:8000
+  // would be talking to itself), so the URL here is the DESKTOP-side address of the server, and the
+  // share of the tunnel is the page's existing /api/agent/chat + /api/agent/models routes. Nothing
+  // new is exposed publicly and no key is required for a loopback server (llama.cpp needs none;
+  // vLLM's --api-key goes in the Key field if it is set). user 2026-10-04: "add a 4th tab Remote ...
+  // instead of us using the DeepSeek tab" for the tunnel.
+  // Its default is the LOCAL tab's own server + /v1, so the tab works the moment a local model is up:
+  // pointing it at a guessed port instead is what made Test read offline against a running llama-server
+  // on :8080 (measured 2026-10-04).
+  remote:     { name: 'Remote',     url: LOCAL_BASE + '/v1',              key: '', model: '', ctx: 128000, defaultModel: '', keyOptional: true }
 };
+// Per-connection UI element ids — one table, so adding a connection is a preset + a pane rather than
+// another `p === 'deepseek' ? … : …` ternary in six functions.
+const CONN_UI = {
+  deepseek:   { url: 'dsUrl',  key: 'dsKey',  refresh: 'dsRefreshBtn',  list: 'dsModelList',  status: 'dsStatus',  test: 'dsTestBtn',  model: null },
+  openrouter: { url: 'orUrl',  key: 'orKey',  refresh: 'orRefreshBtn',  list: 'orModelList',  status: 'orStatus',  test: 'orTestBtn',  model: 'orModel' },
+  remote:     { url: 'rmtUrl', key: 'rmtKey', refresh: 'rmtRefreshBtn', list: 'rmtModelList', status: 'rmtStatus', test: 'rmtTestBtn', model: 'rmtModel' }
+};
+function connEl(p, what) {
+  const id = (CONN_UI[p] || {})[what];
+  return id ? document.getElementById(id) : null;
+}
 const CLOUD_CTX_DEFAULT = 128000;
 function loadCloudConns() {
   let stored = {};
   try { stored = JSON.parse(localStorage.getItem('chat_llm_conns') || '{}') || {}; } catch (e) {}
+  // Migration (2026-10-04): the first cut of the Remote tab shipped a guessed default of
+  // http://127.0.0.1:8000/v1 (vLLM), which reads as "offline" for a llama-server on :8080. Anything
+  // still sitting on that untouched default moves to the LOCAL tab's server + /v1.
+  if (stored.remote && stored.remote.url === 'http://127.0.0.1:8000/v1' && !stored.remote.model) {
+    stored.remote.url = LOCAL_BASE + '/v1';
+  }
   const out = {};
   for (const id of Object.keys(CLOUD_PROVIDERS)) {
     out[id] = Object.assign({}, CLOUD_PROVIDERS[id], stored[id] || {});
@@ -3638,25 +3740,88 @@ function ensureCloudModels(p) {
 // proxy (typed URL/key are applied first — Save stays optional) and lists what the API
 // returned. Clicking a row picks it for THIS thread (same path as the header pill).
 function cloudKeyTyped(p) {
-  const keyEl = document.getElementById(p === 'deepseek' ? 'dsKey' : 'orKey');
-  const btn = document.getElementById(p === 'deepseek' ? 'dsRefreshBtn' : 'orRefreshBtn');
+  const keyEl = connEl(p, 'key');
+  const urlEl = connEl(p, 'url');
+  const btn = connEl(p, 'refresh');
   if (!keyEl) return;
-  const has = String(keyEl.value || '').length > 0;
-  if (btn) btn.style.display = has ? 'inline-flex' : 'none';
+  // Keyed connections show ↻ once a key exists; a keyless one (Remote on a loopback llama.cpp)
+  // shows it as soon as a URL is typed.
+  const c = CLOUD_CONNS[p] || {};
+  const ready = String(keyEl.value || '').length > 0 ||
+                (c.keyOptional && urlEl && String(urlEl.value || '').trim().length > 0);
+  if (btn) btn.style.display = ready ? 'inline-flex' : 'none';
   renderDsModels(p);
 }
+// ── Remote endpoint resolution: llama.cpp :8080 or vLLM :8000, whichever answers ─────────────────
+// user feedback (2026-10-04): "be sure to make work with both vllm and llama.cpp 8000 and 8080". The typed
+// URL is tried FIRST; if nothing answers there, the SAME host is probed on the other standard local
+// port and the one that replies is adopted (pane field + stored conn), so the tab works without
+// knowing which server was launched. Only ports on the same host are tried — never another machine.
+const REMOTE_LOCAL_PORTS = ['8080', '8000'];
+function remoteUrlCandidates(url) {
+  const out = [];
+  const push = (v) => { const t = String(v || '').replace(/\/+$/, ''); if (t && out.indexOf(t) < 0) out.push(t); };
+  push(url);
+  try {
+    const u = new URL(url);
+    for (const port of REMOTE_LOCAL_PORTS) {
+      if (u.port === port) continue;
+      const c = new URL(url);
+      c.port = port;
+      push(c.toString());
+    }
+  } catch (e) { /* a hand-typed string that is not a URL — the typed value is all we have */ }
+  return out;
+}
+async function probeEndpoint(id, url, key) {
+  try {
+    const d = await fetch('/api/agent/ping', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id, url: url, key: key })
+    }).then(r => r.json());
+    return d || { ok: false, error: 'no response' };
+  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+}
+/** Walk the candidates; adopt the first that answers. Returns the URL in use, or null. */
+async function adoptRemoteEndpoint(p, url, key, quiet) {
+  const cands = remoteUrlCandidates(url);
+  let last = null;
+  for (const cand of cands) {
+    last = await probeEndpoint(p, cand, key);
+    if (last && last.ok) {
+      if (cand !== String(url).replace(/\/+$/, '')) {
+        CLOUD_CONNS[p].url = cand; saveCloudConns();
+        const el = connEl(p, 'url'); if (el) el.value = cand;
+        if (!quiet) showToast(CLOUD_CONNS[p].name + ' answered on ' + cand);
+      }
+      return cand;
+    }
+  }
+  if (!quiet) showToast(CLOUD_CONNS[p].name + ' — nothing answered on ' + cands.join(' or ') +
+                        (last && last.error ? ' (' + String(last.error).slice(0, 80) + ')' : ''), null, true);
+  return null;
+}
+
 function refreshCloudModels(p) {
   const c = CLOUD_CONNS[p];
-  const url = document.getElementById(p === 'deepseek' ? 'dsUrl' : 'orUrl').value.trim();
-  const key = document.getElementById(p === 'deepseek' ? 'dsKey' : 'orKey').value;
-  const btn = document.getElementById(p === 'deepseek' ? 'dsRefreshBtn' : 'orRefreshBtn');
+  const urlEl = connEl(p, 'url');
+  const keyEl = connEl(p, 'key');
+  const btn = connEl(p, 'refresh');
+  const url = urlEl ? urlEl.value.trim() : '';
+  const key = keyEl ? keyEl.value : '';
   if (!url) { showToast('Enter the ' + c.name + ' base URL first', null, true); return; }
-  if (!key) { showToast('Enter the ' + c.name + ' API key first', null, true); return; }
+  if (!key && !c.keyOptional) { showToast('Enter the ' + c.name + ' API key first', null, true); return; }
   // apply the typed config (Save optional) so the proxy + pickers use it
   CLOUD_CONNS[p].url = url; CLOUD_CONNS[p].key = key; saveCloudConns();
   cloudModels[p] = null; cloudFetching[p] = false; cloudFallback[p] = false;
   if (btn) { btn.disabled = true; btn.classList.add('spinning'); }
-  ensureCloudModels(p).then(() => { if (btn) { btn.disabled = false; btn.classList.remove('spinning'); } });
+  const done = () => { if (btn) { btn.disabled = false; btn.classList.remove('spinning'); } };
+  if (c.keyOptional) {
+    // A local server behind the tunnel: find which port is actually serving, then pull its list.
+    adoptRemoteEndpoint(p, url, key).then(ok => (ok ? ensureCloudModels(p) : null)).then(done);
+    return;
+  }
+  ensureCloudModels(p).then(done);
 }
 // ── OpenRouter model path input (2026-09-13, the user's ask) ──────────────────────
 // The OpenRouter tab had no place to name the model — the only entry points were the
@@ -3678,17 +3843,48 @@ function currentOrModelInput() {
 }
 function syncConnModelInput(p) {
   if (p !== 'openrouter') return;
-  const el = document.getElementById('orModel');
+  const el = connEl(p, 'model');
   if (!el) return;
   // Use the THREAD's pinned conn model, not the global currentModel: on a fresh boot
   // currentModel can still hold the last local server's model (chat_current_model),
   // which showed up in the OpenRouter field as a .gguf path during testing.
-  const pinned = (activeConn.kind === 'cloud' && activeConn.provider === 'openrouter' && activeConn.model)
+  const pinned = (activeConn.kind === 'cloud' && activeConn.provider === p && activeConn.model)
     ? String(activeConn.model) : '';
-  el.value = pinned || CLOUD_CONNS.openrouter.model || '';
+  el.value = pinned || CLOUD_CONNS[p].model || '';
   // clear the search filter on a programmatic fill: showing only the current model's
   // row would hide the catalog the user is browsing
-  cloudModelFilter.openrouter = '';
+  cloudModelFilter[p] = '';
+}
+// Generic Model-field handlers — OpenRouter's orModelTyped/orModelApply specialised to its own pane
+// (it has the price-sorted catalog); these serve any connection that just needs the id set.
+function connModelTyped(p) {
+  const el = connEl(p, 'model');
+  if (!el) return;
+  cloudModelFilter[p] = String(el.value || '').trim().toLowerCase();
+  renderDsModels(p);
+}
+function connModelApply(p, explicit) {
+  const el = connEl(p, 'model');
+  const m = el ? String(el.value || '').trim() : '';
+  CLOUD_CONNS[p].model = m;
+  saveCloudConns();
+  renderDsModels(p);
+  if (!m) {
+    if (explicit) showToast(CLOUD_CONNS[p].name + ' model cleared — pick one before sending', null, true);
+    return;
+  }
+  const cl = activeCloud();
+  if (cl && cl.id === p && currentModel !== m) pickCloud(p, m);   // live switch on THIS thread
+  else if (explicit) showToast(CLOUD_CONNS[p].name + ' model set — ' + shortModel(m));
+}
+function connUrlApply(p) {
+  // A keyless connection (Remote on a loopback llama.cpp) is usable as soon as the URL is typed, so
+  // store it on change; keyed ones still commit on Save/Test/↻ like they always did.
+  const el = connEl(p, 'url');
+  if (!el) return;
+  const c = CLOUD_CONNS[p];
+  if (c && c.keyOptional) { c.url = el.value.trim(); saveCloudConns(); }
+  cloudKeyTyped(p);
 }
 function orModelApply(explicit) {
   const m = currentOrModelInput();
@@ -3886,15 +4082,16 @@ function catalogSearchTyped(el) {
   refreshCloudRows(p);
 }
 function renderDsModels(p) {
-  const listEl = document.getElementById(p === 'deepseek' ? 'dsModelList' : 'orModelList');
+  const listEl = connEl(p, 'list');
   if (!listEl) return;
   const c = CLOUD_CONNS[p];
-  const keyEl = document.getElementById(p === 'deepseek' ? 'dsKey' : 'orKey');
+  const keyEl = connEl(p, 'key');
   const hasKey = !!keyEl && String(keyEl.value || '').length > 0;
+  const keylessReady = !!(c && c.keyOptional && keyEl && String(keyEl.value || '').length >= 0 && cloudConfigured(p));
   const filter = (cloudModelFilter[p] || '').trim().toLowerCase();
   const cloudNow = activeCloud();
   let html = '';
-  if (!hasKey) {
+  if (!hasKey && !keylessReady) {
     html = '<div class="ds-model-item dim"><span class="dm-check"></span><span class="dm-name">Enter your API key above, then hit ↻ to fetch the model list.</span></div>';
   } else if (cloudFetching[p]) {
     html = '<div class="ds-model-item dim"><span class="tp-spinner"></span><span class="dm-name">Fetching ' + escHtml(c.name) + ' models…</span></div>';
@@ -3999,6 +4196,7 @@ function renderSourceMenu() {
   const none = opts.length === 0 && shown === 0 && cloudShown === 0 && !(ag && !isAgentConnected(ag.id));
   empty.hidden = !none;
   if (none) mlist.innerHTML = '';
+  positionSourceMenu();      // content changed → the panel's own width may have changed
 }
 function toggleSourceMenu() {
   const m = document.getElementById('sourceMenu');
@@ -4007,6 +4205,26 @@ function toggleSourceMenu() {
   renderSourceMenu();
   m.hidden = false;
   pill.classList.add('open');
+  positionSourceMenu();          // anchor under the pill, clamped inside the viewport
+}
+// The panel is body-level (see the markup comment). Anchor it to the pill's rect, and when it
+// cannot fit between the pill and the left edge (phone widths) span the viewport with margins.
+function positionSourceMenu() {
+  const m = document.getElementById('sourceMenu');
+  const pill = document.getElementById('modelPill');
+  if (!m || !pill || m.hidden) return;
+  const PAD = 8;
+  const pr = pill.getBoundingClientRect();
+  const vw = window.innerWidth || document.documentElement.clientWidth;
+  m.style.top = Math.round(pr.bottom + 6) + 'px';
+  m.style.left = 'auto';
+  m.style.width = '';
+  m.style.right = Math.round(Math.max(PAD, vw - pr.right)) + 'px';
+  if (m.offsetWidth > pr.right - PAD) {       // would hang off the left edge → full-width panel
+    m.style.left = PAD + 'px';
+    m.style.right = PAD + 'px';
+    m.style.width = 'auto';
+  }
 }
 function closeSourceMenu() {
   const m = document.getElementById('sourceMenu');
@@ -4192,6 +4410,21 @@ function syncSourceContext() {
     if (!(want > 0)) want = 180000;
   }
   if (want > 0 && contextLimit !== want) { contextLimit = want; updateTokenBar(); }
+  syncSysPromptArea(!!ag);
+}
+
+// ── System Prompt bar is for MODEL sources only (2026-10-04) ──────────────────────────────────
+// user feedback: "not show the System Prompt whole bar while in hermes mode ... if the user is using a
+// cloud chat model or local then we can still show the system prompt input bar at the top of the
+// chat. but if the user is using hermes/pi/deepseek agents then it's not required."
+// An agent already carries instructions of its own — the client sends `instructions` with every
+// run and the gateway owns the system prompt — so a per-thread system prompt there is noise.
+// Hidden, not removed: switching back to a local/cloud model brings the bar straight back.
+function syncSysPromptArea(isAgent) {
+  const area = document.getElementById('sysPromptArea');
+  if (!area) return;
+  area.style.display = isAgent ? 'none' : '';
+  if (isAgent) collapseSysPrompt();   // never leave the editor open behind a hidden bar
 }
 syncSourceContext();   // page load: honor the restored chat_source (agent or local)
 // ── Agent connectivity ──
@@ -4758,7 +4991,7 @@ function musicProbe(track) {
         let why = '';
         try {
           const j = await r.json();
-          why = (j && j.error) ? String(j.error) : '';
+          why = errText(j, '');
           out.candidates = (j && j.candidates) ? j.candidates : [];
         } catch (e) {}
         out.reason = why || ('HTTP ' + r.status);
@@ -5564,14 +5797,15 @@ function renderBubbleFontSel() {
 }
 function openSettings() {
   document.getElementById('setApiUrl').value = API_URL;
-  // LLM Connections: cloud fields (2026-09-05) — keys stay browser-local
-  document.getElementById('dsUrl').value = CLOUD_CONNS.deepseek.url || '';
-  document.getElementById('dsKey').value = CLOUD_CONNS.deepseek.key || '';
-  document.getElementById('orUrl').value = CLOUD_CONNS.openrouter.url || '';
-  document.getElementById('orKey').value = CLOUD_CONNS.openrouter.key || '';
-  cloudKeyTyped('deepseek'); cloudKeyTyped('openrouter');   // ↻ visibility follows a present key
+  // LLM Connections: cloud + remote fields (2026-09-05, Remote 2026-10-04) — keys stay browser-local
+  for (const p of Object.keys(CLOUD_PROVIDERS)) {
+    const u = connEl(p, 'url'); if (u) u.value = CLOUD_CONNS[p].url || '';
+    const k = connEl(p, 'key'); if (k) k.value = CLOUD_CONNS[p].key || '';
+    cloudKeyTyped(p);            // ↻ visibility follows a present key (or a present URL when keyless)
+    renderDsModels(p);
+  }
   syncConnModelInput('openrouter');                         // Model field mirrors the live/stored id
-  renderDsModels('deepseek'); renderDsModels('openrouter');
+  syncConnModelInput('remote');
   document.getElementById('setSysPrompt').value = SYSTEM_PROMPT;
   document.getElementById('setMaxTokens').value = MAX_TOKENS;
   document.getElementById('setTemp').value = TEMPERATURE;
@@ -5594,35 +5828,59 @@ function openSettings() {
   renderAgentAvatarUI();   // Connect Agent → Agent Avatar preview/Remove state (2026-09-24)
   renderYoloUI();          // Connect Agent → Yolo switch state (2026-09-24)
   populateAgentPane();   // Connect Agent: fill fields from stored config (agent tab default-hidden; fields kept live)
-  // LLM Connections tab follows the ACTIVE thread's conn (Local / DeepSeek / OpenRouter)
+  // LLM Connections tab follows the ACTIVE thread's conn (Local / DeepSeek / OpenRouter / Remote)
   connTab(activeConn.kind === 'cloud' ? activeConn.provider : 'local');
-  cloudStatusLine('deepseek'); cloudStatusLine('openrouter');   // status rows reflect last ping
+  // A blip can leave the pill / status rows stale (the user read "offline" against a live server):
+  // re-check the connection this app is actually on, once, whenever Settings opens.
+  if (activeConn.kind === 'agent' && activeConn.agent) pingAgent(activeConn.agent);
+  for (const p of Object.keys(CLOUD_PROVIDERS)) cloudStatusLine(p);   // status rows reflect last ping
   document.getElementById('settingsModal').classList.add('show');
 }
 function closeSettings() { document.getElementById('settingsModal').classList.remove('show'); }
 // LLM Connections inner tabs (2026-09-05)
+/** Re-check a connection and re-pull a missing list — used when the pane opens. */
+function recheckConn(p) {
+  const c = CLOUD_CONNS[p];
+  if (!c || !cloudConfigured(p)) return;
+  if (c.keyOptional) {
+    // keyless local server: find the live port, then refresh status + list
+    adoptRemoteEndpoint(p, c.url, c.key || '', true).then(ok => {
+      if (!ok) return;
+      pingAgent(p).then(() => cloudStatusLine(p));   // pingAgent repaints the PILL; the pane's row needs its own repaint
+      ensureCloudModels(p);
+    });
+    return;
+  }
+  const keyEl = connEl(p, 'key');
+  if (keyEl && String(keyEl.value || '').length > 0) {
+    pingAgent(p).then(() => cloudStatusLine(p));
+    if (!cloudModels[p]) ensureCloudModels(p);
+  }
+}
+
 function connTab(kind) {
   const tabs = document.querySelectorAll('.conn-tab');
   for (const t of tabs) t.classList.toggle('active', t.dataset.ctab === kind);
-  const panes = { local: 'ctLocal', deepseek: 'ctDeepseek', openrouter: 'ctOpenrouter' };
+  const panes = { local: 'ctLocal', deepseek: 'ctDeepseek', openrouter: 'ctOpenrouter', remote: 'ctRemote' };
   for (const k of Object.keys(panes)) {
     const el = document.getElementById(panes[k]);
     if (el) el.hidden = (k !== kind);
   }
-  if (kind === 'deepseek' || kind === 'openrouter') {
+  const c = CLOUD_CONNS[kind];
+  if (c || kind === 'remote') {
     renderDsModels(kind);   // fresh states on tab switch
-    // auto-pull the catalog when the endpoint is ready but never fetched — the tab is
-    // where you pick a model, so the list should already be there (↻ still re-fetches)
-    const keyEl = document.getElementById(kind === 'deepseek' ? 'dsKey' : 'orKey');
-    if (cloudConfigured(kind) && keyEl && String(keyEl.value || '').length > 0 && !cloudModels[kind]) {
-      ensureCloudModels(kind);
-    }
+    // Self-heal on open (2026-10-04): a transient blip (tunnel drop, gateway restart) used to leave
+    // "proxy unreachable" sitting in the status row until the user happened to Test again — the user
+    // opened Remote and read Offline against a llama-server that was running fine. Opening the pane
+    // re-checks the connection it shows and re-pulls a missing model list, so a stale error clears
+    // itself instead of greeting you.
+    if (c) recheckConn(kind);
   }
 }
 function cloudStatusLine(provider) {
-  const map = { deepseek: 'dsStatus', openrouter: 'orStatus' };
+  const map = { deepseek: 'dsStatus', openrouter: 'orStatus', remote: 'rmtStatus' };
   const st = document.getElementById(map[provider]);
-  const btn = document.getElementById(provider === 'deepseek' ? 'dsTestBtn' : 'orTestBtn');
+  const btn = connEl(provider, 'test');
   if (!st) return;
   const dot = st.querySelector('.status-dot');
   const label = st.querySelector('span:last-child');
@@ -5634,22 +5892,35 @@ function cloudStatusLine(provider) {
 }
 async function testCloudConn(provider) {
   const c = CLOUD_CONNS[provider];
-  const url = document.getElementById(provider === 'deepseek' ? 'dsUrl' : 'orUrl').value.trim();
-  const key = document.getElementById(provider === 'deepseek' ? 'dsKey' : 'orKey').value;
-  const st = document.getElementById(provider === 'deepseek' ? 'dsStatus' : 'orStatus');
-  const btn = document.getElementById(provider === 'deepseek' ? 'dsTestBtn' : 'orTestBtn');
+  const url = connEl(provider, 'url') ? connEl(provider, 'url').value.trim() : '';
+  const key = connEl(provider, 'key') ? connEl(provider, 'key').value : '';
+  const st = connEl(provider, 'status');
+  const btn = connEl(provider, 'test');
   if (!url) { st.className = 'agent-status err'; st.querySelector('.status-dot').className = 'status-dot err'; st.querySelector('span:last-child').textContent = 'Enter a base URL first'; return; }
+  // A keyless local server (Remote) may be on either standard port — probe before reporting, and let
+  // the status row say so instead of a toast (the row is the permanent record of the result).
+  let pingTarget = url;
+  if (c.keyOptional) {
+    const found = await adoptRemoteEndpoint(provider, url, key, true);
+    if (!found) {
+      agentState[provider] = { connected: false,
+                               error: 'no server answered on ' + remoteUrlCandidates(url).join(' or ') };
+      cloudStatusLine(provider);
+      return;
+    }
+    pingTarget = found;
+  }
   btn.disabled = true; btn.textContent = 'Testing…';
   st.className = 'agent-status'; st.querySelector('.status-dot').className = 'status-dot';
   st.querySelector('span:last-child').textContent = 'Checking…';
   try {
     const d = await fetch('/api/agent/ping', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: provider, url: url, key: key })
+      body: JSON.stringify({ id: provider, url: pingTarget, key: key })
     }).then(r => r.json());
     if (d.ok) {
       // apply the typed config so Test alone makes the provider available (Save optional)
-      CLOUD_CONNS[provider].url = url; CLOUD_CONNS[provider].key = key;
+      CLOUD_CONNS[provider].url = pingTarget; CLOUD_CONNS[provider].key = key;
       saveCloudConns();
       cloudModels[provider] = null;   // re-list models against the new endpoint
       cloudFallback[provider] = false;
@@ -5672,24 +5943,27 @@ async function testCloudConn(provider) {
 function saveSettings() {
   API_URL = document.getElementById('setApiUrl').value.replace(/\/+$/, '');
   isLlamaCpp = null; _backendKnown = false; detectBackend(); // API URL changed -> re-probe backend
-  // LLM Connections: persist cloud provider endpoints + keys (2026-09-05)
-  const dsUrl = document.getElementById('dsUrl').value.trim();
-  const dsKey = document.getElementById('dsKey').value;
-  const orUrl = document.getElementById('orUrl').value.trim();
-  const orKey = document.getElementById('orKey').value;
+  // LLM Connections: persist cloud + remote endpoints and keys (2026-09-05, Remote 2026-10-04)
   const orModel = currentOrModelInput();   // OpenRouter model path field (2026-09-13)
-  const dsChanged = CLOUD_CONNS.deepseek.url !== dsUrl || CLOUD_CONNS.deepseek.key !== dsKey;
-  const orChanged = CLOUD_CONNS.openrouter.url !== orUrl || CLOUD_CONNS.openrouter.key !== orKey;
-  CLOUD_CONNS.deepseek.url = dsUrl; CLOUD_CONNS.deepseek.key = dsKey;
-  CLOUD_CONNS.openrouter.url = orUrl; CLOUD_CONNS.openrouter.key = orKey;
+  const changed = {};
+  for (const p of Object.keys(CLOUD_PROVIDERS)) {
+    const urlEl = connEl(p, 'url');
+    const keyEl = connEl(p, 'key');
+    const url = urlEl ? urlEl.value.trim() : (CLOUD_CONNS[p].url || '');
+    const key = keyEl ? keyEl.value : (CLOUD_CONNS[p].key || '');
+    changed[p] = CLOUD_CONNS[p].url !== url || CLOUD_CONNS[p].key !== key;
+    CLOUD_CONNS[p].url = url; CLOUD_CONNS[p].key = key;
+  }
+  for (const p of Object.keys(changed)) {
+    if (!changed[p]) continue;
+    cloudModels[p] = null; cloudFallback[p] = false;
+    const c = CLOUD_CONNS[p];
+    const haveKey = String(c.key || '').length > 0;
+    if (c.url && (haveKey || c.keyOptional)) pingAgent(p); else delete agentState[p];
+  }
   CLOUD_CONNS.openrouter.model = orModel;
   saveCloudConns();
-  if (dsChanged || orChanged) {
-    if (dsChanged) { cloudModels.deepseek = null; cloudFallback.deepseek = false; if (dsUrl && dsKey) pingAgent('deepseek'); else delete agentState.deepseek; }
-    if (orChanged) { cloudModels.openrouter = null; cloudFallback.openrouter = false; if (orUrl && orKey) pingAgent('openrouter'); else delete agentState.openrouter; }
-  }
-  renderDsModels('deepseek');   // list reflects the saved config (cleared -> ↻ prompt)
-  renderDsModels('openrouter');
+  for (const p of Object.keys(CLOUD_PROVIDERS)) renderDsModels(p);   // list reflects the saved config
   SYSTEM_PROMPT = document.getElementById('setSysPrompt').value;
   const mt = parseInt(document.getElementById('setMaxTokens').value);
   MAX_TOKENS = (!isNaN(mt) && mt > 0) ? mt : 0;
@@ -5804,14 +6078,64 @@ function wireBgPlayer(f) {
   window.addEventListener('message', onMsg);
   f.addEventListener('load', () => setTimeout(() => cmdToBgPlayer('unloadModule', ['captions']), 400));
 }
-function toggleBgMute() {
+function toggleBgMute(notice) {
   const f = document.querySelector('#chatBg iframe');
   if (!f) return;
   bgMuted = !bgMuted;
   cmdToBgPlayer(bgMuted ? 'mute' : 'unMute');
   if (!bgMuted) cmdToBgPlayer('unloadModule', ['captions']);
   updateBgMuteBtn();
+  if (notice) showBgMuteNotice();
 }
+
+// ── Mute NOTICE instead of a permanent button (2026-10-04) ─────────────────────────────────────
+// user feedback: "we can remove the mute button all together. make it so if the user touched anywhere on the
+// background or clicks the background of the chat, then it simply unmutes with a quick show of the
+// same mute button we have now as the current / changed state then it disappears again. almost like
+// a notice that the video playbackground is unmuted/muted instead of a button that is visible all
+// the time."
+// So the speaker is never a standing control: a tap on the chat BACKGROUND toggles the video bg's
+// audio and the same button flashes for BG_MUTE_NOTICE_MS with the state it just changed to.
+// "Background" = the click landed on #chatArea or #messages themselves — never on a bubble, a link,
+// a control or anything inside them, so reading, selecting and tapping messages stay untouched.
+const BG_MUTE_NOTICE_MS = 1300;
+let bgMuteNoticeTimer = null;
+function showBgMuteNotice() {
+  const b = document.getElementById('bgUnmute');
+  if (!b) return;
+  updateBgMuteBtn();                            // icon/title already reflect the new state
+  b.classList.remove('bg-notice-out');
+  b.style.display = 'flex';
+  b.classList.remove('bg-notice-pop');
+  void b.offsetWidth;                           // restart the pop animation if it is already up
+  b.classList.add('bg-notice-pop');
+  if (bgMuteNoticeTimer) { clearTimeout(bgMuteNoticeTimer); bgMuteNoticeTimer = null; }
+  bgMuteNoticeTimer = setTimeout(() => {
+    b.classList.add('bg-notice-out');           // fade out, then take it out of the layout
+    bgMuteNoticeTimer = setTimeout(() => {
+      b.classList.remove('bg-notice-pop', 'bg-notice-out');
+      b.style.display = 'none';
+      bgMuteNoticeTimer = null;
+    }, 260);
+  }, BG_MUTE_NOTICE_MS);
+}
+function isChatBackgroundTarget(t) {
+  if (!t || !t.closest) return false;
+  // Anything that IS a message, a control or a link (or sits inside one) is not the background —
+  // so reading, selecting, tapping a bubble, a media tile or a button all stay untouched.
+  if (t.closest('.msg,button,a,input,textarea,select,label,[contenteditable="true"],iframe,audio,video')) return false;
+  return !!t.closest('#chatArea');        // the welcome/empty state, the gutter around bubbles, ...
+}
+function onChatBackgroundClick(e) {
+  if (e.defaultPrevented) return;                                  // someone claimed the gesture
+  if (!isChatBackgroundTarget(e.target)) return;
+  if (!document.querySelector('#chatBg iframe')) return;           // no video background -> nothing to mute
+  toggleBgMute(true);
+}
+(function () {
+  const area = document.getElementById('chatArea');
+  if (area) area.addEventListener('click', onChatBackgroundClick);
+})();
 function applyChatBg() {
   const bg = document.getElementById('chatBg');
   const unmute = document.getElementById('bgUnmute');
@@ -5838,7 +6162,7 @@ function applyChatBg() {
       bg.appendChild(f);
       wireBgPlayer(f);   // mute/unmute + force captions off
       bgCapTimer = setInterval(() => cmdToBgPlayer('unloadModule', ['captions']), 3000);   // playlist-advance captions watchdog
-      if (unmute) { unmute.style.display = 'flex'; bgMuted = true; updateBgMuteBtn(); }
+      if (unmute) { bgMuted = true; updateBgMuteBtn(); }   // no standing control — tap the chat background (2026-10-04)
     }
   }
   applyBgOverlay();
@@ -6558,8 +6882,22 @@ function formatDate(ts) {
   if (d.toDateString() === now.toDateString()) return 'Today ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
   return d.toLocaleDateString([], {month:'short',day:'numeric',year:'numeric'}) + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
 }
+// One place that moves the current-thread pointer: this TAB's own copy (sessionStorage) plus the
+// shared last-used hint (localStorage) that a fresh tab inherits once. Never write the pointer
+// directly - a bare localStorage.setItem is what let two tabs overwrite each other.
+function setCurrentChatId(id) {
+  currentChatId = id || null;
+  try {
+    if (currentChatId) sessionStorage.setItem('chat_current_id', currentChatId);
+    else sessionStorage.removeItem('chat_current_id');
+  } catch (_) {}
+  try {
+    if (currentChatId) localStorage.setItem('chat_current_id', currentChatId);
+    else localStorage.removeItem('chat_current_id');
+  } catch (_) {}
+}
 function newChat() {
-  currentChatId = null;
+  setCurrentChatId(null);
   conversationHistory = [];
   chatAgentSessions = {};   // new thread = fresh agent sessions (keep-alive continuity per thread)
   musicThreadChanged();   // a fresh thread has no queue and no playback (2026-09-25)
@@ -6592,7 +6930,7 @@ function saveCurrentChat() {
   // no quota failure and no "storage full" toast. Writes are coalesced + async; the
   // in-memory mirror is already authoritative for the UI.
   chatStoreWrite(currentChatId);
-  try { localStorage.setItem('chat_current_id', currentChatId); } catch (_) {}
+  setCurrentChatId(currentChatId);     // this tab's pointer + the shared last-used hint
   loadHistory();
   return true;
 }
@@ -6600,8 +6938,7 @@ function loadConversation(chatId) {
   const chats = chatStore;
   const chat = chats.find(c => c.id === chatId);
   if (!chat) return;
-  currentChatId = chatId;
-  localStorage.setItem('chat_current_id', chatId);
+  setCurrentChatId(chatId);
   conversationHistory = JSON.parse(JSON.stringify(chat.messages || []));
   musicThreadChanged();   // capture THIS thread's music, drop the previous thread's playback
   chatAgentSessions = (chat.agentSessions && typeof chat.agentSessions === 'object') ? chat.agentSessions : {};
@@ -7015,10 +7352,39 @@ function updateHistBtns() {
                    : 'Newer prompt — Ctrl+↓';
 }
 
+// ── Soft keyboard drops the moment Send is tapped (2026-10-04, user feedback: "for xllm chat on both s25
+// devices ... auto close the keyboard after the user clicks the send button") ─────────────────────
+// Blurring the textarea puts the IME away so the reply lands on the full-height chat instead of the
+// slice above the keyboard. Scoped to touch input (`pointer: coarse`) so a desktop keyboard user
+// keeps the caret in the box and can keep typing; on the phones the next tap on the box brings the
+// keyboard straight back. Called from sendMessage() after its empty-input guard, so it covers both
+// the normal turn and the mid-run steer path.
+function hideSoftKeyboardOnSend() {
+  try {
+    if (!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)) return;
+    const el = document.getElementById('chatInput');
+    if (el && document.activeElement === el) el.blur();
+  } catch (e) { /* never let focus handling break a send */ }
+}
+
+// ── Composer focus after a turn: DESKTOP ONLY ──────────────────────────────────────────────────
+// The run teardown and the steer path used to re-focus #chatInput unconditionally, which on a phone
+// shot the soft keyboard back up over the reply the user was reading (the user, 2026-10-04: "after the
+// response, i see the keyboard flies back open and covering the response — it should stay closed
+// unless the user touches the chat text input"). Desktop keeps the caret ready to type; on a
+// coarse-pointer device the keyboard only ever returns from a real tap on the box.
+function restoreComposerFocus(input) {
+  let coarse = false;
+  try { coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches); } catch (e) {}
+  if (coarse) return;
+  if (input) input.focus();
+}
+
 async function sendMessage() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
   if (!text && attachments.length === 0) return;
+  hideSoftKeyboardOnSend();
   const RS = curRun();
   if (RS) {
     // R1-Connect-style interrupt: while THIS thread's AGENT run streams, typing +
@@ -7281,7 +7647,7 @@ async function streamFromHistory() {
       if (input) {
         input.disabled = false;
         input.placeholder = 'Type a message...';
-        if (threadId === currentChatId) input.focus();
+        if (threadId === currentChatId) restoreComposerFocus(input);
       }
     }
   }
@@ -8162,7 +8528,7 @@ async function agentRunTurn() {
     }
     setActivityLine(connecting, 'err', '', 'run start failed');
     let msg = 'Agent error HTTP ' + r0.status;
-    try { const e = await r0.json(); if (e && e.error) msg = String(e.error); } catch (_) {}
+    try { msg = errText(await r0.json(), msg); } catch (_) {}
     throw new Error(msg);
   }
   const rd = await r0.json();
@@ -8183,7 +8549,7 @@ async function agentRunTurn() {
     });
     if (!evRes.ok) {
       let msg = 'Event stream error HTTP ' + evRes.status;
-      try { const e = await evRes.json(); if (e && e.error) msg = String(e.error); } catch (_) {}
+      try { msg = errText(await evRes.json(), msg); } catch (_) {}
       throw new Error(msg);
     }
     const reader = evRes.body.getReader();
@@ -8368,7 +8734,7 @@ async function doAgentSteer(text) {
   } catch (e) {
     showToast('Steer failed: ' + e.message);
   }
-  input.focus();
+  restoreComposerFocus(input);
 }
 
 // Classic chat-completions agent turn — used when the agent's server does NOT
@@ -8428,7 +8794,7 @@ async function agentChatSimpleTurn(ag, sessId, reuseExisting) {
     });
     if (!res.ok) {
       let msg = 'Agent error HTTP ' + res.status;
-      try { const e = await res.json(); if (e && e.error) msg = String(e.error); } catch (_) {}
+      try { msg = errText(await res.json(), msg); } catch (_) {}
       throw new Error(msg);
     }
     const reader = res.body.getReader();
@@ -8924,7 +9290,7 @@ async function streamResponse(S) {
     }
     if (!res.ok) {
       let emsg = `HTTP ${res.status}: ${res.statusText}`;
-      try { const je = await res.json(); if (je && je.error) emsg = String(je.error).slice(0, 300); } catch (_) {}
+      try { emsg = errText(await res.json(), emsg).slice(0, 300); } catch (_) {}
       throw new Error(emsg);
     }
 
@@ -9050,18 +9416,45 @@ async function streamResponse(S) {
     // * 1000 (cumulative since decode start, exact server counters). NOT the
     // server's predicted_per_second convenience field, which divides (n-1)/ms.
     // vLLM has no timings field, so fall back to the measured rate. (2026-09-06)
-    const exactTps = (serverTimings && serverTimings.predicted_n > 0 && serverTimings.predicted_ms > 0)
-      ? (serverTimings.predicted_n / serverTimings.predicted_ms) * 1000
-      : (genMs > 0 ? (exactTokens / (genMs / 1000)) : 0);
+    const measuredTps = genMs > 0 ? (exactTokens / (genMs / 1000)) : 0;
+    // GUARD (2026-10-06): a server's decode clock can be stale or belong to a DIFFERENT request —
+    // Strata reported 1,179.7 t/s for an 86-token turn that measurably ran ~65 — so the server
+    // figure is used only inside a sane band of the rate we measured ourselves. A wrong headline is
+    // worse than a less precise one, and it becomes the graph's end point too.
+    let exactTps = measuredTps;
+    if (serverTimings && serverTimings.predicted_n > 0 && serverTimings.predicted_ms > 0) {
+      const srvTps = (serverTimings.predicted_n / serverTimings.predicted_ms) * 1000;
+      if (srvTps >= measuredTps * 0.5 && srvTps <= measuredTps * 2 + 5) exactTps = srvTps;
+    }
     // ── Bench capture (2026-09-06): prefill (prompt tokens / time-to-first-token),
     //    exact decode t/s, window ctx + used, and the live speed series → stored on
     //    the message (stats.*) AND mirrored into the benchLive registry for the popup.
     const promptN = (finalUsage && finalUsage.prompt_tokens > 0) ? finalUsage.prompt_tokens
       : ((serverTimings && serverTimings.prompt_n > 0) ? serverTimings.prompt_n : 0);
     const ttfMs = msgFirstTokenTime > 0 ? (msgFirstTokenTime - streamStartTime) : totalMs;
+    // How much of the prompt the server's conversation cache already held. Servers report it in
+    // different places: llama.cpp/Strata as timings.cache_n, any OpenAI-compatible one with
+    // automatic prefix caching as usage.prompt_tokens_details.cached_tokens (vLLM does this).
+    const cacheN = (serverTimings && serverTimings.cache_n > 0)
+      ? serverTimings.cache_n
+      : (((finalUsage || {}).prompt_tokens_details || {}).cached_tokens || 0);
+    // coherent only if the cache figure is part of THIS prompt's token count — a server whose cache
+    // number is not request-scoped can report 155 cached for a 92-token prompt (measured on Strata,
+    // where a second concurrent request overwrites the engine's stats snapshot)
+    const cacheKnown = cacheN > 0 && cacheN < promptN;
+    const readN = cacheKnown ? Math.max(1, promptN - cacheN) : promptN;
     let promptTps = null;
     if (serverTimings && serverTimings.prompt_n > 0 && serverTimings.prompt_ms > 0) promptTps = serverTimings.prompt_n / serverTimings.prompt_ms * 1000;
-    else if (promptN > 0 && ttfMs > 0) promptTps = promptN / (ttfMs / 1000);
+    else if (cacheN > 0 && cacheN >= promptN) {
+      // the whole prompt came from the cache (or the cache figure is not this prompt's): there is no
+      // prefill to report, and '—' beats a rate built from a number we can see is wrong
+      promptTps = null;
+    } else if (readN > 0 && ttfMs > 0) {
+      // Prefill rate = the tokens the server actually READ / TTFT. Counting cache-reused tokens as
+      // prefilled reported 2,123 t/s for a 42,088-token prompt whose own engine read 13,079 of them
+      // at 662 t/s (xLLM bench 2026-10-06) — TTFT buys the cache hit, not the prefill.
+      promptTps = readN / (ttfMs / 1000);
+    }
     // Terminal calibration (2026-09-06): the live series is an ESTIMATE on every
     // non-llama.cpp path (char-based), so its end can sit 10-65% off the exact
     // final decode rate. Calibrate the WHOLE series proportionally (shape
@@ -9080,11 +9473,13 @@ async function streamResponse(S) {
     const finalStats = { tokens: exactTokens, timeMs: totalMs, tps: exactTps, truncated: finishReason === 'length' || undefined, model: displayModelBadge(),
       kind: (S.kind === 'cloud' ? 'cloud' : (S.kind === 'agent' ? 'agent' : 'local')),
       promptTokens: promptN || undefined, ttfMs: ttfMs, promptTps: promptTps || undefined,
+      promptCached: cacheN || undefined, promptRead: readN || undefined,
       ctx: benchCtxLimit || undefined,
       ctxUsed: (promptN > 0 && exactTokens > 0) ? (promptN + exactTokens) : undefined,
       speed: benchSamples.length ? benchDownsample(benchSamples, 240) : undefined };
     if (benchLive && benchLive.chatId === threadId) {
       benchLive.final = { tokens: exactTokens, timeMs: totalMs, tps: exactTps, promptTps: promptTps, promptTokens: promptN || undefined,
+        promptCached: cacheN || undefined, promptRead: readN || undefined,
         ttfMs: ttfMs, ctx: benchCtxLimit || undefined, ctxUsed: finalStats.ctxUsed, truncated: finalStats.truncated || false };
       benchLive.live = false; benchLive.partial = false; benchLive.samples = benchSamples;
       benchLive.elapsed = totalMs; benchLive.tokens = exactTokens; benchLive.tps = exactTps;
@@ -9378,7 +9773,15 @@ function mediaKindOf(tok) {
   return 'audio';
 }
 function mediaBaseName(tok) { return String(tok).split(/[\\/]/).pop() || tok; }
-function mediaApiUrl(tok) { return '/api/media?path=' + encodeURIComponent(tok); }
+function mediaApiUrl(tok) {
+  // Strip the agent-side `MEDIA:` protocol marker before it reaches the file server: it is a routing
+  // marker, not part of the filename. Every Hermes agent on this box emits it (R1 Connect's convention,
+  // also what the local-media MCP tool tells the model to write), and passing it through verbatim made
+  // /api/media look for a file literally named "MEDIA:/home/..." → 404 → a broken tile on the phone
+  // (measured on the S25e 2026-10-04). Paths may keep leading spaces after the prefix.
+  const path = String(tok).trim().replace(/^MEDIA:\s*/i, '');
+  return '/api/media?path=' + encodeURIComponent(path);
+}
 
 function mediaCodeSpans(text) {
   // ```fenced``` + `inline` code regions — image-looking strings inside code are
@@ -9504,7 +9907,7 @@ function mediaItemHTML(tok) {
   const kind = mediaKindOf(tok);
   const title = 'Open ' + kind + ': ' + tok;
   if (kind === 'video') {
-    return `<a class="bubble-media-item mv-kind-video" href="${href}" title="${escAttr(title)}"><video muted playsinline preload="metadata" src="${href}"></video></a>`;
+    return `<a class="bubble-media-item mv-kind-video" href="${href}" title="${escAttr(title)}"><video muted playsinline preload="metadata" src="${href}#t=0.1"></video></a>`;
   }
   if (kind === 'audio') {
     const played = mediaPreviewed(href);
@@ -9798,6 +10201,59 @@ function mvWireImageZoom(el) {
   };
   el.addEventListener('pointerup', endDrag);
   el.addEventListener('pointercancel', endDrag);
+
+  // ── Touch: pinch to zoom, one finger to pan (2026-10-04) ────────────────────────────────────────
+  // The only zoom path used to be `wheel`, which NO touch device fires — so on the phones the picture
+  // was stuck at fit and there was nothing to pan either (pan only armed above 1x). user feedback: "i can't
+  // pinch/pan/zoom on image preview". `touch-action:none` is already on .mv-stage img, so every
+  // gesture arrives here instead of being eaten by the browser's own page zoom.
+  const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  let _mvTouch = null;                       // {mode:'pinch'|'pan', ...}
+  el.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const [a, b] = [e.touches[0], e.touches[1]];
+      _mvTouch = { mode: 'pinch', d: dist(a, b) || 1, zoom: _mvZoom, tx: _mvTx, ty: _mvTy,
+                   cx: (a.clientX + b.clientX) / 2, cy: (a.clientY + b.clientY) / 2 };
+    } else if (e.touches.length === 1 && _mvZoom > MV_ZOOM_MIN + 1e-4) {
+      e.preventDefault();
+      _mvTouch = { mode: 'pan', x: e.touches[0].clientX, y: e.touches[0].clientY, tx: _mvTx, ty: _mvTy };
+      el.classList.add('mv-dragging');
+    }
+  }, { passive: false });
+  el.addEventListener('touchmove', (e) => {
+    if (!_mvTouch) return;
+    e.preventDefault();
+    const box = layoutBox();
+    if (_mvTouch.mode === 'pinch' && e.touches.length === 2) {
+      const [a, b] = [e.touches[0], e.touches[1]];
+      const next = Math.min(MV_ZOOM_MAX, Math.max(MV_ZOOM_MIN, _mvTouch.zoom * (dist(a, b) / _mvTouch.d)));
+      // the point under the fingers' midpoint must not move while they spread
+      const u = (_mvTouch.cx - box.left - _mvTouch.tx) / (box.w * _mvTouch.zoom);
+      const v = (_mvTouch.cy - box.top - _mvTouch.ty) / (box.h * _mvTouch.zoom);
+      _mvZoom = next;
+      _mvTx = (_mvTouch.cx - box.left) - u * box.w * next;
+      _mvTy = (_mvTouch.cy - box.top) - v * box.h * next;
+      if (_mvTouch.zoom * (dist(a, b) / _mvTouch.d) < MV_ZOOM_MIN) {   // pinched shut → back to fit
+        _mvTx = 0; _mvTy = 0;
+      }
+    } else if (_mvTouch.mode === 'pan' && e.touches.length === 1) {
+      _mvTx = _mvTouch.tx + (e.touches[0].clientX - _mvTouch.x);
+      _mvTy = _mvTouch.ty + (e.touches[0].clientY - _mvTouch.y);
+    } else {
+      return;
+    }
+    mvClampPan(box);
+    mvApplyZoom(el);
+    mvZoomHome(el);
+    el.classList.toggle('mv-zoomed', _mvZoom > MV_ZOOM_MIN + 1e-3);
+  }, { passive: false });
+  const endTouch = (e) => {
+    if (!_mvTouch) return;
+    if (e.touches && e.touches.length === 0) { _mvTouch = null; el.classList.remove('mv-dragging'); }
+  };
+  el.addEventListener('touchend', endTouch);
+  el.addEventListener('touchcancel', endTouch);
 }
 function openMediaViewerFrom(itemEl) {
   const wrap = itemEl.closest('.bubble-media');
@@ -9806,6 +10262,39 @@ function openMediaViewerFrom(itemEl) {
   const clickIdx = _mvItems.indexOf(itemEl.href);
   mvOpen(clickIdx >= 0 ? clickIdx : 0);
 }
+// ── Reading an HTTP error body (2026-10-06) ───────────────────────────────────────────────────
+// The failure paths below used to do String(body.error), which prints "[object Object]" the moment a
+// server answers with the OpenAI shape {"error": {"message": ..., "type": ...}} — exactly what Strata
+// returns with a 400 when the launch has no vision encoder (user feedback: "Error: [object Object] is shown
+// when i introduce the image to the chat"). Pull the message out of an object, and fall back to the
+// compact JSON of it, so the real reason always reaches the bubble.
+function errText(body, fallback) {
+  const e = (body && body.error !== undefined) ? body.error : body;
+  if (e === undefined || e === null || e === '') return fallback;
+  if (typeof e === 'string') return e;
+  if (typeof e.message === 'string' && e.message) return e.message;
+  if (typeof e.type === 'string' && e.type) return e.type;
+  try { const s = JSON.stringify(e); return (s && s !== '{}') ? s : fallback; } catch (_) { return fallback; }
+}
+
+// ── Video TILES show their first frame (2026-10-04) ─────────────────────────────────────────────
+// user feedback: "the video returned in chat responses doesn't show the first frame for the preview behind
+// the play button — it only looks like a play icon with a grey background". The tile is a muted
+// <video preload="metadata"> with the ▶ drawn as a CSS ::after overlay and the tile body painted
+// var(--bg3): nothing ever decodes a frame, so the grey shows through. The tile src now carries
+// `#t=0.1` (a media fragment the decoder honours as a still), and this capture-phase listener nudges
+// any tile that still reports metadata-only — media events don't bubble, but capture on document
+// does receive them. The viewer's own <video> is not inside .bubble-media-item, so it is untouched.
+document.addEventListener('loadedmetadata', (e) => {
+  const v = e.target;
+  if (!v || v.tagName !== 'VIDEO' || !v.closest || !v.closest('.bubble-media-item')) return;
+  if (v.dataset.posterDone) return;
+  v.dataset.posterDone = '1';
+  if (v.readyState >= 2) { v.pause(); return; }          // a frame is already decoded
+  try { v.currentTime = (v.duration && v.duration > 0.4) ? 0.1 : 0; } catch (_) {}
+  v.addEventListener('seeked', () => { try { v.pause(); } catch (_) {} }, { once: true });
+}, true);
+
 // Delegated: any media tile click opens the viewer (images no longer open a new tab)
 document.addEventListener('click', (e) => {
   const it = e.target.closest('.bubble-media-item');
@@ -9866,13 +10355,25 @@ function escapeAndFormat(text) {
   const hl = markExternalLinks(highlightCodeBlocks(safe));
   // Post-process code blocks: add copy / try-it / download to the pre blocks
   // that marked emitted, preserving the html-preview integration.
-  return hl.replace(/<pre><code class="language-(html|htm|svelte|jsx|tsx|css)">([\s\S]*?)<\/code><\/pre>/g, (match, lang, code) => {
+  const out = hl.replace(/<pre><code class="language-(html|htm|svelte|jsx|tsx|css)">([\s\S]*?)<\/code><\/pre>/g, (match, lang, code) => {
     return `<pre data-ishtml="1"><code class="lang-${lang}">${code.trim()}</code><div class="pre-btns"><button class="copy-btn" onclick="copyCode(this)">Copy</button><button class="try-btn" onclick="tryHtml(this)">Try it</button><button class="dl-btn" onclick="downloadHtml(this)" title="Download HTML">${STAT_ICON_DOWNLOAD}</button><button class="toggle-btn" onclick="toggleCode(this)" title="Minimize code">&minus;</button></div><div class="pre-btns-bottom"><button class="try-btn" onclick="tryHtml(this)">Try it</button><button class="dl-btn" onclick="downloadHtml(this)" title="Download HTML">${STAT_ICON_DOWNLOAD}</button><button class="toggle-btn" onclick="toggleCode(this)" title="Minimize code">&minus;</button></div></pre>`;
   }).replace(/<pre><code class="language-([\w+-]+)">([\s\S]*?)<\/code><\/pre>/g, (match, lang, code) => {
     return `<pre><code class="lang-${lang}">${code.trim()}</code><button class="copy-btn" onclick="copyCode(this)">Copy</button><button class="toggle-btn" onclick="toggleCode(this)" title="Minimize code">&minus;</button></pre>`;
   }).replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (match, code) => {
     return `<pre><code class="lang-text">${code.trim()}</code><button class="copy-btn" onclick="copyCode(this)">Copy</button><button class="toggle-btn" onclick="toggleCode(this)" title="Minimize code">&minus;</button></pre>`;
   });
+  return wrapTables(out);
+}
+
+// Wrap every rendered markdown table in a horizontal scroller (2026-10-05).
+// A GFM table whose min-content is wider than the bubble used to paint outside
+// the response card and over the page background — the user's phone screenshot.
+// The wrapper is the bubble-width block that the table swipes inside; the table
+// keeps width:auto + min-width:100% (see .bubble .tbl-wrap CSS) so a narrow
+// table still fills the bubble and a wide one scrolls instead of overflowing.
+function wrapTables(html) {
+  if (!html || html.indexOf('<table') === -1) return html;
+  return html.replace(/<table[\s\S]*?<\/table>/gi, m => `<div class="tbl-wrap">${m}</div>`);
 }
 
 // Strip leak/exec vectors from marked-rendered model output: <style> would apply
@@ -9917,15 +10418,24 @@ function copyCode(btn) {
   setTimeout(() => btn.textContent = 'Copy', 1500);
 }
 
+// ── HTML preview overlay state ──
+// _pvH = the frame's own scroll height, reported up from the sandboxed iframe (the parent cannot
+// measure across the sandbox boundary). 0 = not reported yet → the wrap holds a full dvh.
+let _pvH = 0;
+
 function tryHtml(btn) {
   const pre = btn.closest('pre');
   const code = pre.querySelector('code');
-  // llama.cpp DialogCodePreview EXACT behavior: raw srcdoc, zero processing.
-  // No reset injection, no scale-to-fill, no tag repair — the model's HTML
-  // renders exactly as-is in the sandboxed iframe.
+  // llama.cpp DialogCodePreview EXACT behavior: raw srcdoc, zero processing — the model's HTML renders
+  // exactly as-is in the sandboxed iframe, plus one appended bootstrap (in-frame close + size report).
   const html = code ? code.textContent : pre.textContent;
-  document.getElementById('previewOverlay').classList.add('show');
-  document.getElementById('previewFrame').srcdoc = html;
+  const overlay = document.getElementById('previewOverlay');
+  overlay.classList.add('show');
+  _pvH = 0;                                            // unknown until the frame reports
+  document.getElementById('pvLoading').classList.add('show');
+  const wrap = document.querySelector('.preview-frame-wrap');
+  if (wrap) wrap.style.height = '100dvh';
+  document.getElementById('previewFrame').srcdoc = html + PREVIEW_BOOTSTRAP;
 }
 
 function downloadHtml(btn) {
@@ -9938,7 +10448,50 @@ function downloadHtml(btn) {
   if (m && m[1].trim()) {
     name = m[1].trim().replace(/[^\w\-. ]+/g, '').replace(/\s+/g, '-').slice(0, 60) + '.html';
   }
-  const blob = new Blob([html], { type: 'text/html' });
+  downloadBlob(new Blob([html], { type: 'text/html' }), name);
+}
+
+// Save a generated file from any client (2026-10-06).
+//
+// The blob: + <a download> route works in a desktop browser and is DEAD in an Android WebView: the
+// host app's DownloadListener gets "blob:https://…" and DownloadManager refuses it with "can only
+// download over https" (it can only fetch http/https) — which is what the phone showed for Try it →
+// Download HTML, and would have shown on any other embedded client too.
+//
+// So when we are embedded (standalone app / R1 Connect WebView, or an <iframe>), ask the native side
+// for the file: hand it a blob: URL whose FRAGMENT carries xllmname=<name> and xllmb64=<base64>, in
+// slices — a WebView bridge drops huge single fragments, so the payload is chunked and the native
+// host concatenates the xllmb64 values in order. The fragment (unlike a query string) survives all
+// the way to the download listener. Desktop gets plain blob: + <a download>, exactly as before.
+function downloadBlob(blob, name) {
+  const native = (function () {
+    try {
+      if (navigator.userAgent && /wv\)|xLLM|R1 Connect/i.test(navigator.userAgent)) return true;
+      return window.self !== window.top;                    // inside an iframe (the embedded clients)
+    } catch (e) { return true; }
+  })();
+  if (native) {
+    try {
+      const FRAG = 24000;
+      const head = 'blob:https://xllm.local/' + encodeURIComponent(name) + '#xllmname=' +
+                   encodeURIComponent(name) + '&xllmtype=' + encodeURIComponent(blob.type || 'application/octet-stream');
+      const rd = new FileReader();
+      rd.onload = function () {
+        const b64 = String(rd.result).split(',')[1] || '';
+        let url = head;
+        for (let i = 0; i < b64.length; i += FRAG) url += '&xllmb64=' + b64.slice(i, i + FRAG);
+        const a = document.createElement('a');
+        a.href = url; a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+      };
+      rd.onerror = function () { showToast('Could not prepare ' + name, null, true); };
+      rd.readAsDataURL(blob);
+      return;
+    } catch (e) {
+      showToast('Download failed: ' + e.message, null, true);
+      return;
+    }
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = name;
@@ -9949,9 +10502,47 @@ function downloadHtml(btn) {
   showToast('Downloaded ' + name);
 }
 
+// The preview iframe is sandboxed WITHOUT allow-same-origin, so this parent cannot read it — the
+// frame reports its own size, its own scroll, and its own intent to close (see the bootstrap below).
+window.addEventListener('message', (e) => {
+  const f = document.getElementById('previewFrame');
+  if (!f || e.source !== f.contentWindow) return;      // only the preview frame, nothing else
+  const d = e.data || {};
+  if (d.xllm === 'preview-size' && d.h > 40) {
+    _pvH = d.h; _syncPreviewSize();
+  } else if (d.xllm === 'preview-done') {
+    document.getElementById('pvLoading').classList.remove('show');
+  } else if (d.xllm === 'preview-close') {
+    closePreview();
+  }
+});
+
+// Appended to every preview: a close button INSIDE the frame (an absolutely-positioned overlay gets
+// clipped away on the hosted pages, and a fixed one shares the stacking context of whatever the page
+// already stacked above the body), plus a size/scroll reporter. The parent can't measure across the
+// sandbox boundary; the frame can. Kept deliberately small — the preview is meant to show the model's
+// HTML as-is.
+const PREVIEW_BOOTSTRAP = `<style id="xllm-pv-boot">#xllmPvClose{position:fixed;top:10px;right:10px;z-index:2147483647;width:40px;height:40px;border:0;border-radius:20px;background:rgba(18,18,22,.62);color:#fff;font:600 19px/1 system-ui,-apple-system,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.45);-webkit-tap-highlight-color:transparent;touch-action:manipulation}</style><button id="xllmPvClose" type="button" aria-label="Close preview">&#10005;</button><script>(function(){function sn(){try{var h=Math.max(document.body?document.body.scrollHeight:0,document.documentElement.scrollHeight||0);parent.postMessage({xllm:'preview-size',h:h},'*');}catch(e){}}function dn(){try{parent.postMessage({xllm:'preview-done'},'*');}catch(e){}}var b=document.getElementById('xllmPvClose');if(b)b.onclick=function(){try{parent.postMessage({xllm:'preview-close'},'*');}catch(e){}};window.addEventListener('load',function(){dn();setTimeout(sn,50);setTimeout(sn,400);setTimeout(sn,1200);});window.addEventListener('resize',function(){setTimeout(sn,80);});window.addEventListener('orientationchange',function(){setTimeout(sn,150);});setTimeout(dn,900);setTimeout(sn,160);})();<\/script>`;
+
+// Preview overlay: full dvh while the frame is TALLER than the viewport (a tall page scrolls inside),
+// and exactly the frame's own height once it fits — so a short page does not sit in a black well.
+// Reported by the frame itself (sandboxed cross-origin; the parent cannot measure it).
+function _syncPreviewSize() {
+  const wrap = document.querySelector('.preview-frame-wrap');
+  const f = document.getElementById('previewFrame');
+  if (!wrap || !f) return;
+  const vh = window.innerHeight || 800;
+  if (!_pvH) { wrap.style.height = '100dvh'; return; }
+  wrap.style.height = Math.min(_pvH < 80 ? 80 : _pvH, vh) + 'px';
+}
+
+window.addEventListener('orientationchange', () => setTimeout(_syncPreviewSize, 250));
+window.addEventListener('resize', _syncPreviewSize);
+
 function closePreview() {
   document.getElementById('previewOverlay').classList.remove('show');
   document.getElementById('previewFrame').srcdoc = '';
+  document.getElementById('pvLoading').classList.remove('show');
 }
 
 function escHtml(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
@@ -10035,6 +10626,43 @@ function jumpDown() {
 
 function resetJumpIndex() { _jumpIndex = -1; _updateJumpButtons(); }
 
+// HOLD on the page-up button = straight to the TOP of the conversation
+// (user 2026-10-04: "make if holding page up button, goes to top of chat").
+// A tap keeps the one-message walk; a hold swallows the click that follows it.
+const JUMP_HOLD_MS = 400;
+let _jumpHoldTimer = null;
+let _jumpHoldFired = false;
+
+function jumpToTop() {
+  const msgs = _jumpMsgs(); const area = _jumpArea();
+  if (!area) return;
+  _jumpIndex = 0;
+  if (msgs.length) _scrollToMsg(msgs[0]);
+  else area.scrollTo({ top: 0, behavior: 'smooth' });
+  _updateJumpButtons();
+}
+
+(function () {
+  const up = document.getElementById('jumpBtn');
+  if (!up) return;
+  const start = () => {
+    _jumpHoldFired = false;                 // every new press re-arms the click
+    clearTimeout(_jumpHoldTimer);
+    _jumpHoldTimer = setTimeout(() => {
+      if (up.disabled) return;
+      _jumpHoldFired = true;
+      jumpToTop();
+    }, JUMP_HOLD_MS);
+  };
+  const cancel = () => { clearTimeout(_jumpHoldTimer); _jumpHoldTimer = null; };
+  up.addEventListener('pointerdown', start);
+  up.addEventListener('touchstart', start, { passive: true });   // engines without PointerEvent
+  ['pointerup', 'pointercancel', 'pointerleave', 'touchend', 'touchcancel', 'mouseleave']
+    .forEach((ev) => up.addEventListener(ev, cancel, { passive: true }));
+  // a hold must never raise the text-selection / context menu
+  up.addEventListener('contextmenu', (e) => e.preventDefault());
+})();
+
 // The jump stack is position:fixed, so an input box that GROWS (multi-line typing,
 // attachment chips, the system-prompt bar) would slide up underneath it. Track the
 // input area and keep the pair just above whatever the box is now (user 2026-09-24:
@@ -10054,6 +10682,8 @@ function _syncJumpStackOffset() {
   const MIN_ROOM = 80;  // never push the pair off the top of a short viewport
   const bottom = Math.max(window.innerHeight - anchorTop + GAP, 8);
   stack.style.bottom = Math.min(bottom, Math.max(window.innerHeight - MIN_ROOM, 8)) + 'px';
+  // the unmute button rides level with the page-DOWN chevron, so it moves with the stack
+  if (typeof _syncBgUnmuteOffset === 'function') _syncBgUnmuteOffset();
 }
 (function () {
   const area = document.querySelector('.input-area');
@@ -10061,6 +10691,42 @@ function _syncJumpStackOffset() {
   if (window.ResizeObserver) new ResizeObserver(_syncJumpStackOffset).observe(area);
   window.addEventListener('resize', _syncJumpStackOffset);
   _syncJumpStackOffset();
+})();
+
+// The unmute (speaker) button sits PARALLEL TO THE PAGE-DOWN CHEVRON, on the LEFT of the
+// lower chat, just above the chat input bar (user 2026-10-04: "parallel to the page down
+// button, placed on left hand side of the lower bottom of the chat, above the chat input
+// bar"). It mirrors the jump stack: the same x-margin on the left (CSS: the mirrored
+// 820px-column calc) and its centre level with #jumpDownBtn. The stack's bottom is
+// re-synced whenever the input box grows, so _syncJumpStackOffset() calls this too; the
+// CSS `top:calc(100vh - 190px)` is only the no-JS fallback.
+function _syncBgUnmuteOffset() {
+  const btn = document.getElementById('bgUnmute');
+  if (!btn) return;
+  const bh = btn.offsetHeight || 40;
+  let top = null;
+  const down = document.getElementById('jumpDownBtn');
+  const stack = document.getElementById('jumpStack');
+  if (down && down.offsetHeight) {
+    const r = down.getBoundingClientRect();
+    top = r.top + (r.height - bh) / 2;          // level with the page-down chevron
+  } else if (stack && stack.offsetHeight) {
+    top = stack.getBoundingClientRect().bottom - bh;   // fallback: bottom of the stack
+  } else {
+    const bar = document.querySelector('.input-container');
+    if (bar) top = bar.getBoundingClientRect().top - bh - 8;
+  }
+  if (top == null) return;
+  btn.style.top = Math.round(top) + 'px';
+  btn.style.left = '';        // CSS owns the mirrored left margin
+  btn.style.right = 'auto';
+  btn.style.bottom = 'auto';
+}
+(function () {
+  const area = document.querySelector('.input-area');
+  if (window.ResizeObserver && area) new ResizeObserver(_syncBgUnmuteOffset).observe(area);
+  window.addEventListener('resize', _syncBgUnmuteOffset);
+  _syncBgUnmuteOffset();
 })();
 
 // Manual scrolling re-anchors the walk to whatever message is at the viewport top
@@ -10092,7 +10758,10 @@ document.addEventListener('click', (e) => {
     const r = btn.getBoundingClientRect();
     return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
   };
-  if (up && (up.contains(e.target) || inRect(up))) { if (!up.disabled) jumpUp(); return; }
+  if (up && (up.contains(e.target) || inRect(up))) {
+    if (_jumpHoldFired) { _jumpHoldFired = false; return; }   // that press was a HOLD → already at the top
+    if (!up.disabled) jumpUp(); return;
+  }
   if (down && (down.contains(e.target) || inRect(down))) { if (!down.disabled) jumpDown(); return; }
 });
 
@@ -10190,6 +10859,7 @@ function benchCollect() {
   const liveNow = !!(lv && lv.live);
   let model = benchState.model || '', kind = '', stateLabel = '';
   let tokens = null, timeMs = null, tps = null, promptTps = null, promptTokens = null, ttfMs = null;
+  let promptCached = null, promptRead = null;
   let ctx = null, ctxUsed = null, truncated = false, series = null;
   if (st && (st.tokens > 0 || st.timeMs > 0 || Array.isArray(st.speed))) {
     model = st.model || model; kind = st.kind || '';
@@ -10198,6 +10868,8 @@ function benchCollect() {
     promptTps = (st.promptTps !== null && st.promptTps !== undefined) ? st.promptTps : null;
     promptTokens = (st.promptTokens !== null && st.promptTokens !== undefined) ? st.promptTokens : null;
     ttfMs = (st.ttfMs !== null && st.ttfMs !== undefined) ? st.ttfMs : null;
+    promptCached = (st.promptCached !== null && st.promptCached !== undefined) ? st.promptCached : null;
+    promptRead = (st.promptRead !== null && st.promptRead !== undefined) ? st.promptRead : null;
     ctx = (st.ctx !== null && st.ctx !== undefined) ? st.ctx : null;
     ctxUsed = (st.ctxUsed !== null && st.ctxUsed !== undefined) ? st.ctxUsed : null;
     truncated = !!st.truncated;
@@ -10215,6 +10887,8 @@ function benchCollect() {
       const f = lv.final;
       tokens = f.tokens; timeMs = f.timeMs; tps = f.tps;
       promptTps = f.promptTps; promptTokens = f.promptTokens; ttfMs = f.ttfMs;
+      promptCached = (f.promptCached !== null && f.promptCached !== undefined) ? f.promptCached : null;
+      promptRead = (f.promptRead !== null && f.promptRead !== undefined) ? f.promptRead : null;
       ctx = (f.ctx !== null && f.ctx !== undefined) ? f.ctx : null;
       ctxUsed = (f.ctxUsed !== null && f.ctxUsed !== undefined) ? f.ctxUsed : null;
       truncated = !!f.truncated;
@@ -10230,7 +10904,7 @@ function benchCollect() {
   }
   const hasAny = (tokens !== null) || (series !== null);
   return { msgEl, sb, model, kind, live: liveNow, stateLabel, tokens, timeMs, tps, promptTps,
-    promptTokens, ttfMs, ctx, ctxUsed, truncated, series, hasAny };
+    promptTokens, promptCached, promptRead, ttfMs, ctx, ctxUsed, truncated, series, hasAny };
 }
 function benchPromptSnippet() {
   for (let i = benchState.hidx - 1; i >= 0; i--) {
@@ -10324,7 +10998,7 @@ function benchHTML(v) {
   const liveChip = v.live ? '<span class="bm-live"><i></i>LIVE</span>'
     : (v.stateLabel === 'partial' ? '<span class="bm-live" style="color:var(--red)"><i style="background:var(--red)"></i>STOPPED</span>' : '');
   const rows = [
-    ['Prefill speed', benchFmtTps(v.promptTps), ''],
+    ['Prefill speed', benchFmtTps(v.promptTps) + ((v.promptCached > 0 && v.promptCached < v.promptTokens) ? '<span class="sub">' + benchFmtInt(v.promptCached) + ' cached</span>' : ''), ''],
     ['Tokens', benchFmtInt(v.tokens) + (v.truncated ? ' <span class="sub">⚠ cap</span>' : ''), v.truncated ? 'warn' : ''],
     ['Time', formatPerfTime(v.timeMs || 0), ''],
     ['Decode t/s', benchFmtTps(v.tps), v.live ? 'live' : ''],
@@ -10443,6 +11117,11 @@ function benchPayload() {
   if (v.tps !== null) stats.decodeTps = v.tps;
   if (v.promptTps !== null) stats.prefillTps = v.promptTps;
   if (v.promptTokens !== null) stats.promptTokens = v.promptTokens;
+  // the prompt's split: how much the server's cache already held, and how much it actually read.
+  // Without these a bench's prefill rate is not comparable across runs (one turn reads 13k tokens,
+  // the next reads 19 of 42k) — and the old promptTokens/TTFT figure credited cache hits as prefill.
+  if (v.promptRead !== null) stats.promptRead = v.promptRead;
+  if (v.promptCached !== null) stats.promptCached = v.promptCached;
   if (v.ttfMs !== null) stats.ttfMs = v.ttfMs;
   if (v.truncated) stats.truncated = true;
   const ctx = {};
@@ -10935,7 +11614,12 @@ if (activeCloud() && cloudConfigured(activeCloud().id)) pingAgent(activeCloud().
 document.addEventListener('click', (e) => {
   const src = document.getElementById('sourceMenu');
   const pill = document.getElementById('modelPill');
-  if (src && src.hidden === false && pill && !pill.contains(e.target)) closeSourceMenu();
+  // the panel is body-level now, so a click inside it is not inside the pill — allow both
+  if (src && src.hidden === false && pill && !pill.contains(e.target) && !src.contains(e.target)) closeSourceMenu();
+});
+window.addEventListener('resize', () => {
+  const src = document.getElementById('sourceMenu');
+  if (src && src.hidden === false) positionSourceMenu();
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSourceMenu(); });
 // Source-menu model rows are data-driven (ids may contain any character — see
