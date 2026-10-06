@@ -933,7 +933,7 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.5.8</span>
+    <span class="footer-version">xLLM Chat v3.5.9</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -3440,7 +3440,7 @@ function healLocalModelPin(name) {
 let currentChatId = sessionStorage.getItem('chat_current_id') || localStorage.getItem('chat_current_id') || null;
 try { if (currentChatId) sessionStorage.setItem('chat_current_id', currentChatId); } catch (_) {}
 let conversationHistory = [];
-const APP_VERSION = '3.5.8';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.5.9';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -10478,35 +10478,66 @@ function downloadBlob(blob, name) {
     } catch (e) { return true; }
   })();
   if (native) {
+    // Path A: the shell's own bridge (Android.fetchToDownloads) — a real HTTP fetch on the native
+    // side, with the basic-auth this host needs, then written straight to Downloads. This is the
+    // route that works for files the page only has as a Blob AND for links.
     try {
+      if (window.Android && typeof window.Android.fetchToDownloads === 'function') {
+        const rdA = new FileReader();
+        rdA.onload = function () {
+          const b64 = String(rdA.result).split(',')[1] || '';
+          window.Android.fetchToDownloads('data:' + (blob.type || 'text/html') + ';base64,' + b64, name);
+        };
+        rdA.onerror = function () { showToast('Could not prepare ' + name, null, true); };
+        rdA.readAsDataURL(blob);
+        return;
+      }
+      // Path B: no bridge bound (older shell, or a client that only has the download listener). Hand
+      // the bytes over as a blob: URL whose FRAGMENT carries the name — the shape the shell's
+      // DownloadListener understands. Bounded: a bridge that silently drops an oversized fragment is
+      // worse than the anchor fallback below, so only take this route for modest pages.
       const FRAG = 24000;
+      const MAXCHUNKS = 80;                                 // ~1.9 MB of base64
       const head = 'blob:https://xllm.local/' + encodeURIComponent(name) + '#xllmname=' +
                    encodeURIComponent(name) + '&xllmtype=' + encodeURIComponent(blob.type || 'application/octet-stream');
-      const rd = new FileReader();
-      rd.onload = function () {
-        const b64 = String(rd.result).split(',')[1] || '';
+      const rdB = new FileReader();
+      rdB.onload = function () {
+        const b64 = String(rdB.result).split(',')[1] || '';
+        if (!b64 || Math.ceil(b64.length / FRAG) > MAXCHUNKS) { anchorFallback(blob, name); return; }
         let url = head;
         for (let i = 0; i < b64.length; i += FRAG) url += '&xllmb64=' + b64.slice(i, i + FRAG);
-        const a = document.createElement('a');
-        a.href = url; a.download = name;
-        document.body.appendChild(a); a.click(); a.remove();
+        clickAnchor(url, name);
       };
-      rd.onerror = function () { showToast('Could not prepare ' + name, null, true); };
-      rd.readAsDataURL(blob);
+      rdB.onerror = function () { anchorFallback(blob, name); };
+      rdB.readAsDataURL(blob);
       return;
     } catch (e) {
-      showToast('Download failed: ' + e.message, null, true);
+      // never a silent no-op: fall through to the plain anchor, and say so if even that cannot run
+      try { anchorFallback(blob, name); } catch (e2) {
+        showToast('Download failed: ' + e2.message, null, true);
+      }
       return;
     }
   }
+  anchorFallback(blob, name);
+}
+
+// The universal path: a blob: URL on an <a download>. Every desktop browser saves it; embedded
+// clients ignore it, which is exactly why it is the LAST resort and not the only one.
+function anchorFallback(blob, name) {
   const url = URL.createObjectURL(blob);
+  clickAnchor(url, name);
+  URL.revokeObjectURL(url);
+  showToast('Downloaded ' + name);
+}
+
+function clickAnchor(url, name) {
   const a = document.createElement('a');
   a.href = url; a.download = name;
+  a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(url);
-  showToast('Downloaded ' + name);
 }
 
 // The preview iframe is sandboxed WITHOUT allow-same-origin, so this parent cannot read it — the
