@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -933,7 +933,7 @@ var STARTER_FONT_SIZE = 16, STARTER_BUBBLE_FONT = 'Ubuntu';
     <button class="icon-btn" onclick="openExportModal()" title="Export chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     </button>
-    <span class="footer-version">xLLM Chat v3.5.7</span>
+    <span class="footer-version">xLLM Chat v3.5.8</span>
     <button class="icon-btn" onclick="openImportModal()" title="Import chats (JSON)">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
@@ -3440,7 +3440,7 @@ function healLocalModelPin(name) {
 let currentChatId = sessionStorage.getItem('chat_current_id') || localStorage.getItem('chat_current_id') || null;
 try { if (currentChatId) sessionStorage.setItem('chat_current_id', currentChatId); } catch (_) {}
 let conversationHistory = [];
-const APP_VERSION = '3.5.7';   // keep in sync with the sidebar footer version text
+const APP_VERSION = '3.5.8';   // keep in sync with the sidebar footer version text
 // ── Agent connect (2026-09-04): flip the chat source between the local model and
 //    a connected agent. Named presets: Hermes (the local gateway on :8642 — key
 //    stays server-side in .agent-keys.json, NEVER in this public file), Pi and DS
@@ -9976,6 +9976,13 @@ function mvBuildStage() {
   dl.href = src;
   const dlName = mvBaseNameFromHref(src);
   dl.setAttribute('download', (dlName && !/[/\\?]/.test(dlName)) ? dlName : 'download');
+  // In the phone shells this link is a plain same-origin <a>: the WebView NAVIGATES to it and paints
+  // the bytes in the window instead of downloading, and the shell's download listener never sees it
+  // (it only fires for downloads the engine would hand off — blob:, data:, foreign hosts). Route it
+  // through the native bridge when that is present, with the same filename (user 2026-10-06).
+  dl.onclick = (window.Android && window.Android.fetchToDownloads)
+    ? function (ev) { ev.preventDefault(); window.Android.fetchToDownloads(dl.href, dlName || 'download'); }
+    : null;
   document.getElementById('mediaViewer').querySelector('.mv-box').classList.toggle('has-nav', _mvItems.length > 1);
   document.getElementById('mvPrev').style.visibility = _mvIdx > 0 ? 'visible' : 'hidden';
   document.getElementById('mvNext').style.visibility = _mvIdx < _mvItems.length - 1 ? 'visible' : 'hidden';
@@ -10538,6 +10545,13 @@ function _syncPreviewSize() {
 
 window.addEventListener('orientationchange', () => setTimeout(_syncPreviewSize, 250));
 window.addEventListener('resize', _syncPreviewSize);
+// The wrap's height is an inline px value, so a rotation that lands while a preview is open has to
+// re-measure — the frame reports its own new height on orientationchange, and this re-clamps to the
+// new viewport immediately so the frame never keeps the old orientation's height for a beat.
+window.addEventListener('orientationchange', () => setTimeout(() => {
+  const f = document.getElementById('previewFrame');
+  if (f && f.srcdoc) { _pvH = 0; _syncPreviewSize(); }
+}, 60));
 
 function closePreview() {
   document.getElementById('previewOverlay').classList.remove('show');
