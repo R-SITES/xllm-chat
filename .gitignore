@@ -1,9 +1,22 @@
 __pycache__/
 *.pyc
 .DS_Store
+
+# Local working state — never published.
 Checkpoints/
 server.log
 .chat-client.pid
 .chat-client.log
 .agent-keys.json
 .models-dev-cache.json
+
+# Local scratch: verification harnesses, screenshots and proofs written while working on
+# this tree. Useful on the machine, not part of the product — keeping them out of the
+# index means a future `git add -A` cannot sweep them in the way it did once.
+scripts/_*.png
+scripts/_*.js
+scripts/cdp-eval.mjs
+scripts/cdp-shot.mjs
+scripts/make-proof.py
+scripts/phone-table-check.py
+scripts/table-scroll-*.js
