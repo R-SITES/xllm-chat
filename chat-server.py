@@ -3,13 +3,19 @@ import socketserver
 import os
 import json
 import io
+import ipaddress
 import re
 import time
 import urllib.request
 import urllib.error
-from urllib.parse import unquote, quote
+from urllib.parse import unquote, quote, urlsplit
 
 PORT = 3001
+# Bind address. Loopback by default: the companion server proxies agent/cloud calls with keys
+# injected, serves any file under the media roots, and fetches caller-supplied URLs, so it must
+# NOT be reachable from the LAN/Tailscale unless the operator deliberately opts in. Front it with
+# a reverse proxy or set XLLM_HOST to expose it on purpose (e.g. XLLM_HOST=0.0.0.0).
+HOST = os.environ.get("XLLM_HOST", "127.0.0.1")
 MAX_UPLOAD = 50 * 1024 * 1024      # 50 MB body cap
 MAX_EXTRACT_CHARS = 100_000        # extraction text cap (protects LLM context)
 
@@ -83,6 +89,40 @@ MEDIA_BASE_PATHS = [                # relative refs resolve against these, in or
     os.path.expanduser("~"),
     os.getcwd(),
 ]
+# Roots an ABSOLUTE media path is allowed to resolve inside. Without this, /api/media serves any
+# existing media-extension file on the machine (the extension gate alone lets a LAN visitor walk the
+# disk for images/video/audio). Confine absolute paths to the user's home plus the search roots
+# below; set XLLM_MEDIA_ROOTS=/a:/b to widen, or XLLM_MEDIA_UNCONFINED=1 to disable the check.
+MEDIA_ALLOWED_ROOTS = [p for p in [
+    os.path.expanduser("~"),
+    os.path.expanduser("~/ComfyUI"),
+    os.path.expanduser("~/Music"),
+    os.path.expanduser("~/Downloads"),
+    os.path.expanduser("~/song-factory"),
+    os.path.expanduser("~/flac-archive"),
+    os.getcwd(),
+] if p]
+
+
+def _media_roots():
+    extra = os.environ.get("XLLM_MEDIA_ROOTS", "")
+    roots = list(MEDIA_ALLOWED_ROOTS)
+    for r in extra.split(":"):
+        r = r.strip()
+        if r:
+            roots.append(os.path.expanduser(r))
+    return [os.path.realpath(r) for r in roots]
+
+
+def _media_path_allowed(path):
+    """True when an absolute media path sits inside one of the allowed roots."""
+    if os.environ.get("XLLM_MEDIA_UNCONFINED") == "1":
+        return True
+    real = os.path.realpath(path)
+    for root in _media_roots():
+        if real == root or real.startswith(root + os.sep):
+            return True
+    return False
 
 
 def resolve_media_path(raw):
@@ -106,8 +146,11 @@ def resolve_media_path(raw):
         path = path[6:]
     path = os.path.expanduser(path)
     if os.path.isabs(path):
-        if os.path.isfile(path):
+        if os.path.isfile(path) and _media_path_allowed(path):
             return path, 'exact', []
+        # Outside the allowed roots (or not a file): fall through to the name search, which only
+        # ever looks inside the media search roots — an out-of-bounds absolute path resolves to
+        # nothing rather than being served.
     else:
         clean = re.sub(r"^\.?[/\\]", "", path)
         for base in MEDIA_BASE_PATHS:
@@ -301,8 +344,55 @@ def agent_runs_url(base):
     return root + "/v1/runs"
 
 
+def _ssrf_blocked(url):
+    """Block server-side fetches of internal/metadata targets from a caller-supplied URL.
+
+    The /api/agent/* routes take a URL from the request body and fetch it here with the
+    agent key attached. With the server reachable beyond loopback that is an open pivot:
+    anyone who can reach the port can point it at 169.254.169.254 (cloud metadata),
+    127.0.0.1:<other service>, or a LAN address and read the response through this proxy.
+
+    Policy: allow loopback and public hosts (local agents live on 127.0.0.1; models.dev and
+    cloud providers are public), block link-local/metadata, private LAN ranges, and the
+    unspecified/unique-local ranges. Set XLLM_ALLOW_PRIVATE_FETCH=1 to opt out (e.g. a
+    deliberate agent on 192.168.x.x). Returns a reason string when blocked, else None.
+    """
+    if os.environ.get("XLLM_ALLOW_PRIVATE_FETCH") == "1":
+        return None
+    try:
+        host = urlsplit(url).hostname
+    except Exception:
+        return "unparseable URL"
+    if not host:
+        return "no host in URL"
+    h = host.strip("[]").lower()
+    if h in ("localhost",):
+        return None
+    ip = None
+    try:
+        ip = ipaddress.ip_address(h)
+    except ValueError:
+        return None                      # a DNS name — urlopen resolves and we cannot pre-judge it
+    if ip.is_loopback:
+        return None                      # a local agent on 127.0.0.1 is the normal case
+    if ip.is_link_local:
+        return f"{host} is link-local (cloud metadata range)"
+    if ip.is_private:
+        return f"{host} is a private/LAN address"
+    # 100.64.0.0/10 is carrier-grade NAT / Tailscale — not "private" to Python, but not public either.
+    if ip.version == 4 and int(ip) >= int(ipaddress.ip_address("100.64.0.0")) \
+            and int(ip) <= int(ipaddress.ip_address("100.127.255.255")):
+        return f"{host} is a CGNAT/Tailscale address"
+    if ip.is_unspecified or ip.is_reserved or ip.is_multicast:
+        return f"{host} is not a routable host"
+    return None
+
+
 def agent_open(url, key, method="GET", body=None, headers=None, timeout=None):
     """timeout=None = no cap (long agent tasks); ping passes a small cap."""
+    blocked = _ssrf_blocked(url)
+    if blocked:
+        raise ValueError(f"refusing to fetch {blocked} (set XLLM_ALLOW_PRIVATE_FETCH=1 to allow)")
     hdrs = dict(headers or {})
     if key:
         hdrs["Authorization"] = "Bearer " + key
@@ -1252,6 +1342,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
 
-with http.server.ThreadingHTTPServer(("", PORT), Handler) as httpd:
-    print(f"Chat server running on port {PORT}")
+with http.server.ThreadingHTTPServer((HOST, PORT), Handler) as httpd:
+    where = "localhost" if HOST in ("127.0.0.1", "localhost", "::1") else HOST
+    print(f"Chat server running on http://{where}:{PORT}")
+    if HOST not in ("127.0.0.1", "localhost", "::1"):
+        print(f"WARNING: bound to {HOST} — reachable beyond this machine. "
+              f"Anyone who can reach this port can read files under the media roots and use "
+              f"this server to fetch internal URLs. Use a firewall or a keyed reverse proxy.")
     httpd.serve_forever()

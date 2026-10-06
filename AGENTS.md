@@ -20,10 +20,12 @@ contract — if you extend this code, extend it the same way.
   `chat-server.py`, or in the `HERMES_API_KEY` environment variable. Cloud provider keys (DeepSeek /
   OpenRouter) live only in the browser's `localStorage` (`chat_llm_conns`). A key in a tracked file is a
   bug: move it out and rotate it.
-- **Loopback by default.** The companion server talks to loopback services (an agent gateway on
-  `127.0.0.1:8642`, a TTS server on `127.0.0.1:5093`) and to whatever model endpoint you configured. Remote
-  access is your own reverse proxy or tunnel — never expose these ports to the internet on someone's
-  behalf, and never put a key in a URL. If the box is shared, bind the server to `127.0.0.1` explicitly.
+- **Loopback by default.** The companion server binds `127.0.0.1` unless you set `XLLM_HOST` (e.g.
+  `XLLM_HOST=0.0.0.0` to expose it deliberately, or front it with a keyed reverse proxy). It talks to
+  loopback services (an agent gateway on `127.0.0.1:8642`, a TTS server on `127.0.0.1:5093`) and to whatever
+  model endpoint you configured. Remote access is your own reverse proxy or tunnel — never expose these
+  ports to the internet on someone's behalf, and never put a key in a URL. If the box is shared, keep the
+  default loopback bind.
 - **Same-origin only.** The page never calls a gateway or cloud API directly: the companion server proxies
   those (`/api/agent/*`) so the key is injected server-side, no CORS is needed, and no secret ever lands in
   the browser. Do not "simplify" a proxied call into a direct browser fetch.
@@ -100,6 +102,12 @@ Setup: Settings → Connect Agent → Server URL + API Key (blank key = a same-h
 across turns and reloads, so the agent resumes the same conversation. Approvals prompt in the UI unless the
 user enables **Yolo**, which answers with the least-permissive *allow* choice on offer (never Deny).
 
+**Outbound fetch guard.** Because these routes fetch a caller-supplied URL server-side, the server refuses
+link-local/metadata (`169.254.0.0/16`), private LAN, and CGNAT/Tailscale (`100.64.0.0/10`) targets — an
+open proxy must not be usable as a pivot into the host's own network. Loopback (`127.0.0.1:8642` etc.) and
+public hosts are allowed, since that is the normal case (a local agent, a cloud provider). To deliberately
+reach a private address, set `XLLM_ALLOW_PRIVATE_FETCH=1`.
+
 ---
 
 ## Tier 4 wiring — media and voice
@@ -114,7 +122,9 @@ Resolution — a reference must land in one of these or nothing renders:
 3. a bare filename → searched across `~/Music`, `~/Downloads`, `~/song-factory`, `~/flac-archive`,
    `~/ComfyUI/output` (newest first), so a stale path in an old chat still resolves to the file on disk
 
-Limits: 8 MB per image, 256 MB per video/audio file. Supported: png/jpg/jpeg/webp/gif/bmp and
+Limits: 8 MB per image, 256 MB per video/audio file. Absolute paths are confined to the user's home and
+the media/search roots (`XLLM_MEDIA_ROOTS` to widen, colon-separated; `XLLM_MEDIA_UNCONFINED=1` to disable
+the check entirely). Supported: png/jpg/jpeg/webp/gif/bmp and
 mp4/mov/m4v/webm, mp3/wav/m4a/aac/ogg/flac/opus. Attachments spool to `XLLM_ATTACH_DIR`
 (default `~/xllm-attachments`) and reach the agent as a `MEDIA:` path, not as pixels — cheap for the model,
 and the file survives in the conversation. Voice read-aloud proxies a local TTS on `127.0.0.1:5093`
